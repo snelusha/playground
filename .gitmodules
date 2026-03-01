@@ -1,0 +1,3 @@
+[submodule "wasm/ballerina-lang-go"]
+	path = wasm/ballerina-lang-go
+	url = git@github.com:ballerina-platform/ballerina-lang-go.git
