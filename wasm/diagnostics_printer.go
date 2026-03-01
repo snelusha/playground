@@ -51,13 +51,13 @@ func buildDiagnosticLocation(filePath string, startLine, startCol, endLine, endC
 	}
 }
 
-func printDiagnostics(fsys fs.FS, w io.Writer, diagResult projects.DiagnosticResult) {
+func printDiagnostics(fsys fs.FS, basePath string, w io.Writer, diagResult projects.DiagnosticResult) {
 	for _, d := range diagResult.Diagnostics() {
-		printDiagnostic(fsys, w, d)
+		printDiagnostic(fsys, basePath, w, d)
 	}
 }
 
-func printDiagnostic(fsys fs.FS, w io.Writer, d diagnostics.Diagnostic) {
+func printDiagnostic(fsys fs.FS, basePath string, w io.Writer, d diagnostics.Diagnostic) {
 	s := outputStyleFor()
 	printDiagnosticHeader(w, s, d)
 
@@ -74,7 +74,7 @@ func printDiagnostic(fsys fs.FS, w io.Writer, d diagnostics.Diagnostic) {
 		lineRange.EndLine().Line(), lineRange.EndLine().Offset(),
 	)
 	printDiagnosticLocation(w, s, loc)
-	printSourceSnippet(w, s, loc, fsys, s.severityColor(d.DiagnosticInfo().Severity()))
+	printSourceSnippet(w, s, loc, fsys, s.severityColor(d.DiagnosticInfo().Severity()), basePath)
 	fmt.Fprintln(w)
 }
 
@@ -99,9 +99,21 @@ func printDiagnosticLocation(w io.Writer, s outputStyle, loc diagnosticLocation)
 	}
 }
 
-func printSourceSnippet(w io.Writer, s outputStyle, loc diagnosticLocation, fsys fs.FS, severityColor string) {
-	content, err := fs.ReadFile(fsys, loc.filePath)
+func resolveFilePath(fsys fs.FS, basePath, fileName string) string {
+	if basePath != "" {
+		fullPath := basePath + "/" + fileName
+		if _, err := fs.Stat(fsys, fullPath); err == nil {
+			return fullPath
+		}
+	}
+	return fileName
+}
+
+func printSourceSnippet(w io.Writer, s outputStyle, loc diagnosticLocation, fsys fs.FS, severityColor string, basePath string) {
+	filePath := resolveFilePath(fsys, basePath, loc.filePath)
+	content, err := fs.ReadFile(fsys, filePath)
 	if err != nil {
+		fmt.Fprintf(w, "%*s %s|%s %sCould not read source file: %v%s\n", loc.numWidth, "", s.cyan, s.reset, severityColor, err, s.reset)
 		return
 	}
 	lines := strings.Split(string(content), "\n")
