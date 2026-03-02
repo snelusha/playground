@@ -2,42 +2,9 @@ import { pathSegments } from "@/lib/paths";
 
 import type { FileNode } from "@/types/files";
 
+import EXAMPLES from "@/lib/examples.json";
+
 const STORAGE_KEY = "ballerina-playground-bfs";
-
-const EXAMPLES: FileNode[] = [
-    {
-        kind: "dir",
-        name: "src",
-        children: [
-            {
-                kind: "file",
-                name: "main.bal",
-                content: `import ballerina/io;
-
-public function main() {
-    io:println("Hello World");
-}`,
-            },
-            {
-                kind: "file",
-                name: "Ballerina.toml",
-                content: `[package]
-org = "wso2"
-name = "ballerina"
-version = "0.1.0"`,
-            },
-        ],
-    },
-    {
-        kind: "file",
-        name: "main.bal",
-        content: `import ballerina/io;
-
-public function main() {
-    io:println("Hello World");
-}`,
-    },
-];
 
 type FSNode = {
     isDir: boolean;
@@ -68,15 +35,8 @@ export class BrowserFS implements BrowserFSProxy {
     private data: FSNode = { isDir: true, children: {} };
 
     constructor() {
-        // FIXME: For now we don't persist the data.
-        this._seed(EXAMPLES);
-        // this._load();
-
-        // if (Object.keys(this.data.children ?? {}).length === 0) {
-        //     if (EXAMPLES && EXAMPLES.length > 0) {
-        //         this._seed(EXAMPLES);
-        //     }
-        // }
+        this._load();
+        this._seed(EXAMPLES as FileNode[]);
     }
 
     public static getInstance(): BrowserFS {
