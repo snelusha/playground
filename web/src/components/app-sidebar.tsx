@@ -31,6 +31,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useFileStore } from "@/stores/file-store";
 
+import type { FileNode, FilePath } from "@/types/files";
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const tree = useFileStore((s) => s.tree);
     const selectedFilePath = useFileStore((s) => s.selectedFilePath);
