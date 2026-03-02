@@ -6,6 +6,7 @@ import { defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig({
+  base: "/playground/",
   plugins: [react(), tailwindcss(), nodePolyfills()],
   resolve: {
     alias: {
