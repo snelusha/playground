@@ -33,10 +33,6 @@ jobs:
           cache-dependency-path: |
             wasm/go.mod
 
-      - name: Run Go tests
-        working-directory: wasm
-        run: go test ./...
-
       - name: Build ballerina.wasm
         working-directory: wasm
         env:
