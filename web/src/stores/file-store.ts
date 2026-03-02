@@ -20,24 +20,9 @@ export type FileActions = {
 
 const fs = BrowserFS.getInstance();
 
-// const INITIAL_TREE: FileNode[] = [
-//     {
-//         kind: "dir",
-//         name: "src",
-//         children: [
-//             { kind: "file", name: "sad.bal", content: "Hello" },
-//             {
-//                 kind: "file",
-//                 name: "Ballerina.toml",
-//                 content: "World!",
-//             },
-//         ],
-//     },
-// ];
-
 export const useFileStore = create<FileState & FileActions>((set) => ({
-    tree: [],
-    selectedFilePath: null,
+    tree: fs.transformToTree() || [],
+    selectedFilePath: "main.bal",
 
     setTree: (tree) => set({ tree }),
 

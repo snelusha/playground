@@ -25,6 +25,7 @@ import {
     SidebarMenuItem,
     SidebarMenuSub,
     useSidebar,
+    sidebarMenuButtonVariants,
 } from "@/components/ui/sidebar";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -32,6 +33,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useFileStore } from "@/stores/file-store";
 
 import type { FileNode, FilePath } from "@/types/files";
+import { cn } from "@/lib/utils";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const tree = useFileStore((s) => s.tree);
@@ -115,13 +117,14 @@ function TreeNode({
                 defaultOpen={defaultOpen}
                 className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
             >
-                <CollapsibleTrigger className="w-full">
-                    <SidebarMenuButton>
-                        <HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
-                        <HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
-                        <span className="break-keep">{node.name}</span>
-                    </SidebarMenuButton>
+                <CollapsibleTrigger
+                    className={cn(sidebarMenuButtonVariants(), "w-full")}
+                >
+                    <HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
+                    <HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
+                    <span className="break-keep">{node.name}</span>
                 </CollapsibleTrigger>
+
                 <CollapsibleContent>
                     <SidebarMenuSub>
                         {node.children.map((child) => {

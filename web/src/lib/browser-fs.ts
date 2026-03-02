@@ -4,7 +4,7 @@ import type { FileNode } from "@/types/files";
 
 const STORAGE_KEY = "ballerina-playground-bfs";
 
-const INITIAL_TREE: FileNode[] = [
+const EXAMPLES: FileNode[] = [
     {
         kind: "dir",
         name: "src",
@@ -15,7 +15,6 @@ const INITIAL_TREE: FileNode[] = [
                 content: `import ballerina/io;
 
 public function main() {
-    int a = "10";
     io:println("Hello World");
 }`,
             },
@@ -35,7 +34,6 @@ version = "0.1.0"`,
         content: `import ballerina/io;
 
 public function main() {
-    int a = "10";
     io:println("Hello World");
 }`,
     },
@@ -70,13 +68,15 @@ export class BrowserFS implements BrowserFSProxy {
     private data: FSNode = { isDir: true, children: {} };
 
     constructor() {
-        this._load();
+        // FIXME: For now we don't persist the data.
+        this._seed(EXAMPLES);
+        // this._load();
 
-        if (Object.keys(this.data.children ?? {}).length === 0) {
-            if (INITIAL_TREE && INITIAL_TREE.length > 0) {
-                this._seed(INITIAL_TREE);
-            }
-        }
+        // if (Object.keys(this.data.children ?? {}).length === 0) {
+        //     if (EXAMPLES && EXAMPLES.length > 0) {
+        //         this._seed(EXAMPLES);
+        //     }
+        // }
     }
 
     public static getInstance(): BrowserFS {
