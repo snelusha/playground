@@ -1,8 +1,9 @@
 import { pathSegments } from "@/lib/paths";
 
-import type { FileNode } from "@/types/files";
-
 import EXAMPLES from "@/lib/examples.json";
+
+import type { FSProxy } from "@/lib/fs-proxy";
+import type { FileNode } from "@/types/files";
 
 const STORAGE_KEY = "ballerina-playground-bfs";
 
@@ -13,30 +14,14 @@ type FSNode = {
     children?: Record<string, FSNode>;
 };
 
-export interface BrowserFSProxy {
-    open(path: string): {
-        content: string;
-        size: number;
-        modTime: number;
-        isDir: boolean;
-    } | null;
-    stat(
-        path: string,
-    ): { name: string; size: number; modTime: number; isDir: boolean } | null;
-    readDir(path: string): { name: string; isDir: boolean }[] | null;
-    writeFile(path: string, content: string): boolean;
-    remove(path: string): boolean;
-    move(oldPath: string, newPath: string): boolean;
-    mkdirAll(path: string): boolean;
-}
-
-export class BrowserFS implements BrowserFSProxy {
+export class BrowserFS implements FSProxy {
     public static instance: BrowserFS;
+
     private data: FSNode = { isDir: true, children: {} };
 
     constructor() {
+        this._reset(EXAMPLES as FileNode[]);
         this._load();
-        this._seed(EXAMPLES as FileNode[]);
     }
 
     public static getInstance(): BrowserFS {
@@ -57,6 +42,13 @@ export class BrowserFS implements BrowserFSProxy {
 
     private _save(): void {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+    }
+
+    private _reset(tree: FileNode[] = []): void {
+        this.data = { isDir: true, children: {} };
+        this._save();
+
+        if (!!tree.length) this._seed(tree);
     }
 
     private _seed(tree: FileNode[], prefix = ""): void {
@@ -246,7 +238,7 @@ export class BrowserFS implements BrowserFSProxy {
     }
 }
 
-export function treeFromBrowserFS(fs: BrowserFSProxy, path = ""): FileNode[] {
+export function getTree(fs: FSProxy, path = ""): FileNode[] {
     const entries = fs.readDir(path);
     if (!entries) return [];
     const result: FileNode[] = [];
@@ -256,7 +248,7 @@ export function treeFromBrowserFS(fs: BrowserFSProxy, path = ""): FileNode[] {
             result.push({
                 kind: "dir",
                 name: entry.name,
-                children: treeFromBrowserFS(fs, fullPath),
+                children: getTree(fs, fullPath),
             });
         } else {
             const f = fs.open(fullPath);

@@ -5,23 +5,23 @@ import * as React from "react";
 import { BrowserFS } from "@/lib/browser-fs";
 
 export function useBallerina() {
-    const [ready, setReady] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(false);
 
     React.useEffect(() => {
         let cancelled = false;
 
-        async function loadWasm() {
+        async function load() {
             const go = new window.Go();
             const result = await WebAssembly.instantiateStreaming(
                 fetch("ballerina.wasm"),
                 go.importObject,
             );
             go.run(result.instance);
-            if (!cancelled) setReady(true);
+            if (!cancelled) setIsLoading(true);
         }
 
-        loadWasm().catch(() => {
-            if (!cancelled) setReady(false);
+        load().catch(() => {
+            if (!cancelled) setIsLoading(false);
         });
 
         return () => {
@@ -31,7 +31,7 @@ export function useBallerina() {
 
     function run(projectPath: string): { error?: string } | null {
         if (typeof window.run !== "function") {
-            return { error: "WASM not loaded" };
+            return { error: "Ballerina runtime is not ready" };
         }
         const bfs = BrowserFS.getInstance();
         const result = window.run(bfs, projectPath);
@@ -41,5 +41,5 @@ export function useBallerina() {
         return null;
     }
 
-    return { ready, run };
+    return { isReady: isLoading, run };
 }

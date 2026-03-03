@@ -1,6 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { BrowserFSProvider } from "@/providers/browser-fs-provider";
+import { BrowserFSProvider } from "@/providers/fs-provider";
 
 import { Editor } from "@/components/editor";
 

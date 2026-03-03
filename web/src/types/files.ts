@@ -4,6 +4,7 @@ export type FileNode =
 
 export type FilePath = string;
 
+// FIXME: These functions should be moved to a more appropriate place!
 export function languageFromFileName(name: string): string {
     if (name.endsWith(".bal")) return "ballerina";
     if (name.endsWith(".toml")) return "toml";
