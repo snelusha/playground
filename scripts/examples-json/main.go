@@ -11,40 +11,92 @@ import (
 )
 
 func main() {
+	flag.CommandLine.SetOutput(os.Stderr)
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(
-			flag.CommandLine.Output(),
-			"Usage: %s <input_dir> <output_json>\n\nGenerates a FileNode[] JSON array from the direct children of <input_dir>.\n",
+			os.Stderr,
+			"Usage: %s <input_dir> <output_json>\n\nGenerates a FileNode[] JSON array from the direct children of <input_dir>.\nOnly includes .bal and .toml files; skips empty directories.\n",
 			filepath.Base(os.Args[0]),
 		)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
-	args := flag.Args()
+	if err := run(flag.Args()); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+type Node struct {
+	Kind     string
+	Name     string
+	Content  *string
+	Children []Node
+}
+
+func File(name, content string) Node {
+	return Node{Kind: "file", Name: name, Content: &content}
+}
+
+func Dir(name string, children []Node) Node {
+	return Node{Kind: "dir", Name: name, Children: children}
+}
+
+func (n Node) MarshalJSON() ([]byte, error) {
+	switch n.Kind {
+	case "file":
+		if n.Content == nil {
+			return nil, fmt.Errorf("file node %q missing content", n.Name)
+		}
+		type fileNode struct {
+			Kind    string `json:"kind"`
+			Name    string `json:"name"`
+			Content string `json:"content"`
+		}
+		return json.Marshal(fileNode{Kind: n.Kind, Name: n.Name, Content: *n.Content})
+	case "dir":
+		type dirNode struct {
+			Kind     string `json:"kind"`
+			Name     string `json:"name"`
+			Children []Node `json:"children"`
+		}
+		children := n.Children
+		if children == nil {
+			children = []Node{}
+		}
+		return json.Marshal(dirNode{Kind: n.Kind, Name: n.Name, Children: children})
+	default:
+		return nil, fmt.Errorf("invalid node kind %q for %q", n.Kind, n.Name)
+	}
+}
+
+func run(args []string) error {
 	if len(args) != 2 {
 		flag.Usage()
-		os.Exit(2)
+		return fmt.Errorf("expected 2 arguments, got %d", len(args))
 	}
 
 	inputDir := args[0]
 	outputPath := args[1]
 
 	if err := validateInputDir(inputDir); err != nil {
-		fatalf("%v", err)
+		return err
 	}
 
 	nodes, err := buildNodes(inputDir)
 	if err != nil {
-		fatalf("build: %v", err)
+		return fmt.Errorf("build nodes: %w", err)
 	}
 
 	if err := writeJSON(outputPath, nodes); err != nil {
-		fatalf("write: %v", err)
+		return fmt.Errorf("write json: %w", err)
 	}
+
+	return nil
 }
 
-func buildNodes(dir string) ([]any, error) {
+func buildNodes(dir string) ([]Node, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -60,7 +112,6 @@ func buildNodes(dir string) ([]any, error) {
 
 	for _, e := range entries {
 		name := e.Name()
-
 		switch {
 		case e.IsDir():
 			dirs = append(dirs, item{name: name, dir: true})
@@ -72,7 +123,7 @@ func buildNodes(dir string) ([]any, error) {
 	sort.Slice(dirs, func(i, j int) bool { return dirs[i].name < dirs[j].name })
 	sort.Slice(files, func(i, j int) bool { return files[i].name < files[j].name })
 
-	nodes := make([]any, 0, len(dirs)+len(files))
+	nodes := make([]Node, 0, len(dirs)+len(files))
 
 	for _, d := range dirs {
 		full := filepath.Join(dir, d.name)
@@ -83,11 +134,7 @@ func buildNodes(dir string) ([]any, error) {
 		if len(children) == 0 {
 			continue
 		}
-		nodes = append(nodes, map[string]any{
-			"kind":     "dir",
-			"name":     d.name,
-			"children": children,
-		})
+		nodes = append(nodes, Dir(d.name, children))
 	}
 
 	for _, f := range files {
@@ -96,11 +143,7 @@ func buildNodes(dir string) ([]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		nodes = append(nodes, map[string]any{
-			"kind":    "file",
-			"name":    f.name,
-			"content": string(contentBytes),
-		})
+		nodes = append(nodes, File(f.name, string(contentBytes)))
 	}
 
 	return nodes, nil
@@ -126,9 +169,12 @@ func validateInputDir(path string) error {
 	return nil
 }
 
-func writeJSON(path string, v any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+func writeJSON(path string, v []Node) error {
+	outDir := filepath.Dir(path)
+	if outDir != "." {
+		if err := os.MkdirAll(outDir, 0o755); err != nil {
+			return err
+		}
 	}
 
 	f, err := os.Create(path)
@@ -141,9 +187,4 @@ func writeJSON(path string, v any) error {
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
 	return enc.Encode(v)
-}
-
-func fatalf(format string, args ...any) {
-	_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(1)
 }
