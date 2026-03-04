@@ -2,8 +2,6 @@ import "@/wasm_exec";
 
 import * as React from "react";
 
-import { BrowserFS } from "@/lib/browser-fs";
-
 export function useBallerina() {
     const [isLoading, setIsLoading] = React.useState(false);
 
@@ -29,17 +27,30 @@ export function useBallerina() {
         };
     }, []);
 
-    function run(path: string): { error?: string } | null {
-        if (typeof window.run !== "function") {
+    function updateFile(
+        path: string,
+        content: string,
+    ): { error?: string } | null {
+        if (typeof window.updateFile !== "function") {
             return { error: "Ballerina runtime is not ready" };
         }
-        const bfs = BrowserFS.getInstance();
-        const result = window.run(bfs, path);
+        const result = window.updateFile(path, content);
         if (result && typeof result === "object" && "error" in result) {
             return result as { error?: string };
         }
         return null;
     }
 
-    return { isReady: isLoading, run };
+    function run(path: string): { error?: string } | null {
+        if (typeof window.run !== "function") {
+            return { error: "Ballerina runtime is not ready" };
+        }
+        const result = window.run(path);
+        if (result && typeof result === "object" && "error" in result) {
+            return result as { error?: string };
+        }
+        return null;
+    }
+
+    return { isReady: isLoading, updateFile, run };
 }

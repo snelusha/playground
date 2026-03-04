@@ -23,12 +23,23 @@ import { CodeEditor } from "@/components/code-editor";
 import { ANSI } from "@/components/ansi";
 
 import { useEditorStore } from "@/stores/editor-store";
-import { useFileStore } from "@/stores/file-store";
+import { useFileStore, useSelectedFile } from "@/stores/file-store";
 
 import { useBallerina } from "@/hooks/use-ballerina";
 
-import { getDir, getLanguage } from "@/lib/filepath";
 import { cn } from "@/lib/utils";
+
+import type { FilePath } from "@/types/files";
+
+function getLanguage(path: FilePath): string {
+    const ext = path.split(".").pop();
+    switch (ext) {
+        case "toml":
+            return "toml";
+        default:
+            return "ballerina";
+    }
+}
 
 function OutputPane() {
     const output = useEditorStore((s) => s.output);
@@ -90,7 +101,7 @@ function OutputPane() {
 
 function EditorPane({ onRun }: { onRun: () => void }) {
     const selectedFilePath = useFileStore((s) => s.selectedFilePath);
-    const selectedFile = useFileStore((s) => s.selectedFile);
+    const selectedFile = useSelectedFile();
     const updateFileContent = useFileStore((s) => s.updateFile);
     const outputOpen = useEditorStore((s) => s.outputOpen);
 
@@ -167,11 +178,11 @@ function EditorHeader() {
 function EditorContent() {
     const openOutputWith = useEditorStore((s) => s.openOutputWith);
 
-    const { isReady, run } = useBallerina();
+    const { isReady, run, updateFile } = useBallerina();
     const { toggleSidebar } = useSidebar();
 
     const selectedFilePath = useFileStore((s) => s.selectedFilePath);
-    const selectedFile = useFileStore((s) => s.selectedFile);
+    const selectedFile = useSelectedFile();
 
     const handleRun = React.useCallback(() => {
         if (!selectedFile || getLanguage(selectedFile.name) !== "ballerina")
@@ -187,10 +198,16 @@ function EditorContent() {
         };
 
         try {
-            const projectPath = getDir(selectedFilePath);
-            const result = run(projectPath);
-            if (result?.error) {
-                captured += result.error + "\n";
+            const updateFileResult = updateFile(
+                selectedFilePath,
+                selectedFile.content,
+            );
+            if (updateFileResult?.error) {
+                captured += updateFileResult.error + "\n";
+            }
+            const runResult = run(selectedFilePath);
+            if (runResult?.error) {
+                captured += runResult.error + "\n";
             }
         } finally {
             console.log = oldConsole;

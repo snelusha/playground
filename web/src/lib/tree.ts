@@ -1,4 +1,4 @@
-import { pathSegments } from "@/lib/filepath";
+import { pathSegments } from "@/lib/utils";
 
 import type { FileNode, FilePath } from "@/types/files";
 
@@ -46,38 +46,4 @@ export function updateNode(
     }
 
     return recurse(tree, 0);
-}
-
-export function deleteNode(tree: FileNode[], path: FilePath): FileNode[] {
-    const parts = pathSegments(path);
-
-    function recurse(nodes: FileNode[], depth: number): FileNode[] {
-        if (depth == parts.length - 1)
-            return nodes.filter((node) => node.name !== parts[depth]);
-        return nodes.map((node) => {
-            if (node.name !== parts[depth] || node.kind !== "dir") return node;
-            return { ...node, children: recurse(node.children, depth + 1) };
-        });
-    }
-
-    return recurse(tree, 0);
-}
-
-export function allPaths(tree: FileNode[], prefix: FilePath = ""): FilePath[] {
-    const paths: FilePath[] = [];
-    for (const node of tree) {
-        const currentPath = `${prefix}/${node.name}`;
-        paths.push(currentPath);
-        if (node.kind === "dir") {
-            paths.push(...allPaths(node.children, currentPath));
-        }
-    }
-    return paths;
-}
-
-export function pathsUnder(tree: FileNode[], path: FilePath): FilePath[] {
-    const node = getNode(tree, path);
-    if (!node) return [];
-    if (node.kind === "file") return [path];
-    return [path, ...allPaths(node.children, path)];
 }

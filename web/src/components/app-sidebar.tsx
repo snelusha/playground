@@ -26,11 +26,12 @@ import {
     SidebarMenuSub,
     useSidebar,
     sidebarMenuButtonVariants,
+    SidebarSeparator,
 } from "@/components/ui/sidebar";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { useFileStore } from "@/stores/file-store";
+import { isExampleFile, useFileStore } from "@/stores/file-store";
 
 import { cn } from "@/lib/utils";
 
@@ -39,18 +40,22 @@ import type { FileNode, FilePath } from "@/types/files";
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const tree = useFileStore((s) => s.tree);
     const selectedFilePath = useFileStore((s) => s.selectedFilePath);
+    const createEmptyFile = useFileStore((s) => s.createEmptyFile);
+
+    const examplesFiles = tree.filter((n) => isExampleFile(n.name));
+    const otherFiles = tree.filter((n) => !isExampleFile(n.name));
 
     return (
         <Sidebar {...props}>
             <SidebarContent>
                 <SidebarGroup>
                     <div className="flex items-center justify-between">
-                        <SidebarGroupLabel>Files</SidebarGroupLabel>
+                        <SidebarGroupLabel>Examples</SidebarGroupLabel>
                         <Button
                             className="h-full rounded-none"
                             variant="ghost"
-                            onClick={() => {}}
-                            title="New project"
+                            onClick={() => createEmptyFile()}
+                            title="New File"
                         >
                             <HugeiconsIcon
                                 icon={PlusSignIcon}
@@ -60,7 +65,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </div>
                     <SidebarGroupContent className="mt-2">
                         <SidebarMenu>
-                            {tree.map((node, index) => (
+                            {examplesFiles.map((node, index) => (
                                 <TreeNode
                                     key={node.name}
                                     node={node}
@@ -77,6 +82,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
+                {!!otherFiles.length && (
+                    <>
+                        <SidebarSeparator />
+                        <SidebarGroup>
+                            <SidebarGroupLabel>User Space</SidebarGroupLabel>
+                            <SidebarGroupContent className="mt-2">
+                                <SidebarMenu>
+                                    {otherFiles.map((node, index) => (
+                                        <TreeNode
+                                            key={node.name}
+                                            node={node}
+                                            path={node.name}
+                                            defaultOpen={
+                                                index === 0 ||
+                                                (!!selectedFilePath &&
+                                                    selectedFilePath.startsWith(
+                                                        node.name + "/",
+                                                    ))
+                                            }
+                                        />
+                                    ))}
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    </>
+                )}
             </SidebarContent>
         </Sidebar>
     );

@@ -1,22 +1,20 @@
 import { create } from "zustand";
 
-import { BrowserFS } from "@/lib/browser-fs";
-import {
-    addNode,
-    allPaths,
-    deleteNode,
-    getNode,
-    pathsUnder,
-    updateNode,
-} from "@/lib/tree";
-import { addNodeToFs, remove, writeFile } from "@/lib/fs";
+import { addNode, getNode, updateNode } from "@/lib/tree";
 
 import type { FileNode, FilePath } from "@/types/files";
+
+import EXAMPLES from "@/assets/examples.json";
+
+const EMPTY_MAIN_BAL = `import ballerina/io;
+
+public function main() {
+		io:println("Hello, World!");
+}`;
 
 export type FileState = {
     tree: FileNode[];
     selectedFilePath: FilePath | null;
-    selectedFile: Extract<FileNode, { kind: "file" }> | null;
 };
 
 export type FileActions = {
@@ -25,16 +23,17 @@ export type FileActions = {
     selectFile: (path: FilePath | null) => void;
     updateFile: (path: FilePath, content: string) => void;
 
+    createEmptyFile: () => void;
+
     addNode: (parentPath: FilePath | null, node: FileNode) => void;
-    deleteNode: (path: FilePath) => void;
 };
 
-const fs = BrowserFS.getInstance();
+const DEFAULT_TREE = EXAMPLES as FileNode[];
+const DEFAULT_SELECTED_FILE_PATH = "01-orders.bal";
 
 export const useFileStore = create<FileState & FileActions>((set) => ({
-    tree: fs.transformToTree() || [],
-    selectedFilePath: "main.bal",
-    selectedFile: null,
+    tree: DEFAULT_TREE,
+    selectedFilePath: DEFAULT_SELECTED_FILE_PATH,
 
     setTree: (tree) => set({ tree }),
 
@@ -46,7 +45,6 @@ export const useFileStore = create<FileState & FileActions>((set) => ({
             return { selectedFilePath: path, selectedFile: node };
         }),
     updateFile: (path, content) => {
-        writeFile(fs, path, content);
         set((state) => ({
             tree: updateNode(state.tree, path, (node) =>
                 node.kind === "file" ? { ...node, content } : node,
@@ -54,24 +52,41 @@ export const useFileStore = create<FileState & FileActions>((set) => ({
         }));
     },
 
+    createEmptyFile: () =>
+        set((state) => {
+            const newFileName = `0${state.tree.length + 1}-main.bal`;
+            const node: FileNode = {
+                name: newFileName,
+                kind: "file",
+                content: EMPTY_MAIN_BAL,
+            };
+            return {
+                tree: addNode(state.tree, null, node),
+                selectedFilePath: newFileName,
+            };
+        }),
+
     addNode: (parentPath, node) => {
-        addNodeToFs(fs, parentPath, node);
         set((state) => ({ tree: addNode(state.tree, parentPath, node) }));
     },
-    deleteNode: (path) => {
-        set((state) => {
-            pathsUnder(state.tree, path)
-                .reverse()
-                .forEach((path) => remove(fs, path));
-            const paths = allPaths(state.tree);
-
-            return {
-                tree: deleteNode(state.tree, path),
-                selectedFilePath:
-                    state.selectedFilePath === path
-                        ? (paths[0] ?? null)
-                        : state.selectedFilePath,
-            };
-        });
-    },
 }));
+
+export function useSelectedFile(): Extract<FileNode, { kind: "file" }> | null {
+    const tree = useFileStore((state) => state.tree);
+    const selectedFilePath = useFileStore((state) => state.selectedFilePath);
+    if (!selectedFilePath) return null;
+    const node = getNode(tree, selectedFilePath);
+    if (!node || node.kind !== "file") return null;
+    return node;
+}
+
+export function isExampleFile(path: FilePath) {
+    return DEFAULT_TREE.some((node) => {
+        if (node.kind === "file") return node.name === path;
+        if (node.kind === "dir")
+            return node.children.some(
+                (child) => child.kind === "file" && child.name === path,
+            );
+        return false;
+    });
+}

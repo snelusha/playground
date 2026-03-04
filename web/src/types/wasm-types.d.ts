@@ -3,7 +3,8 @@ import type { BrowserFSProxy } from "@/lib/browser-fs";
 declare global {
     export interface Window {
         Go: any;
-        run(fsProxy: BrowserFSProxy, path: string): { error?: string } | null;
+        updateFile(path: string, content: string): { error?: string } | null;
+        run(path: string): { error?: string } | null;
     }
 }
 

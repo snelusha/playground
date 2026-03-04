@@ -16,18 +16,18 @@ export type EditorActions = {
 
 export type EditorStore = EditorState & EditorActions;
 
-const initialEditorState: EditorState = {
+const initial: EditorState = {
     output: "",
     outputOpen: false,
 };
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
-    ...initialEditorState,
+    ...initial,
 
     setOutput: (output) => set({ output }),
-    clearOutput: () => set({ output: initialEditorState.output }),
+    clearOutput: () => set({ output: initial.output }),
     openOutputWith: (output) => set({ output, outputOpen: true }),
     setOutputOpen: (outputOpen) => set({ outputOpen }),
     toggleOutputOpen: () => set({ outputOpen: !get().outputOpen }),
-    reset: () => set(initialEditorState),
+    reset: () => set(initial),
 }));
