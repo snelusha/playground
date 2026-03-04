@@ -24,6 +24,7 @@ import (
 	"ballerina-lang-go/runtime"
 	"fmt"
 	"io/fs"
+	"os"
 	"syscall/js"
 )
 
@@ -68,6 +69,7 @@ func run(this js.Value, args []js.Value) any {
 
 	diags := result.Diagnostics()
 	if diags.HasErrors() {
+		printDiagnostics(fsys, path, os.Stderr, diags)
 		return nil
 	}
 
@@ -77,6 +79,7 @@ func run(this js.Value, args []js.Value) any {
 	compilation := pkg.Compilation()
 	diags = compilation.DiagnosticResult()
 	if diags.HasErrors() {
+		printDiagnostics(fsys, path, os.Stderr, diags)
 		return nil
 	}
 
