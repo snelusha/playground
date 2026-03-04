@@ -1,3 +1,3 @@
 module example_gen
 
-go 1.22
+go 1.26

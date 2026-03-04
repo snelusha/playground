@@ -42,7 +42,7 @@ export const useFileStore = create<FileState & FileActions>((set) => ({
             const node = path ? getNode(state.tree, path) : null;
             if (!node || node.kind !== "file")
                 return { selectedFilePath: path, selectedFile: null };
-            return { selectedFilePath: path, selectedFile: node };
+            return { selectedFilePath: path };
         }),
     updateFile: (path, content) => {
         set((state) => ({

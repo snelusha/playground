@@ -68,14 +68,14 @@ export function CodeEditor({
                     highlighterRef.current = hl;
                     renderHighlight(value, hl);
                 }
-            } catch {
-                // ignore shiki initialization errors
-            }
+            } catch {} // eslint-disable-line no-empty
         }
 
         initShiki();
         return () => {
             isMounted = false;
+            highlighterRef.current?.dispose();
+            highlighterRef.current = null;
         };
     }, [renderHighlight, value]);
 
