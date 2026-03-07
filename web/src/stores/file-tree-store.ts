@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { immer } from "zustand/middleware/immer";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
@@ -95,10 +96,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 
             createEmptyFile() {
                 const { localTree } = get();
-                const nextNum =
-                    localTree.length > 0
-                        ? localTree.length + 1
-                        : 1;
+                const nextNum = localTree.length > 0 ? localTree.length + 1 : 1;
                 const path = `/local/${String(nextNum).padStart(2, "0")}-main.bal`;
                 const result = _fs().writeFile(path, EMPTY_MAIN_BAL);
                 if (!result) return false;
@@ -170,16 +168,20 @@ export const useTempTree = () => useFileTreeStore((s) => s.tempTree);
 export const useLocalTree = () => useFileTreeStore((s) => s.localTree);
 
 export const useActiveFile = () => useFileTreeStore((s) => s.activeFile);
+export const useActiveFilePath = () =>
+    useFileTreeStore((s) => s.activeFile?.path ?? null);
 
 export const useFileTreeActions = () =>
-    useFileTreeStore((s) => ({
-        openFile: s.openFile,
-        saveFile: s.saveFile,
-        createEmptyFile: s.createEmptyFile,
-        createFile: s.createFile,
-        deleteFile: s.deleteFile,
-        renameFile: s.renameFile,
-        createDir: s.createDir,
-        deleteDir: s.deleteDir,
-        updateFileContent: s.updateFileContent,
-    }));
+    useFileTreeStore(
+        useShallow((s) => ({
+            openFile: s.openFile,
+            saveFile: s.saveFile,
+            createEmptyFile: s.createEmptyFile,
+            createFile: s.createFile,
+            deleteFile: s.deleteFile,
+            renameFile: s.renameFile,
+            createDir: s.createDir,
+            deleteDir: s.deleteDir,
+            updateFileContent: s.updateFileContent,
+        })),
+    );

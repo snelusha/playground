@@ -10,105 +10,105 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
     Sidebar,
     SidebarContent,
     SidebarGroup,
     SidebarGroupContent,
     SidebarGroupLabel,
-    SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarMenuSub,
-    SidebarSeparator,
     useSidebar,
+    sidebarMenuButtonVariants,
+    SidebarSeparator,
 } from "@/components/ui/sidebar";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+    useTempTree,
+    useLocalTree,
+    useActiveFile,
+    useFileTreeStore,
+} from "@/stores/file-tree-store";
+
+import { cn } from "@/lib/utils";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
-import {
-    useActiveFile,
-    useActiveFilePath,
-    useFileTreeActions,
-    useLocalTree,
-    useTempTree,
-} from "@/stores/file-tree-store";
-import { useIsMobile } from "@/hooks/use-mobile";
+
+const TEMP_PREFIX = "/tmp";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const tempTree = useTempTree();
     const localTree = useLocalTree();
-
     const activeFile = useActiveFile();
+    const createEmptyFile = useFileTreeStore((s) => s.createEmptyFile);
+
+    const selectedFilePath = activeFile?.path ?? null;
+    const examples = tempTree;
+    const others = localTree;
 
     return (
         <Sidebar {...props}>
-            <SidebarHeader>
-                <DropdownMenu>
-                    <DropdownMenuTrigger
-                        className="self-end"
-                        render={<Button variant="ghost" />}
-                    >
-                        <HugeiconsIcon icon={PlusSignIcon} strokeWidth={1.5} />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem>New File</DropdownMenuItem>
-                            <DropdownMenuItem>New Project</DropdownMenuItem>
-                        </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Examples</SidebarGroupLabel>
+                    <div className="flex items-center justify-between">
+                        <SidebarGroupLabel>Examples</SidebarGroupLabel>
+                        <Button
+                            className="h-full rounded-none"
+                            variant="ghost"
+                            onClick={() => createEmptyFile()}
+                            title="New File"
+                        >
+                            <HugeiconsIcon
+                                icon={PlusSignIcon}
+                                strokeWidth={1.5}
+                            />
+                        </Button>
+                    </div>
                     <SidebarGroupContent className="mt-2">
                         <SidebarMenu>
-                            {tempTree.map((node, index) => (
-                                <FileTreeNode
+                            {examples.map((node, index) => (
+                                <TreeNode
                                     key={node.name}
                                     node={node}
-                                    path={`/tmp/${node.name}`}
+                                    path={`${TEMP_PREFIX}/${node.name}`}
                                     defaultOpen={
                                         index === 0 ||
-                                        !!activeFile?.path?.startsWith(
-                                            `/tmp/${node.name}/`,
-                                        )
+                                        (!!selectedFilePath &&
+                                            selectedFilePath.startsWith(
+                                                `${TEMP_PREFIX}/${node.name}/`,
+                                            ))
                                     }
                                 />
                             ))}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-                {!!localTree.length && (
+                {!!others.length && (
                     <>
                         <SidebarSeparator />
                         <SidebarGroup>
-                            <SidebarGroupLabel>Local</SidebarGroupLabel>
+                            <SidebarGroupLabel>User Space</SidebarGroupLabel>
                             <SidebarGroupContent className="mt-2">
                                 <SidebarMenu>
-                                    {localTree.map((node, index) => (
-                                        <FileTreeNode
+                                    {others.map((node, index) => (
+                                        <TreeNode
                                             key={node.name}
                                             node={node}
-                                            path={`/tmp/${node.name}`}
+                                            path={`/local/${node.name}`}
                                             defaultOpen={
                                                 index === 0 ||
-                                                !!activeFile?.path?.startsWith(
-                                                    `/tmp/${node.name}/`,
-                                                )
+                                                (!!selectedFilePath &&
+                                                    selectedFilePath.startsWith(
+                                                        `/local/${node.name}/`,
+                                                    ))
                                             }
                                         />
                                     ))}
@@ -122,31 +122,32 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     );
 }
 
-type FileTreeNodeProps = {
+function TreeNode({
+    node,
+    path,
+    defaultOpen = false,
+}: {
     node: FileNode;
     path: string;
     defaultOpen?: boolean;
-};
+}) {
+    const openFile = useFileTreeStore((s) => s.openFile);
+    const selectedFilePath = useActiveFile()?.path ?? null;
 
-function FileTreeNode({ node, path, defaultOpen = false }: FileTreeNodeProps) {
     const isMobile = useIsMobile();
     const { toggleSidebar } = useSidebar();
-
-    const activeFilePath = useActiveFilePath();
-
-    const { openFile } = useFileTreeActions();
 
     if (node.kind === "file") {
         return (
             <SidebarMenuButton
-                isActive={activeFilePath === path}
+                isActive={selectedFilePath === path}
                 onClick={() => {
                     openFile(path);
                     if (isMobile) toggleSidebar();
                 }}
             >
                 <HugeiconsIcon icon={File01Icon} strokeWidth={1.5} />
-                {node.name}
+                <span className="break-keep">{node.name}</span>
             </SidebarMenuButton>
         );
     }
@@ -157,23 +158,25 @@ function FileTreeNode({ node, path, defaultOpen = false }: FileTreeNodeProps) {
                 defaultOpen={defaultOpen}
                 className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
             >
-                <CollapsibleTrigger render={<SidebarMenuButton />}>
+                <CollapsibleTrigger
+                    className={cn(sidebarMenuButtonVariants(), "w-full")}
+                >
                     <HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
                     <HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
-                    <span className="truncate">{node.name}</span>
+                    <span className="break-keep">{node.name}</span>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="overflow-hidden">
-                    <SidebarMenuSub className="w-full">
+                <CollapsibleContent>
+                    <SidebarMenuSub>
                         {node.children.map((child) => {
                             const childPath = `${path}/${child.name}`;
                             return (
-                                <FileTreeNode
+                                <TreeNode
                                     key={child.name}
                                     node={child}
                                     path={childPath}
                                     defaultOpen={
-                                        !!activeFilePath &&
-                                        activeFilePath.startsWith(
+                                        !!selectedFilePath &&
+                                        selectedFilePath.startsWith(
                                             childPath + "/",
                                         )
                                     }

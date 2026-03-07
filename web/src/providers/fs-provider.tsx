@@ -10,12 +10,48 @@ import EXAMPLES from "@/assets/examples.json";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
+const MORE: FileNode[] = [
+    {
+        kind: "dir",
+        name: "paypal.orders",
+        children: [
+            {
+                kind: "dir",
+                name: "modules",
+                children: [
+                    {
+                        kind: "dir",
+                        name: "service",
+                        children: [
+                            {
+                                kind: "file",
+                                name: "service.bal",
+                                content: "",
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                kind: "file",
+                name: "Ballerina.toml",
+                content: "",
+            },
+            {
+                kind: "file",
+                name: "main.bal",
+                content: "",
+            },
+        ],
+    },
+];
+
 function createFS(): LayeredFS {
     const wrappedExamples: FileNode[] = [
         {
             kind: "dir",
             name: "tmp",
-            children: EXAMPLES as FileNode[],
+            children: (EXAMPLES as FileNode[]).concat(MORE),
         },
     ];
     return new LayeredFS(
