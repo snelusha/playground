@@ -10,19 +10,10 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarGroup,
-    SidebarGroupContent,
-    SidebarGroupLabel,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-    SidebarMenuSub,
-    SidebarSeparator,
-    useSidebar,
-} from "@/components/ui/sidebar";
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -30,95 +21,49 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuAction,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarSeparator,
+    useSidebar,
+} from "@/components/ui/sidebar";
 
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-
-import type { FileNode } from "@/lib/fs/core/file-node.types";
-import {
-    useActiveFile,
     useActiveFilePath,
     useFileTreeActions,
     useLocalTree,
     useTempTree,
 } from "@/stores/file-tree-store";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const tempTree = useTempTree();
-    const localTree = useLocalTree();
+import type { FileNode } from "@/lib/fs/core/file-node.types";
 
-    const activeFile = useActiveFile();
-
+function SidebarCreateMenu() {
     return (
-        <Sidebar {...props}>
-            <SidebarHeader>
-                <DropdownMenu>
-                    <DropdownMenuTrigger
-                        className="self-end"
-                        render={<Button variant="ghost" />}
-                    >
-                        <HugeiconsIcon icon={PlusSignIcon} strokeWidth={1.5} />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem>New File</DropdownMenuItem>
-                            <DropdownMenuItem>New Project</DropdownMenuItem>
-                        </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </SidebarHeader>
-            <SidebarContent>
-                <SidebarGroup>
-                    <SidebarGroupLabel>Examples</SidebarGroupLabel>
-                    <SidebarGroupContent className="mt-2">
-                        <SidebarMenu>
-                            {tempTree.map((node, index) => (
-                                <FileTreeNode
-                                    key={node.name}
-                                    node={node}
-                                    path={`/tmp/${node.name}`}
-                                    defaultOpen={
-                                        index === 0 ||
-                                        !!activeFile?.path?.startsWith(
-                                            `/tmp/${node.name}/`,
-                                        )
-                                    }
-                                />
-                            ))}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
-                {!!localTree.length && (
-                    <>
-                        <SidebarSeparator />
-                        <SidebarGroup>
-                            <SidebarGroupLabel>Local</SidebarGroupLabel>
-                            <SidebarGroupContent className="mt-2">
-                                <SidebarMenu>
-                                    {localTree.map((node, index) => (
-                                        <FileTreeNode
-                                            key={node.name}
-                                            node={node}
-                                            path={`/tmp/${node.name}`}
-                                            defaultOpen={
-                                                index === 0 ||
-                                                !!activeFile?.path?.startsWith(
-                                                    `/tmp/${node.name}/`,
-                                                )
-                                            }
-                                        />
-                                    ))}
-                                </SidebarMenu>
-                            </SidebarGroupContent>
-                        </SidebarGroup>
-                    </>
-                )}
-            </SidebarContent>
-        </Sidebar>
+        <DropdownMenu>
+            <DropdownMenuTrigger
+                className="self-end"
+                render={<Button variant="ghost" />}
+            >
+                <HugeiconsIcon icon={PlusSignIcon} strokeWidth={1.5} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuGroup>
+                    <DropdownMenuItem>New File</DropdownMenuItem>
+                    <DropdownMenuItem>New Project</DropdownMenuItem>
+                </DropdownMenuGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -128,28 +73,45 @@ type FileTreeNodeProps = {
     defaultOpen?: boolean;
 };
 
-function FileTreeNode({ node, path, defaultOpen = false }: FileTreeNodeProps) {
+function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
     const isMobile = useIsMobile();
     const { toggleSidebar } = useSidebar();
-
     const activeFilePath = useActiveFilePath();
-
     const { openFile } = useFileTreeActions();
 
-    if (node.kind === "file") {
-        return (
+    function handleClick() {
+        openFile(path);
+        if (isMobile) toggleSidebar();
+    }
+
+    return (
+        <SidebarMenuItem>
             <SidebarMenuButton
                 isActive={activeFilePath === path}
-                onClick={() => {
-                    openFile(path);
-                    if (isMobile) toggleSidebar();
-                }}
+                onClick={handleClick}
             >
                 <HugeiconsIcon icon={File01Icon} strokeWidth={1.5} />
                 {node.name}
             </SidebarMenuButton>
-        );
-    }
+            <SidebarMenuAction onClick={() => console.log(path)}>
+                S
+            </SidebarMenuAction>
+        </SidebarMenuItem>
+    );
+}
+
+type FileTreeDirNodeProps = {
+    node: Extract<FileNode, { kind: "dir" }>;
+    path: string;
+    defaultOpen?: boolean;
+};
+
+function FileTreeDirNode({
+    node,
+    path,
+    defaultOpen = false,
+}: FileTreeDirNodeProps) {
+    const activeFilePath = useActiveFilePath();
 
     return (
         <SidebarMenuItem>
@@ -162,8 +124,8 @@ function FileTreeNode({ node, path, defaultOpen = false }: FileTreeNodeProps) {
                     <HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
                     <span className="truncate">{node.name}</span>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="overflow-hidden">
-                    <SidebarMenuSub className="w-full">
+                <CollapsibleContent>
+                    <SidebarMenuSub className="mx-0 px-0 pl-3.5">
                         {node.children.map((child) => {
                             const childPath = `${path}/${child.name}`;
                             return (
@@ -184,5 +146,76 @@ function FileTreeNode({ node, path, defaultOpen = false }: FileTreeNodeProps) {
                 </CollapsibleContent>
             </Collapsible>
         </SidebarMenuItem>
+    );
+}
+
+function FileTreeNode({ node, path, defaultOpen }: FileTreeNodeProps) {
+    if (node.kind === "file")
+        return <FileTreeFileNode node={node} path={path} />;
+    return (
+        <FileTreeDirNode node={node} path={path} defaultOpen={defaultOpen} />
+    );
+}
+
+type FileTreeGroupProps = {
+    label: string;
+    nodes: FileNode[];
+    basePath: string;
+};
+
+function FileTreeGroup({ label, nodes, basePath }: FileTreeGroupProps) {
+    const activeFilePath = useActiveFilePath();
+    return (
+        <SidebarGroup>
+            <SidebarGroupLabel>{label}</SidebarGroupLabel>
+            <SidebarGroupContent className="mt-2">
+                <SidebarMenu>
+                    {nodes.map((node, index) => {
+                        const path = `${basePath}/${node.name}`;
+                        return (
+                            <FileTreeNode
+                                key={node.name}
+                                node={node}
+                                path={path}
+                                defaultOpen={
+                                    index === 0 ||
+                                    !!activeFilePath?.startsWith(path + "/")
+                                }
+                            />
+                        );
+                    })}
+                </SidebarMenu>
+            </SidebarGroupContent>
+        </SidebarGroup>
+    );
+}
+
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const tempTree = useTempTree();
+    const localTree = useLocalTree();
+
+    return (
+        <Sidebar {...props}>
+            <SidebarHeader>
+                <SidebarCreateMenu />
+            </SidebarHeader>
+            <SidebarContent>
+                <FileTreeGroup
+                    label="Examples"
+                    nodes={tempTree}
+                    basePath="/tmp"
+                />
+                {!!localTree.length && (
+                    <>
+                        <SidebarSeparator />
+                        <FileTreeGroup
+                            label="Local"
+                            nodes={localTree}
+                            basePath="/local"
+                        />
+                    </>
+                )}
+            </SidebarContent>
+        </Sidebar>
     );
 }
