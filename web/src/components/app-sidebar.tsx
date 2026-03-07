@@ -31,19 +31,28 @@ import {
 
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { isExample, useFileStore } from "@/stores/file-store";
+import {
+    useTempTree,
+    useLocalTree,
+    useActiveFile,
+    useFileTreeStore,
+} from "@/stores/file-tree-store";
 
 import { cn } from "@/lib/utils";
 
-import type { FileNode, FilePath } from "@/types/files";
+import type { FileNode } from "@/lib/fs/core/file-node.types";
+
+const TEMP_PREFIX = "/tmp";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const tree = useFileStore((s) => s.tree);
-    const selectedFilePath = useFileStore((s) => s.selectedFilePath);
-    const createEmptyFile = useFileStore((s) => s.createEmptyFile);
+    const tempTree = useTempTree();
+    const localTree = useLocalTree();
+    const activeFile = useActiveFile();
+    const createEmptyFile = useFileTreeStore((s) => s.createEmptyFile);
 
-    const examples = tree.filter((n) => isExample(n));
-    const others = tree.filter((n) => !isExample(n));
+    const selectedFilePath = activeFile?.path ?? null;
+    const examples = tempTree;
+    const others = localTree;
 
     return (
         <Sidebar {...props}>
@@ -69,12 +78,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 <TreeNode
                                     key={node.name}
                                     node={node}
-                                    path={node.name}
+                                    path={`${TEMP_PREFIX}/${node.name}`}
                                     defaultOpen={
                                         index === 0 ||
                                         (!!selectedFilePath &&
                                             selectedFilePath.startsWith(
-                                                node.name + "/",
+                                                `${TEMP_PREFIX}/${node.name}/`,
                                             ))
                                     }
                                 />
@@ -93,12 +102,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         <TreeNode
                                             key={node.name}
                                             node={node}
-                                            path={node.name}
+                                            path={`/local/${node.name}`}
                                             defaultOpen={
                                                 index === 0 ||
                                                 (!!selectedFilePath &&
                                                     selectedFilePath.startsWith(
-                                                        node.name + "/",
+                                                        `/local/${node.name}/`,
                                                     ))
                                             }
                                         />
@@ -119,11 +128,11 @@ function TreeNode({
     defaultOpen = false,
 }: {
     node: FileNode;
-    path: FilePath;
+    path: string;
     defaultOpen?: boolean;
 }) {
-    const selectFile = useFileStore((s) => s.selectFile);
-    const selectedFilePath = useFileStore((s) => s.selectedFilePath);
+    const openFile = useFileTreeStore((s) => s.openFile);
+    const selectedFilePath = useActiveFile()?.path ?? null;
 
     const isMobile = useIsMobile();
     const { toggleSidebar } = useSidebar();
@@ -133,7 +142,7 @@ function TreeNode({
             <SidebarMenuButton
                 isActive={selectedFilePath === path}
                 onClick={() => {
-                    selectFile(path);
+                    openFile(path);
                     if (isMobile) toggleSidebar();
                 }}
             >

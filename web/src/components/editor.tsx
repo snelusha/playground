@@ -22,15 +22,16 @@ import { CodeEditor } from "@/components/code-editor";
 import { ANSI } from "@/components/ansi";
 
 import { useEditorStore } from "@/stores/editor-store";
-import { useFileStore, useSelectedFile } from "@/stores/file-store";
+import { useActiveFile, useFileTreeStore } from "@/stores/file-tree-store";
 
 import { useBallerina } from "@/hooks/use-ballerina";
 
+import { basename } from "@/lib/fs/core/path-utils";
+
 import { cn } from "@/lib/utils";
+import { useFS } from "@/providers/fs-provider";
 
-import type { FilePath } from "@/types/files";
-
-function getLanguage(path: FilePath): string {
+function getLanguage(path: string): string {
     const ext = path.split(".").pop();
     switch (ext) {
         case "toml":
@@ -99,17 +100,16 @@ function OutputPane() {
 }
 
 function EditorPane({ onRun }: { onRun: () => void }) {
-    const selectedFilePath = useFileStore((s) => s.selectedFilePath);
-    const selectedFile = useSelectedFile();
-    const updateFileContent = useFileStore((s) => s.updateFile);
+    const activeFile = useActiveFile();
+    const updateFileContent = useFileTreeStore((s) => s.updateFileContent);
     const outputOpen = useEditorStore((s) => s.outputOpen);
 
     const handleChange = React.useCallback(
         (next: string) => {
-            if (!selectedFilePath) return;
-            updateFileContent(selectedFilePath, next);
+            if (!activeFile) return;
+            updateFileContent(next);
         },
-        [selectedFilePath, updateFileContent],
+        [activeFile, updateFileContent],
     );
     return (
         <div
@@ -121,15 +121,17 @@ function EditorPane({ onRun }: { onRun: () => void }) {
         >
             <div className="flex h-10 shrink-0 items-center justify-between border-b">
                 <span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
-                    {selectedFile?.name || "No file selected"}
+                    {activeFile
+                        ? basename(activeFile.path)
+                        : "No file selected"}
                 </span>
                 <Button
                     className="h-full rounded-none"
                     variant="ghost"
                     onClick={onRun}
                     disabled={
-                        !selectedFile ||
-                        getLanguage(selectedFile.name) !== "ballerina"
+                        !activeFile ||
+                        getLanguage(activeFile.path) !== "ballerina"
                     }
                 >
                     <HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
@@ -138,11 +140,9 @@ function EditorPane({ onRun }: { onRun: () => void }) {
             </div>
             <CodeEditor
                 className="flex-1 min-h-0 w-full"
-                value={selectedFile?.content ?? ""}
+                value={activeFile?.content ?? ""}
                 onChange={handleChange}
-                language={
-                    selectedFile ? getLanguage(selectedFile.name) : undefined
-                }
+                language={activeFile ? getLanguage(activeFile.path) : undefined}
             />
         </div>
     );
@@ -175,20 +175,15 @@ function EditorHeader() {
 }
 
 function EditorContent() {
-    const { isReady, run, updateFile } = useBallerina();
+    const fs = useFS();
+    const { isReady, run } = useBallerina();
 
     const openOutputWith = useEditorStore((s) => s.openOutputWith);
-
-    const selectedFilePath = useFileStore((s) => s.selectedFilePath);
-    const selectedFile = useSelectedFile();
+    const activeFile = useActiveFile();
+    const saveFile = useFileTreeStore((s) => s.saveFile);
 
     const handleRun = React.useCallback(() => {
-        if (
-            !selectedFilePath ||
-            !selectedFile ||
-            getLanguage(selectedFile.name) !== "ballerina"
-        )
-            return;
+        if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
         const oldConsole = console.log;
         let captured = "";
@@ -199,14 +194,8 @@ function EditorContent() {
         };
 
         try {
-            const updateFileResult = updateFile(
-                selectedFilePath,
-                selectedFile.content,
-            );
-            if (updateFileResult?.error) {
-                captured += updateFileResult.error + "\n";
-            }
-            const runResult = run(selectedFilePath);
+            saveFile();
+            const runResult = run(fs, activeFile.path);
             if (runResult?.error) {
                 captured += runResult.error + "\n";
             }
@@ -215,7 +204,7 @@ function EditorContent() {
         }
 
         openOutputWith(captured);
-    }, [selectedFile, selectedFilePath, updateFile, run, openOutputWith]);
+    }, [activeFile, saveFile, fs, run, openOutputWith]);
 
     useHotkeys(
         "mod+enter",

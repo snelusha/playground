@@ -18,3 +18,7 @@ export function joinPath(...segments: string[]): string {
         .filter(Boolean)
         .join("/");
 }
+
+export function isRootPath(path: string): boolean {
+    return !path || path === "." || path === "/";
+}
