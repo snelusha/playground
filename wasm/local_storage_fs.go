@@ -49,7 +49,11 @@ func (l *localStorageFS) Create(name string) (fs.File, error) {
 }
 
 func (l *localStorageFS) MkdirAll(path string, perm fs.FileMode) error {
-	panic("unimplemented")
+	res := l.proxy.Call("mkdirAll", path)
+	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
+		return &fs.PathError{Op: "mkdirAll", Path: path, Err: fs.ErrNotExist}
+	}
+	return nil
 }
 
 func (l *localStorageFS) Move(oldpath string, newpath string) error {
