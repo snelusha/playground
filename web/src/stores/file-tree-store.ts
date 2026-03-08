@@ -32,6 +32,9 @@ type FileTreeActions = {
 
 	updateFileContent(content: string): void;
 
+	createNewFile(path: string): boolean;
+	createNewDir(path: string): boolean;
+
 	_syncTrees(): void;
 };
 
@@ -95,6 +98,9 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			deleteFile(path) {
 				const result = _fs().remove(path);
 				if (!result) return false;
+				set((s) => {
+					if (s.activeFile?.path === path) s.activeFile = null;
+				});
 				get()._syncTrees();
 				return true;
 			},
@@ -102,6 +108,16 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			renameFile(oldPath, newPath) {
 				const result = _fs().move(oldPath, newPath);
 				if (!result) return false;
+				set((s) => {
+					if (!s.activeFile) return;
+					const currentPath = s.activeFile.path;
+					if (currentPath === oldPath) {
+						s.activeFile.path = newPath;
+					} else if (currentPath.startsWith(`${oldPath}/`)) {
+						const suffix = currentPath.slice(oldPath.length);
+						s.activeFile.path = newPath + suffix;
+					}
+				});
 				get()._syncTrees();
 				return true;
 			},
@@ -130,6 +146,21 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						s.activeFile.dirty = true;
 					}
 				});
+			},
+
+			createNewFile(path) {
+				const result = _fs().writeFile(path, "");
+				if (!result) return false;
+				get()._syncTrees();
+				get().openFile(path);
+				return true;
+			},
+
+			createNewDir(path) {
+				const result = _fs().mkdirAll(path);
+				if (!result) return false;
+				get()._syncTrees();
+				return true;
 			},
 
 			_syncTrees() {
@@ -161,5 +192,7 @@ export const useFileTreeActions = () =>
 			createDir: s.createDir,
 			deleteDir: s.deleteDir,
 			updateFileContent: s.updateFileContent,
+			createNewFile: s.createNewFile,
+			createNewDir: s.createNewDir,
 		})),
 	);
