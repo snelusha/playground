@@ -2,55 +2,46 @@ import "@/wasm_exec";
 
 import * as React from "react";
 
+import { useFS } from "@/providers/fs-provider";
+
 export function useBallerina() {
-    const [isReady, setIsReady] = React.useState(false);
+	const fs = useFS();
 
-    React.useEffect(() => {
-        let cancelled = false;
+	const [isReady, setIsReady] = React.useState(false);
 
-        async function load() {
-            const go = new window.Go();
-            const result = await WebAssembly.instantiateStreaming(
-                fetch("ballerina.wasm"),
-                go.importObject,
-            );
-            go.run(result.instance);
-            if (!cancelled) setIsReady(true);
-        }
+	React.useEffect(() => {
+		let cancelled = false;
 
-        load().catch(() => {
-            if (!cancelled) setIsReady(false);
-        });
+		async function load() {
+			const go = new window.Go();
+			const result = await WebAssembly.instantiateStreaming(
+				fetch("ballerina.wasm"),
+				go.importObject,
+			);
+			go.run(result.instance);
+			if (!cancelled) setIsReady(true);
+		}
 
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+		load().catch(() => {
+			if (!cancelled) setIsReady(false);
+		});
 
-    function updateFile(
-        path: string,
-        content: string,
-    ): { error?: string } | null {
-        if (typeof window.updateFile !== "function") {
-            return { error: "Ballerina runtime is not ready" };
-        }
-        const result = window.updateFile(path, content);
-        if (result && typeof result === "object" && "error" in result) {
-            return result as { error?: string };
-        }
-        return null;
-    }
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
-    function run(path: string): { error?: string } | null {
-        if (typeof window.run !== "function") {
-            return { error: "Ballerina runtime is not ready" };
-        }
-        const result = window.run(path);
-        if (result && typeof result === "object" && "error" in result) {
-            return result as { error?: string };
-        }
-        return null;
-    }
+	function run(path: string): { error?: string } | null {
+		if (typeof window.run !== "function")
+			return { error: "Ballerina runtime is not ready" };
+		if (!fs) return { error: "Virtual file system is not available" };
 
-    return { isReady, updateFile, run };
+		const result = window.run(fs, path);
+		if (result && typeof result === "object" && "error" in result) {
+			return result as { error?: string };
+		}
+		return null;
+	}
+
+	return { isReady, run };
 }
