@@ -9,14 +9,11 @@ import {
 	MoreVerticalIcon,
 	Delete02Icon,
 	Edit02Icon,
+	PackageIcon,
 } from "@hugeicons/core-free-icons";
 
 import { Button } from "@/components/ui/button";
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
 	Dialog,
 	DialogContent,
@@ -148,103 +145,104 @@ function FileTreeDirNode({
 	const activeFilePath = useActiveFilePath();
 
 	const expandedPaths = useExpandedPaths();
-	const { deleteDir, setFileOperationDialog, expandDir, collapseDir } =
-		useFileTreeActions();
+	const { deleteDir, setFileOperationDialog, toggleDir } = useFileTreeActions();
 
-	const [initialOpen] = React.useState(
-		() => expandedPaths.has(path) || defaultOpen,
-	);
+	const [hasInteracted, setHasInteracted] = React.useState(false);
+	const expanded = (!hasInteracted && defaultOpen) || expandedPaths.has(path);
+
+	const handleToggle = () => {
+		if (!hasInteracted && defaultOpen) {
+			setHasInteracted(true);
+			return;
+		}
+		toggleDir(path);
+	};
 
 	return (
 		<Collapsible
-			defaultOpen={initialOpen}
-			onOpenChange={(open) => {
-				if (open) expandDir(path);
-				else collapseDir(path);
-			}}
+			open={expanded}
 			className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
 		>
-		<SidebarMenuItem>
-			<CollapsibleTrigger
-				className="group/row w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent"
-				render={<SidebarMenuButton />}
-			>
-				<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
-				<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
-				<span className="truncate">{node.name}</span>
-				<DropdownMenu modal={false}>
-					<DropdownMenuTrigger
-						render={
-							<SidebarMenuAction className="peer-data-[active=true]/menu-button:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 aria-expanded:opacity-100 md:opacity-0" />
-						}
-						onClick={(e) => e.stopPropagation()}
-					>
-						<HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={1.5} />
-					</DropdownMenuTrigger>
-					<DropdownMenuContent
-						className="w-20"
-						side="bottom"
-						align={isMobile ? "end" : "start"}
-					>
-						<DropdownMenuItem
-							onClick={() => {
-								setFileOperationDialog({ type: "new-file", path });
-							}}
+			<SidebarMenuItem>
+				<div className="group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent">
+					<SidebarMenuButton className="w-full" onClick={handleToggle}>
+						<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
+						<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
+						<span className="truncate">{node.name}</span>
+					</SidebarMenuButton>
+					<DropdownMenu modal={false}>
+						<DropdownMenuTrigger
+							render={
+								<SidebarMenuAction className="peer-data-[active=true]/menu-button:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 aria-expanded:opacity-100 md:opacity-0" />
+							}
+							onClick={(e) => e.stopPropagation()}
 						>
-							<HugeiconsIcon icon={File01Icon} strokeWidth={1.5} />
-							<span>New File</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={() => {
-								setFileOperationDialog({ type: "new-folder", path });
-							}}
+							<HugeiconsIcon icon={MoreVerticalIcon} strokeWidth={1.5} />
+						</DropdownMenuTrigger>
+						<DropdownMenuContent
+							className="w-20"
+							side="bottom"
+							align={isMobile ? "end" : "start"}
 						>
-							<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
-							<span>New Folder</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={() => {
-								setFileOperationDialog({
-									type: "rename-folder",
-									path,
-									defaultName: node.name,
-								});
-							}}
-						>
-							<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
-							<span>Rename</span>
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							variant="destructive"
-							onClick={() => deleteDir(path)}
-						>
-							<HugeiconsIcon icon={Delete02Icon} strokeWidth={1.5} />
-							<span>Delete</span>
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</CollapsibleTrigger>
-			{!!node.children.length && (
-				<CollapsibleContent>
-					<SidebarMenuSub className="translate-x-0 mx-0 px-0 pl-3.5">
-						{node.children.map((child) => {
-							const childPath = `${path}/${child.name}`;
-							return (
-								<FileTreeNode
-									key={child.name}
-									node={child}
-									path={childPath}
-									defaultOpen={
-										!!activeFilePath &&
-										activeFilePath.startsWith(`${childPath}/`)
-									}
-								/>
-							);
-						})}
-					</SidebarMenuSub>
-				</CollapsibleContent>
-			)}
-		</SidebarMenuItem>
+							<DropdownMenuItem
+								onClick={() => {
+									setFileOperationDialog({ type: "new-file", path });
+								}}
+							>
+								<HugeiconsIcon icon={File01Icon} strokeWidth={1.5} />
+								<span>New File</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={() => {
+									setFileOperationDialog({ type: "new-folder", path });
+								}}
+							>
+								<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
+								<span>New Folder</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={() => {
+									setFileOperationDialog({
+										type: "rename-folder",
+										path,
+										defaultName: node.name,
+									});
+								}}
+							>
+								<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
+								<span>Rename</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								variant="destructive"
+								onClick={() => deleteDir(path)}
+							>
+								<HugeiconsIcon icon={Delete02Icon} strokeWidth={1.5} />
+								<span>Delete</span>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+				{!!node.children.length && (
+					<CollapsibleContent>
+						<SidebarMenuSub className="translate-x-0 mx-0 px-0 pl-3.5">
+							{node.children.map((child) => {
+								const childPath = `${path}/${child.name}`;
+								return (
+									<FileTreeNode
+										key={child.name}
+										node={child}
+										path={childPath}
+										defaultOpen={
+											!!activeFilePath &&
+											activeFilePath.startsWith(`${childPath}/`)
+										}
+									/>
+								);
+							})}
+						</SidebarMenuSub>
+					</CollapsibleContent>
+				)}
+			</SidebarMenuItem>
 		</Collapsible>
 	);
 }
@@ -294,8 +292,7 @@ function FileTreeDialog() {
 		createNewPackage,
 		renameFile,
 		setFileOperationDialog,
-	} =
-		useFileTreeActions();
+	} = useFileTreeActions();
 
 	const handleOpenChange = (open: boolean) => {
 		if (!open) setFileOperationDialog(null);
@@ -372,9 +369,7 @@ function FileTreeDialog() {
 						>
 							Cancel
 						</Button>
-						<Button type="submit">
-							{isRename ? "Rename" : "Create"}
-						</Button>
+						<Button type="submit">{isRename ? "Rename" : "Create"}</Button>
 					</DialogFooter>
 				</form>
 			</DialogContent>
@@ -436,8 +431,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 								side="bottom"
 								align={isMobile ? "end" : "start"}
 							>
-								<DropdownMenuItem onClick={() => setFileOperationDialog({ type: "new-package", path: "/local" })}>
-									<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
+								<DropdownMenuItem
+									onClick={() =>
+										setFileOperationDialog({
+											type: "new-package",
+											path: "/local",
+										})
+									}
+								>
+									<HugeiconsIcon icon={PackageIcon} strokeWidth={1.5} />
 									<span>New Package</span>
 								</DropdownMenuItem>
 							</DropdownMenuContent>
