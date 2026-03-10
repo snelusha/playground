@@ -15,15 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
-	DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
@@ -43,12 +34,14 @@ import {
 	SidebarSeparator,
 	useSidebar,
 } from "@/components/ui/sidebar";
+
+import { FileTreeDialog } from "@/components/file-tree-dialog";
+
 import {
 	useActiveFilePath,
 	useFileTreeActions,
 	useLocalTree,
 	useTempTree,
-	useFileOperationDialog,
 	useExpandedPaths,
 } from "@/stores/file-tree-store";
 
@@ -252,130 +245,165 @@ function FileTreeNode({ node, path, defaultOpen }: FileTreeNodeProps) {
 	return <FileTreeDirNode node={node} path={path} defaultOpen={defaultOpen} />;
 }
 
-type FileTreeGroupProps = {
-	label: string;
-	nodes: FileNode[];
-	basePath: string;
-};
+// type FileTreeGroupProps = {
+// 	label: string;
+// 	nodes: FileNode[];
+// 	basePath: string;
+// };
+//
+// function FileTreeGroup({ label, nodes, basePath }: FileTreeGroupProps) {
+// 	const activeFilePath = useActiveFilePath();
+// 	return (
+// 		<SidebarGroup>
+// 			<SidebarGroupLabel>{label}</SidebarGroupLabel>
+// 			<SidebarGroupContent className="mt-2">
+// 				<SidebarMenu>
+// 					{nodes.map((node, index) => {
+// 						const path = `${basePath}/${node.name}`;
+// 						return (
+// 							<FileTreeNode
+// 								key={node.name}
+// 								node={node}
+// 								path={path}
+// 								defaultOpen={
+// 									index === 0 || !!activeFilePath?.startsWith(`${path}/`)
+// 								}
+// 							/>
+// 						);
+// 					})}
+// 				</SidebarMenu>
+// 			</SidebarGroupContent>
+// 		</SidebarGroup>
+// 	);
+// }
 
-function FileTreeGroup({ label, nodes, basePath }: FileTreeGroupProps) {
-	const activeFilePath = useActiveFilePath();
-	return (
-		<SidebarGroup>
-			<SidebarGroupLabel>{label}</SidebarGroupLabel>
-			<SidebarGroupContent className="mt-2">
-				<SidebarMenu>
-					{nodes.map((node, index) => {
-						const path = `${basePath}/${node.name}`;
-						return (
-							<FileTreeNode
-								key={node.name}
-								node={node}
-								path={path}
-								defaultOpen={
-									index === 0 || !!activeFilePath?.startsWith(`${path}/`)
-								}
-							/>
-						);
-					})}
-				</SidebarMenu>
-			</SidebarGroupContent>
-		</SidebarGroup>
-	);
-}
-
-function FileTreeDialog() {
-	const fileOperationDialog = useFileOperationDialog();
-	const {
-		createNewFile,
-		createNewDir,
-		createNewPackage,
-		renameFile,
-		setFileOperationDialog,
-	} = useFileTreeActions();
-
-	const handleOpenChange = (open: boolean) => {
-		if (!open) setFileOperationDialog(null);
-	};
-
-	const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (e) => {
-		e.preventDefault();
-		if (!fileOperationDialog) return;
-
-		const formData = new FormData(e.currentTarget);
-		const name = formData.get("name") as string;
-		if (!name?.trim()) return;
-
-		const { type, path } = fileOperationDialog;
-
-		if (type === "new-file") {
-			createNewFile(`${path}/${name}`);
-		} else if (type === "new-folder") {
-			createNewDir(`${path}/${name}`);
-		} else if (type === "new-package") {
-			createNewPackage(path, name);
-		} else if (type === "rename-file" || type === "rename-folder") {
-			const lastSlash = path.lastIndexOf("/");
-			const newPath =
-				lastSlash >= 0 ? path.slice(0, lastSlash + 1) + name : `/${name}`;
-			renameFile(path, newPath);
-		}
-
-		setFileOperationDialog(null);
-	};
-
-	if (!fileOperationDialog) return null;
-
-	const type = fileOperationDialog.type;
-	const isRename = type.startsWith("rename");
-
-	const metaByType = {
-		"new-file": { entityLabel: "File", placeholder: "main.bal" },
-		"new-folder": { entityLabel: "Folder", placeholder: "folder_name" },
-		"new-package": { entityLabel: "Package", placeholder: "package_name" },
-		"rename-file": { entityLabel: "File", placeholder: "main.bal" },
-		"rename-folder": { entityLabel: "Folder", placeholder: "folder_name" },
-	} as const;
-
-	const meta = metaByType[type];
-	const { entityLabel, placeholder } = meta;
-
-	const title = `${isRename ? "Rename" : "Create New"} ${entityLabel}`;
-
-	const description = isRename
-		? `Enter a new name for the ${entityLabel.toLowerCase()}.`
-		: `Enter a name for the ${entityLabel.toLowerCase()}.`;
-
-	return (
-		<Dialog open={!!fileOperationDialog} onOpenChange={handleOpenChange}>
-			<DialogContent>
-				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-					<DialogHeader>
-						<DialogTitle>{title}</DialogTitle>
-						<DialogDescription>{description}</DialogDescription>
-					</DialogHeader>
-					<Input
-						name="name"
-						placeholder={placeholder}
-						defaultValue={fileOperationDialog.defaultName}
-						autoFocus
-						autoComplete="off"
-					/>
-					<DialogFooter>
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => setFileOperationDialog(null)}
-						>
-							Cancel
-						</Button>
-						<Button type="submit">{isRename ? "Rename" : "Create"}</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
-	);
-}
+// function FileTreeDialog() {
+// 	const fileOperationDialog = useFileOperationDialog();
+// 	const {
+// 		createNewFile,
+// 		createNewDir,
+// 		createNewPackage,
+// 		renameFile,
+// 		setFileOperationDialog,
+// 		exists,
+// 	} = useFileTreeActions();
+//
+// 	const [name, setName] = React.useState("");
+//
+// 	React.useEffect(() => {
+// 		if (fileOperationDialog) {
+// 			setName(fileOperationDialog.defaultName ?? "");
+// 		}
+// 	}, [fileOperationDialog]);
+//
+// 	const path = fileOperationDialog?.path;
+// 	const type = fileOperationDialog?.type;
+//
+// 	const targetPath = React.useMemo(() => {
+// 		if (!name.trim() || !path || !type) return null;
+// 		if (type === "new-package" || type === "new-folder" || type === "new-file") {
+// 			return `${path}/${name}`;
+// 		}
+// 		if (type === "rename-file" || type === "rename-folder") {
+// 			const lastSlash = path.lastIndexOf("/");
+// 			return lastSlash >= 0 ? path.slice(0, lastSlash + 1) + name : `/${name}`;
+// 		}
+// 		return null;
+// 	}, [name, type, path]);
+//
+// 	const isSamePath = targetPath === path && type?.startsWith("rename");
+// 	const alreadyExists = targetPath && !isSamePath ? exists(targetPath) : false;
+// 	const isActionDisabled = !name.trim() || alreadyExists || isSamePath;
+//
+// 	const handleOpenChange = (open: boolean) => {
+// 		if (!open) {
+// 			setFileOperationDialog(null);
+// 			setTimeout(() => setName(""), 200);
+// 		}
+// 	};
+//
+// 	const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (e) => {
+// 		e.preventDefault();
+// 		if (!fileOperationDialog || isActionDisabled || !targetPath) return;
+//
+// 		const { type, path } = fileOperationDialog;
+//
+// 		if (type === "new-file") {
+// 			createNewFile(targetPath);
+// 		} else if (type === "new-folder") {
+// 			createNewDir(targetPath);
+// 		} else if (type === "new-package") {
+// 			createNewPackage(path, name);
+// 		} else if (type === "rename-file" || type === "rename-folder") {
+// 			renameFile(path, targetPath);
+// 		}
+//
+// 		setFileOperationDialog(null);
+// 		setTimeout(() => setName(""), 200);
+// 	};
+//
+// 	if (!fileOperationDialog || !type) return null;
+//
+// 	const isRename = type.startsWith("rename");
+//
+// 	const metaByType = {
+// 		"new-file": { entityLabel: "File", placeholder: "main.bal" },
+// 		"new-folder": { entityLabel: "Folder", placeholder: "folder_name" },
+// 		"new-package": { entityLabel: "Package", placeholder: "package_name" },
+// 		"rename-file": { entityLabel: "File", placeholder: "main.bal" },
+// 		"rename-folder": { entityLabel: "Folder", placeholder: "folder_name" },
+// 	} as const;
+//
+// 	const meta = metaByType[type];
+// 	const { entityLabel, placeholder } = meta;
+//
+// 	const title = `${isRename ? "Rename" : "Create New"} ${entityLabel}`;
+//
+// 	const description = isRename
+// 		? `Enter a new name for the ${entityLabel.toLowerCase()}.`
+// 		: `Enter a name for the ${entityLabel.toLowerCase()}.`;
+//
+// 	return (
+// 		<Dialog open={!!fileOperationDialog} onOpenChange={handleOpenChange}>
+// 			<DialogContent>
+// 				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
+// 					<DialogHeader>
+// 						<DialogTitle>{title}</DialogTitle>
+// 						<DialogDescription>{description}</DialogDescription>
+// 					</DialogHeader>
+// 					<div className="flex flex-col gap-2">
+// 						<Input
+// 							name="name"
+// 							value={name}
+// 							onChange={(e) => setName(e.target.value)}
+// 							placeholder={placeholder}
+// 							autoFocus
+// 							autoComplete="off"
+// 							aria-invalid={alreadyExists}
+// 						/>
+// 						{alreadyExists && (
+// 							<p className="text-[0.8rem] font-medium text-destructive">
+// 								A {entityLabel.toLowerCase()} with this name already exists.
+// 							</p>
+// 						)}
+// 					</div>
+// 					<DialogFooter>
+// 						<Button
+// 							type="button"
+// 							variant="outline"
+// 							onClick={() => handleOpenChange(false)}
+// 						>
+// 							Cancel
+// 						</Button>
+// 						<Button type="submit" disabled={isActionDisabled}>
+// 							{isRename ? "Rename" : "Create"}
+// 						</Button>
+// 					</DialogFooter>
+// 				</form>
+// 			</DialogContent>
+// 		</Dialog>
+// 	);
+// }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const isMobile = useIsMobile();
