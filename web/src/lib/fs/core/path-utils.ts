@@ -12,6 +12,10 @@ export function dirname(path: string): string {
 	return parts.slice(0, -1).join("/");
 }
 
+export function ext(path: string): string {
+	return path.split(".").pop() ?? "";
+}
+
 export function joinPath(...segments: string[]): string {
 	return segments
 		.flatMap((s) => s.split("/"))
