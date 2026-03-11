@@ -36,6 +36,12 @@ func main() {
 }
 
 func run(this js.Value, args []js.Value) any {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", r)
+		}
+	}()
+
 	if len(args) < 2 {
 		return jsError(fmt.Errorf("expected at least 2 arguments: (fsProxy, path)"))
 	}
