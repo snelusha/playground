@@ -30,6 +30,25 @@ import { cn } from "@/lib/utils";
 
 import type { FilePath } from "@/types/files";
 
+function WasmLoadingScreen({ progress }: { progress: number }) {
+    const pct = Math.max(0, Math.min(100, progress));
+    return (
+        <div className="w-full flex items-center justify-center min-h-dvh">
+            <div className="flex flex-col items-center gap-3">
+                <div className="text-sm text-muted-foreground">
+                    Loading WASM binaries... {pct}%
+                </div>
+                <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div
+                        className="h-full bg-emerald-500 transition-[width] duration-150"
+                        style={{ width: `${pct}%` }}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function getLanguage(path: FilePath): string {
     const ext = path.split(".").pop();
     switch (ext) {
@@ -175,7 +194,7 @@ function EditorHeader() {
 }
 
 function EditorContent() {
-    const { isReady, run, updateFile } = useBallerina();
+    const { isReady, progress, run, updateFile } = useBallerina();
 
     const openOutputWith = useEditorStore((s) => s.openOutputWith);
 
@@ -230,13 +249,7 @@ function EditorContent() {
     );
 
     if (!isReady) {
-        return (
-            <div className="w-full flex items-center justify-center min-h-dvh">
-                <div className="text-sm text-muted-foreground">
-                    Loading WASM binaries...
-                </div>
-            </div>
-        );
+        return <WasmLoadingScreen progress={progress ?? 0} />;
     }
 
     return (
