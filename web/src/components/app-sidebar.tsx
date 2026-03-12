@@ -62,8 +62,7 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 
 	const activeFilePath = useActiveFilePath();
 
-	const { openFile, saveFile, deleteFile, setFileOperationDialog } =
-		useFileTreeActions();
+	const { openFile, saveFile, setFileOperationDialog } = useFileTreeActions();
 
 	function handleClick() {
 		// TODO: This is a bit hacky, we should ideally have a separate "switchFile" action that doesn't mark the file as dirty
@@ -111,7 +110,13 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 
 						<DropdownMenuItem
 							variant="destructive"
-							onClick={() => deleteFile(path)}
+							onClick={() =>
+								setFileOperationDialog({
+									type: "delete-file",
+									path,
+									defaultName: node.name,
+								})
+							}
 						>
 							<HugeiconsIcon icon={Delete02Icon} strokeWidth={1.5} />
 							<span>Delete</span>
@@ -138,7 +143,7 @@ function FileTreeDirNode({
 	const activeFilePath = useActiveFilePath();
 
 	const expandedPaths = useExpandedPaths();
-	const { deleteDir, setFileOperationDialog, toggleDir } = useFileTreeActions();
+	const { setFileOperationDialog, toggleDir } = useFileTreeActions();
 
 	const [hasInteracted, setHasInteracted] = React.useState(false);
 	const expanded = (!hasInteracted && defaultOpen) || expandedPaths.has(path);
@@ -207,7 +212,13 @@ function FileTreeDirNode({
 							</DropdownMenuItem>
 							<DropdownMenuItem
 								variant="destructive"
-								onClick={() => deleteDir(path)}
+								onClick={() =>
+									setFileOperationDialog({
+										type: "delete-folder",
+										path,
+										defaultName: node.name,
+									})
+								}
 							>
 								<HugeiconsIcon icon={Delete02Icon} strokeWidth={1.5} />
 								<span>Delete</span>

@@ -24,11 +24,13 @@ export type ActiveFile = {
 
 export type FileOperationDialog = {
 	type:
-	| "new-file"
-	| "new-folder"
-	| "new-package"
-	| "rename-file"
-	| "rename-folder";
+		| "new-file"
+		| "new-folder"
+		| "new-package"
+		| "rename-file"
+		| "rename-folder"
+		| "delete-file"
+		| "delete-folder";
 	path: string;
 	defaultName?: string;
 } | null;
