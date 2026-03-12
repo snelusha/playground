@@ -4,18 +4,58 @@ import * as React from "react";
 
 export function useBallerina() {
     const [isReady, setIsReady] = React.useState(false);
+    const [progress, setProgress] = React.useState(0);
 
     React.useEffect(() => {
         let cancelled = false;
 
         async function load() {
             const go = new window.Go();
-            const result = await WebAssembly.instantiateStreaming(
-                fetch("ballerina.wasm"),
-                go.importObject,
-            );
+            const res = await fetch("ballerina.wasm");
+            const total = Number(res.headers.get("content-length") ?? 0);
+
+            if (!res.body || !total) {
+                const result = await WebAssembly.instantiateStreaming(
+                    res,
+                    go.importObject,
+                );
+                go.run(result.instance);
+                if (!cancelled) {
+                    setProgress(100);
+                    setIsReady(true);
+                }
+                return;
+            }
+
+            const reader = res.body.getReader();
+            let loaded = 0;
+            const chunks: Uint8Array[] = [];
+
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) {
+                    chunks.push(value);
+                    loaded += value.byteLength;
+                    if (!cancelled && total) {
+                        setProgress(Math.round((loaded / total) * 100));
+                    }
+                }
+            }
+
+            const bytes = new Uint8Array(loaded);
+            let offset = 0;
+            for (const chunk of chunks) {
+                bytes.set(chunk, offset);
+                offset += chunk.byteLength;
+            }
+
+            const result = await WebAssembly.instantiate(bytes, go.importObject);
             go.run(result.instance);
-            if (!cancelled) setIsReady(true);
+            if (!cancelled) {
+                setProgress(100);
+                setIsReady(true);
+            }
         }
 
         load().catch(() => {
@@ -52,5 +92,5 @@ export function useBallerina() {
         return null;
     }
 
-    return { isReady, updateFile, run };
+    return { isReady, progress, updateFile, run };
 }

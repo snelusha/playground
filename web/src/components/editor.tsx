@@ -30,6 +30,36 @@ import { cn } from "@/lib/utils";
 
 import type { FilePath } from "@/types/files";
 
+function WasmLoadingScreen({ progress }: { progress: number }) {
+    const pct = Math.max(0, Math.min(100, progress));
+    return (
+        <div className="w-full flex items-center justify-center min-h-dvh">
+            <div className="flex flex-col items-center gap-3">
+                <div
+                    id="wasm-load-progress-label"
+                    className="text-sm text-muted-foreground"
+                    aria-live="polite"
+                >
+                    Loading WASM binaries... {pct}%
+                </div>
+                <div
+                    className="w-48 h-1.5 rounded-full bg-muted overflow-hidden"
+                    role="progressbar"
+                    aria-labelledby="wasm-load-progress-label"
+                    aria-valuenow={pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                >
+                    <div
+                        className="h-full bg-emerald-500 transition-[width] duration-150"
+                        style={{ width: `${pct}%` }}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function getLanguage(path: FilePath): string {
     const ext = path.split(".").pop();
     switch (ext) {
@@ -158,7 +188,7 @@ function EditorHeader() {
             <div>
                 <a
                     className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
-                    href="https://github.com/ballerina-platform/ballerina-lang-go"
+                    href="https://github.com/ballerina-platform/playground"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
@@ -175,7 +205,7 @@ function EditorHeader() {
 }
 
 function EditorContent() {
-    const { isReady, run, updateFile } = useBallerina();
+    const { isReady, progress, run, updateFile } = useBallerina();
 
     const openOutputWith = useEditorStore((s) => s.openOutputWith);
 
@@ -230,13 +260,7 @@ function EditorContent() {
     );
 
     if (!isReady) {
-        return (
-            <div className="w-full flex items-center justify-center min-h-dvh">
-                <div className="text-sm text-muted-foreground">
-                    Loading WASM binaries...
-                </div>
-            </div>
-        );
+        return <WasmLoadingScreen progress={progress ?? 0} />;
     }
 
     return (
