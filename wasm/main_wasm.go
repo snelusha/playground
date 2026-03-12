@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"syscall/js"
 )
 
@@ -31,8 +32,6 @@ var fsys fs.FS
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
-
-	select {}
 }
 
 func run(this js.Value, args []js.Value) any {
@@ -42,14 +41,29 @@ func run(this js.Value, args []js.Value) any {
 		}
 	}()
 
-	if len(args) < 2 {
-		return jsError(fmt.Errorf("expected at least 2 arguments: (fsProxy, path)"))
+	if len(args) < 1 {
+		return jsError(fmt.Errorf("expected at least 1 argument: (path)"))
 	}
 
-	proxy := args[0]
-	path := args[1].String()
+	path := "."
+	if len(args) > 0 {
+		path = args[0].String()
+	}
 
-	fsys := NewLocalStorageFS(proxy)
+	info, err := os.Stat(path)
+	if err != nil {
+		return jsError(err)
+	}
+
+	baseDir := path
+	if !info.IsDir() {
+		baseDir = filepath.Dir(path)
+		path = filepath.Base(path)
+	} else {
+		path = "."
+	}
+
+	fsys := os.DirFS(baseDir)
 
 	result, err := directory.LoadProject(fsys, path)
 	if err != nil {
