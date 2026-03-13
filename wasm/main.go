@@ -27,6 +27,7 @@ import (
 )
 
 func main() {
+	fmt.Println("Ballerina WASM Runtime")
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: wasm <path>")
 		os.Exit(1)
