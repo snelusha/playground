@@ -1,4 +1,4 @@
-import { isRootPath } from "@/lib/fs/core/path-utils";
+import { isRootPath, isUnder } from "@/lib/fs/core/path-utils";
 
 import type { FS } from "@/lib/fs/core/fs.interface";
 import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
@@ -16,7 +16,7 @@ export class LayeredFS implements FS {
 	) {}
 
 	open(path: string) {
-		return this._target(path).open(path);
+		return this._withTargetOrNull(path, (fs) => fs.open(path));
 	}
 
 	stat(path: string) {
@@ -27,7 +27,7 @@ export class LayeredFS implements FS {
 				modTime: 0,
 				isDir: true,
 			};
-		return this._target(path).stat(path);
+		return this._withTargetOrNull(path, (fs) => fs.stat(path));
 	}
 
 	readDir(path: string) {
@@ -36,26 +36,27 @@ export class LayeredFS implements FS {
 				{ name: TEMP_ROOT.slice(1), isDir: true },
 				{ name: LOCAL_ROOT.slice(1), isDir: true },
 			];
-		return this._target(path).readDir(path);
+		return this._withTargetOrNull(path, (fs) => fs.readDir(path));
 	}
 
 	writeFile(path: string, content: string) {
-		return this._target(path).writeFile(path, content);
+		return this._withTargetOrFalse(path, (fs) => fs.writeFile(path, content));
 	}
 
 	remove(path: string) {
-		return this._target(path).remove(path);
+		return this._withTargetOrFalse(path, (fs) => fs.remove(path));
 	}
 
 	move(oldPath: string, newPath: string) {
 		const oldTarget = this._target(oldPath);
 		const newTarget = this._target(newPath);
+		if (!oldTarget || !newTarget) return false;
 		if (oldTarget === newTarget) return oldTarget.move(oldPath, newPath);
 		return this._moveToTarget(oldTarget, newTarget, oldPath, newPath);
 	}
 
 	mkdirAll(path: string) {
-		return this._target(path).mkdirAll(path);
+		return this._withTargetOrFalse(path, (fs) => fs.mkdirAll(path));
 	}
 
 	tempTree() {
@@ -90,15 +91,31 @@ export class LayeredFS implements FS {
 		return oldTarget.remove(oldPath);
 	}
 
-	private _namespace(path: string): Namespace {
-		if (path.startsWith(TEMP_ROOT)) return "temp";
-		else if (path.startsWith(LOCAL_ROOT)) return "local";
-
-		throw new Error(`[LayeredFS] Invalid path: ${path}`);
+	private _namespace(path: string): Namespace | null {
+		if (isUnder(path, TEMP_ROOT)) return "temp";
+		if (isUnder(path, LOCAL_ROOT)) return "local";
+		return null;
 	}
 
-	private _target(path: string): FS {
+	private _target(path: string): FS | null {
 		const ns = this._namespace(path);
-		return ns === "temp" ? this.temp : this.local;
+		if (ns === "temp") return this.temp;
+		if (ns === "local") return this.local;
+		return null;
+	}
+
+	private _withTargetOrNull<T>(
+		path: string,
+		fn: (fs: FS) => T | null,
+	): T | null {
+		const target = this._target(path);
+		if (!target) return null;
+		return fn(target);
+	}
+
+	private _withTargetOrFalse(path: string, fn: (fs: FS) => boolean): boolean {
+		const target = this._target(path);
+		if (!target) return false;
+		return fn(target);
 	}
 }

@@ -173,7 +173,10 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				const result = _fs().remove(path);
 				if (!result) return false;
 				set((s) => {
-					if (s.activeFile?.path.startsWith(path)) s.activeFile = null;
+					const activePath = s.activeFile?.path;
+					if (activePath === path || activePath?.startsWith(`${path}/`)) {
+						s.activeFile = null;
+					}
 				});
 				get()._syncTrees();
 				return true;

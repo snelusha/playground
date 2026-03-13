@@ -9,11 +9,14 @@ export function basename(path: string): string {
 
 export function dirname(path: string): string {
 	const parts = pathSegments(path);
-	return parts.slice(0, -1).join("/");
+	const dir = parts.slice(0, -1).join("/");
+	return path.startsWith("/") ? (dir ? `/${dir}` : "/") : dir;
 }
 
 export function ext(path: string): string {
-	return path.split(".").pop() ?? "";
+	const base = path.split(/[\\/]/).pop() ?? "";
+	const dot = base.lastIndexOf(".");
+	return dot === -1 ? "" : base.slice(dot + 1);
 }
 
 export function join(...segments: string[]): string {
@@ -29,4 +32,8 @@ export function join(...segments: string[]): string {
 
 export function isRootPath(path: string): boolean {
 	return !path || path === "." || path === "/";
+}
+
+export function isUnder(path: string, root: string): boolean {
+	return path === root || path.startsWith(`${root}/`);
 }

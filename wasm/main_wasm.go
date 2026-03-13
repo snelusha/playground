@@ -22,12 +22,9 @@ import (
 	"ballerina-lang-go/projects/directory"
 	"ballerina-lang-go/runtime"
 	"fmt"
-	"io/fs"
 	"os"
 	"syscall/js"
 )
-
-var fsys fs.FS
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))

@@ -92,6 +92,7 @@ function getTargetPath(
 	name: string,
 ): string | null {
 	if (!name.trim()) return null;
+	if (/[\\/]/.test(name)) return null;
 
 	if (type === "new-package" || type === "new-folder" || type === "new-file") {
 		return `${path}/${name}`;
@@ -137,13 +138,15 @@ function useFileTreeDialog() {
 		[name, type, path],
 	);
 
+	const hasPathSeparator = /[\\/]/.test(name);
+
 	const isRename = type?.startsWith("rename") ?? false;
 	const isDelete = type === "delete-file" || type === "delete-folder";
 	const isSamePath = isRename && targetPath === path;
 	const alreadyExists = !!targetPath && !isSamePath && exists(targetPath);
 	const isActionDisabled = isDelete
 		? false
-		: !name.trim() || alreadyExists || isSamePath;
+		: !name.trim() || hasPathSeparator || alreadyExists || isSamePath;
 
 	const close = () => {
 		setFileOperationDialog(null);
@@ -240,7 +243,11 @@ export function FileTreeDialog() {
 
 					{!isDelete && (
 						<div className="flex flex-col gap-2">
+							<label htmlFor="file-tree-dialog-name" className="sr-only">
+								Name
+							</label>
 							<Input
+								id="file-tree-dialog-name"
 								name="name"
 								value={name}
 								onChange={(e) => setName(e.target.value)}
@@ -248,9 +255,15 @@ export function FileTreeDialog() {
 								autoFocus
 								autoComplete="off"
 								aria-invalid={alreadyExists}
+								aria-describedby={
+									alreadyExists ? "file-tree-dialog-name-error" : undefined
+								}
 							/>
 							{alreadyExists && (
-								<p className="text-xs text-destructive">
+								<p
+									id="file-tree-dialog-name-error"
+									className="text-xs text-destructive"
+								>
 									{alreadyExistsMessage}
 								</p>
 							)}

@@ -75,9 +75,12 @@ export function CodeEditor({
 
 				if (isMounted) {
 					highlighterRef.current = hl;
-					renderHighlight(value, hl);
+					renderHighlight(textareaRef.current?.value ?? "", hl);
 				}
-			} catch {} // eslint-disable-line no-empty
+			} catch {
+				if (isMounted)
+					setHighlighted(escapeHtml(textareaRef.current?.value ?? ""));
+			}
 		}
 
 		initShiki();
@@ -86,7 +89,7 @@ export function CodeEditor({
 			highlighterRef.current?.dispose();
 			highlighterRef.current = null;
 		};
-	}, [renderHighlight, value]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [renderHighlight]);
 
 	React.useEffect(() => {
 		renderHighlight(value);

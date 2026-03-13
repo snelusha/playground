@@ -89,6 +89,9 @@ export class AbstractFS implements FS {
 
 	move(oldPath: string, newPath: string): boolean {
 		try {
+			if (oldPath === newPath) return true;
+			if (newPath.startsWith(`${oldPath}/`)) return false;
+
 			const node = this._getNode(oldPath, false);
 			if (!node) return false;
 			const { parent: newParent, name: newName } =
@@ -160,6 +163,7 @@ export class AbstractFS implements FS {
 		const parts = pathSegments(path);
 		let node: FSNode = this.data;
 		for (const part of parts) {
+			if (!node.isDir) return null;
 			const children = node.children ?? {};
 			if (!children[part]) {
 				if (autoCreateDirs) {
