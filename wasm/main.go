@@ -27,12 +27,11 @@ import (
 )
 
 func main() {
-	fmt.Println("Ballerina WASM Runtime")
-	if len(os.Args) < 2 {
+	if len(os.Args) < 1 {
 		fmt.Fprintln(os.Stderr, "usage: wasm <path>")
 		os.Exit(1)
 	}
-	if result := execute(os.Args[1]); result != nil {
+	if result := execute(os.Args[0]); result != nil {
 		if errMsg, ok := result["error"]; ok {
 			fmt.Fprintln(os.Stderr, errMsg)
 			os.Exit(1)
