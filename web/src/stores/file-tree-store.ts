@@ -49,7 +49,7 @@ type FileTreeState = {
 type FileTreeActions = {
 	init(fs: LayeredFS): void;
 
-	openFile(path: string): void;
+	openFile(path: string): boolean;
 	saveFile(): boolean;
 	createFile(path: string): boolean;
 	deleteFile(path: string): boolean;
@@ -106,7 +106,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 
 			openFile(path) {
 				const file = _fs().open(path);
-				if (!file) return;
+				if (!file) return false;
 				set((s) => {
 					s.activeFile = {
 						path,
@@ -114,6 +114,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						dirty: false,
 					};
 				});
+				return true;
 			},
 
 			saveFile() {

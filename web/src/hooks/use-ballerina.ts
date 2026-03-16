@@ -15,9 +15,13 @@ export function useBallerina() {
 
 		async function load() {
 			const go = new window.Go();
+			// `import.meta.env.BASE_URL` can be "/" in dev; `new URL(..., "/")` throws.
+			// Build an absolute base URL using the current origin.
+			const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+			const wasmUrl = new URL("ballerina.wasm", baseUrl).toString();
 
 			const result = await WebAssembly.instantiateStreaming(
-				fetchResponseWithProgress("ballerina.wasm", (pct) => {
+				fetchResponseWithProgress(wasmUrl, (pct) => {
 					if (!cancelled) setProgress(pct);
 				}),
 				go.importObject,
@@ -31,8 +35,12 @@ export function useBallerina() {
 			}
 		}
 
-		load().catch(() => {
-			if (!cancelled) setIsReady(false);
+		load().catch((err) => {
+			console.error(err);
+			if (!cancelled) {
+				setIsReady(false);
+				setProgress(0);
+			}
 		});
 
 		return () => {
@@ -60,6 +68,9 @@ async function fetchResponseWithProgress(
 	onProgress: (pct: number) => void,
 ): Promise<Response> {
 	const res = await fetch(url);
+	if (!res.ok) {
+		throw new Error(`Failed to fetch wasm: ${res.status} ${res.statusText}`);
+	}
 	const total = Number(res.headers.get("content-length") ?? 0);
 
 	if (!res.body || !total) return res;
