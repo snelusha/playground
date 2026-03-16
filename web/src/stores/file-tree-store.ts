@@ -49,7 +49,7 @@ type FileTreeState = {
 type FileTreeActions = {
 	init(fs: LayeredFS): void;
 
-	openFile(path: string): boolean;
+	openFile(path: string): void;
 	saveFile(): boolean;
 	createFile(path: string): boolean;
 	deleteFile(path: string): boolean;
@@ -61,6 +61,7 @@ type FileTreeActions = {
 	updateFileContent(content: string): void;
 
 	exists(path: string): boolean;
+	existsFile(path: string): boolean;
 
 	createNewFile(path: string): boolean;
 	createNewDir(path: string): boolean;
@@ -105,8 +106,10 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			},
 
 			openFile(path) {
+				const info = _fs().stat(path);
+				if (!info || info.isDir) return;
 				const file = _fs().open(path);
-				if (!file) return false;
+				if (!file) return;
 				set((s) => {
 					s.activeFile = {
 						path,
@@ -114,7 +117,6 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						dirty: false,
 					};
 				});
-				return true;
 			},
 
 			saveFile() {
@@ -195,6 +197,15 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			exists(path) {
 				try {
 					return !!_fs().stat(path);
+				} catch {
+					return false;
+				}
+			},
+
+			existsFile(path) {
+				try {
+					const info = _fs().stat(path);
+					return !!info && !info.isDir;
 				} catch {
 					return false;
 				}
@@ -295,6 +306,7 @@ export const useFileTreeActions = () =>
 			deleteDir: s.deleteDir,
 			updateFileContent: s.updateFileContent,
 			exists: s.exists,
+			existsFile: s.existsFile,
 			createNewFile: s.createNewFile,
 			createNewDir: s.createNewDir,
 			createNewPackage: s.createNewPackage,

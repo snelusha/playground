@@ -25,7 +25,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const params = useParams({ strict: false }) as { _splat?: string };
 	const navigate = useNavigate();
 
-	const { openFile } = useFileTreeActions();
+	const { openFile, existsFile } = useFileTreeActions();
 	const activeFilePath = useFileTreeStore((s) => s.activeFile?.path ?? null);
 	const ready = useFileTreeStore((s) => s.ready);
 
@@ -38,20 +38,20 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		if (!ready) return;
 
 		if (!filePathFromUrl) {
-			const ok = openFile(DEFAULT_FILE);
-			if (ok) {
+			if (existsFile(DEFAULT_FILE)) {
+				openFile(DEFAULT_FILE);
 				navigate({ to: "/$", params: { _splat: DEFAULT_SPLAT }, replace: true });
 			}
 			return;
 		}
 
-		const ok = openFile(filePathFromUrl);
-		if (!ok) {
-			setNotFoundPath(filePathFromUrl);
-		} else {
+		if (existsFile(filePathFromUrl)) {
+			openFile(filePathFromUrl);
 			setNotFoundPath(null);
+		} else {
+			setNotFoundPath(filePathFromUrl);
 		}
-	}, [ready, filePathFromUrl, openFile, navigate]);
+	}, [ready, filePathFromUrl, openFile, existsFile, navigate]);
 
 	React.useEffect(() => {
 		if (!ready || !activeFilePath || notFoundPath) return;
