@@ -8,7 +8,7 @@ export function useBallerina() {
 	const fs = useFS();
 
 	const [isReady, setIsReady] = React.useState(false);
-	const [progress, setProgress] = React.useState(0);
+	const [progressPct, setProgressPct] = React.useState<number | null>(0);
 
 	React.useEffect(() => {
 		let cancelled = false;
@@ -18,7 +18,7 @@ export function useBallerina() {
 
 			const result = await WebAssembly.instantiateStreaming(
 				fetchResponseWithProgress("ballerina.wasm", (pct) => {
-					if (!cancelled) setProgress(pct);
+					if (!cancelled) setProgressPct(pct);
 				}),
 				go.importObject,
 			);
@@ -26,7 +26,7 @@ export function useBallerina() {
 			go.run(result.instance);
 
 			if (!cancelled) {
-				setProgress(100);
+				setProgressPct(100);
 				setIsReady(true);
 			}
 		}
@@ -52,31 +52,44 @@ export function useBallerina() {
 		return null;
 	}
 
-	return { isReady, progress, run };
+	return { isReady, progressPct, run };
 }
 
 async function fetchResponseWithProgress(
 	url: string,
-	onProgress: (pct: number) => void,
+	onProgress: (pct: number | null) => void,
 ): Promise<Response> {
 	const res = await fetch(url);
+	const encoding = (res.headers.get("content-encoding") ?? "").trim().toLowerCase();
 	const total = Number(res.headers.get("content-length") ?? 0);
+	const hasReliableTotal = Number.isFinite(total) && total > 0 && (!encoding || encoding === "identity");
 
-	if (!res.body || !total) return res;
+	if (!res.body) return res;
+	if (!hasReliableTotal) {
+		onProgress(null);
+		return res;
+	}
 
 	const reader = res.body.getReader();
 	const stream = new ReadableStream({
 		async start(controller) {
 			let loaded = 0;
+			let lastPct = 0;
 			for (;;) {
 				const { done, value } = await reader.read();
 				if (done) {
+					onProgress(100);
 					controller.close();
 					break;
 				}
 				if (value) {
 					loaded += value.byteLength;
-					onProgress(Math.round((loaded / total) * 100));
+					const rawPct = Math.floor((loaded / total) * 100);
+					const clampedPct = Math.max(0, Math.min(99, rawPct));
+					if (clampedPct !== lastPct) {
+						lastPct = clampedPct;
+						onProgress(clampedPct);
+					}
 					controller.enqueue(value);
 				}
 			}

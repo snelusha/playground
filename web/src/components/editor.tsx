@@ -197,7 +197,7 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run } = useBallerina();
+	const { isReady, progressPct, run } = useBallerina();
 
 	const activeFile = useActiveFile();
 
@@ -244,7 +244,7 @@ function EditorContent() {
 		},
 	);
 
-	if (!isReady) return <WasmLoadingScreen progress={progress} />;
+	if (!isReady) return <WasmLoadingScreen progressPct={progressPct} />;
 
 	return (
 		<>
@@ -260,18 +260,24 @@ function EditorContent() {
 	);
 }
 
-function WasmLoadingScreen({ progress }: { progress: number }) {
-	const pct = Math.max(0, Math.min(100, progress));
+function WasmLoadingScreen({ progressPct }: { progressPct: number | null }) {
+	const hasPct = typeof progressPct === "number" && Number.isFinite(progressPct);
+	const pct = hasPct ? Math.max(0, Math.min(100, progressPct)) : null;
 	return (
 		<div className="w-full flex items-center justify-center min-h-dvh">
 			<div className="flex flex-col items-center gap-4">
 				<div className="text-sm text-muted-foreground">
-					Loading WASM binaries...&nbsp;
-					<span className="inline-block text-right w-10 tabular-nums">
-						{pct}%
-					</span>
+					Loading WASM binaries...
+					{pct === null ? null : (
+						<>
+							&nbsp;
+							<span className="inline-block text-right w-10 tabular-nums">
+								{pct}%
+							</span>
+						</>
+					)}
 				</div>
-				<Progress className="w-full" value={progress} />
+				<Progress className="w-full" value={pct} />
 			</div>
 		</div>
 	);
