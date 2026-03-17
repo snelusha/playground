@@ -244,7 +244,7 @@ function EditorContent() {
 		},
 	);
 
-	if (!isReady) return <WasmLoadingScreen progressPct={progressPct} />;
+	if (!isReady) return <WasmLoadingScreen isReady={isReady} progressPct={progressPct} />;
 
 	return (
 		<>
@@ -260,10 +260,17 @@ function EditorContent() {
 	);
 }
 
-function WasmLoadingScreen({ progressPct }: { progressPct: number | null }) {
+function WasmLoadingScreen({
+	isReady,
+	progressPct,
+}: {
+	isReady: boolean;
+	progressPct: number | null;
+}) {
 	const hasPct = typeof progressPct === "number" && Number.isFinite(progressPct);
 	const pct = hasPct ? Math.max(0, Math.min(100, progressPct)) : null;
 	const pctDisplay = pct ?? 0;
+	const pctDisplayClamped = !isReady && pctDisplay >= 100 ? 99 : pctDisplay;
 	return (
 		<div className="w-full flex items-center justify-center min-h-dvh">
 			<div className="flex flex-col items-center gap-4">
@@ -271,7 +278,7 @@ function WasmLoadingScreen({ progressPct }: { progressPct: number | null }) {
 					Loading WASM binaries...
 					&nbsp;
 					<span className="inline-block text-right w-10 tabular-nums">
-						{pctDisplay}%
+						{pctDisplayClamped}%
 					</span>
 				</div>
 				<Progress className="w-full" value={pct} />

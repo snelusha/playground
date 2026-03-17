@@ -74,6 +74,7 @@ async function fetchResponseWithProgress(
 		async start(controller) {
 			let loaded = 0;
 			let lastPct = 0;
+			let determinate = true;
 			for (;;) {
 				const { done, value } = await reader.read();
 				if (done) {
@@ -83,11 +84,20 @@ async function fetchResponseWithProgress(
 				}
 				if (value) {
 					loaded += value.byteLength;
-					const rawPct = Math.floor((loaded / total) * 100);
-					const clampedPct = Math.max(0, Math.min(99, rawPct));
-					if (clampedPct !== lastPct) {
-						lastPct = clampedPct;
-						onProgress(clampedPct);
+					// Some hosts/CDNs serve WASM with compression where `Content-Length` reflects the
+					// compressed transfer size but `res.body` yields decompressed bytes. If we detect
+					// that mismatch, stop reporting a fake percent and fall back to indeterminate.
+					if (determinate && loaded > total) {
+						determinate = false;
+						onProgress(null);
+					}
+					if (determinate) {
+						const rawPct = Math.floor((loaded / total) * 100);
+						const clampedPct = Math.max(0, Math.min(99, rawPct));
+						if (clampedPct !== lastPct) {
+							lastPct = clampedPct;
+							onProgress(clampedPct);
+						}
 					}
 					controller.enqueue(value);
 				}
