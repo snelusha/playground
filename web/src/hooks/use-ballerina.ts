@@ -18,7 +18,7 @@ export function useBallerina() {
 
 			const result = await WebAssembly.instantiateStreaming(
 				fetchResponseWithProgress("ballerina.wasm", (pct) => {
-					if (!cancelled) setProgress(pct);
+					if (!cancelled) setProgress(Math.min(pct, 99));
 				}),
 				go.importObject,
 			);
