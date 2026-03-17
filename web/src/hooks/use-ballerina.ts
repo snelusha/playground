@@ -60,12 +60,11 @@ async function fetchResponseWithProgress(
 	onProgress: (pct: number | null) => void,
 ): Promise<Response> {
 	const res = await fetch(url);
-	const encoding = (res.headers.get("content-encoding") ?? "").trim().toLowerCase();
 	const total = Number(res.headers.get("content-length") ?? 0);
-	const hasReliableTotal = Number.isFinite(total) && total > 0 && (!encoding || encoding === "identity");
+	const hasTotal = Number.isFinite(total) && total > 0;
 
 	if (!res.body) return res;
-	if (!hasReliableTotal) {
+	if (!hasTotal) {
 		onProgress(null);
 		return res;
 	}

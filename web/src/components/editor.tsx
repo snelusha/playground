@@ -263,19 +263,16 @@ function EditorContent() {
 function WasmLoadingScreen({ progressPct }: { progressPct: number | null }) {
 	const hasPct = typeof progressPct === "number" && Number.isFinite(progressPct);
 	const pct = hasPct ? Math.max(0, Math.min(100, progressPct)) : null;
+	const pctDisplay = pct ?? 0;
 	return (
 		<div className="w-full flex items-center justify-center min-h-dvh">
 			<div className="flex flex-col items-center gap-4">
 				<div className="text-sm text-muted-foreground">
 					Loading WASM binaries...
-					{pct === null ? null : (
-						<>
-							&nbsp;
-							<span className="inline-block text-right w-10 tabular-nums">
-								{pct}%
-							</span>
-						</>
-					)}
+					&nbsp;
+					<span className="inline-block text-right w-10 tabular-nums">
+						{pctDisplay}%
+					</span>
 				</div>
 				<Progress className="w-full" value={pct} />
 			</div>
