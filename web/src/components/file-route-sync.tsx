@@ -6,7 +6,7 @@ import type { ShareSearch } from "@/lib/share/share-link";
 
 import { useFileTreeStore, useFileTreeActions } from "@/stores/file-tree-store";
 
-const DEFAULT_FILE = "/tmp/01-orders.bal";
+const DEFAULT_FILE = "/tmp/examples/01-orders.bal";
 const DEFAULT_SPLAT = DEFAULT_FILE.replace(/^\/+/, "");
 
 function normalizeSplat(splat: string | undefined) {

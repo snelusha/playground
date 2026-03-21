@@ -4,6 +4,10 @@
     "name": "tmp",
     "children": [
       {
+        "kind": "dir",
+        "name": "examples",
+        "children": [
+      {
         "kind": "file",
         "name": "01-orders.bal",
         "content": "import ballerina/io;\n\n// Shows pending orders with delivery fees\ntype Order record {|\n    string id;\n    string customer;\n    int amount;\n    string zone;\n|};\n\npublic function main() {\n    Order[] orders = [\n        {id: \"ORD001\", customer: \"Alice\", amount: 150, zone: \"Downtown\"},\n        {id: \"ORD002\", customer: \"Bob\", amount: 75, zone: \"Suburb\"},\n        {id: \"ORD003\", customer: \"Carol\", amount: 200, zone: \"Downtown\"}\n    ];\n    map\u003cint\u003e deliveryFee = {\"Downtown\": 5, \"Suburb\": 10};\n\n    io:println(\"=== Pending Orders ===\");\n    foreach int i in 0 ..\u003c orders.length() {\n        Order ord = orders[i];\n        io:println(i + 1, \". \", ord.id, \" | \",\n                ord.customer, \" | $\", ord.amount,\n                \" | \", ord.zone, \" (fee: $\", deliveryFee[ord.zone], \")\");\n    }\n}\n\n"
@@ -17,6 +21,8 @@
         "kind": "file",
         "name": "03-fibonacci.bal",
         "content": "import ballerina/io;\n\npublic function main() {\n    int n = 10;\n    int i = 0;\n    while (i \u003c n) {\n        io:println(\"F(\", i, \") = \", fibonacci(i));\n        i += 1;\n    }\n}\n\nfunction fibonacci(int n) returns int {\n    if (n \u003c= 1) {\n        return n;\n    }\n    int prev = 0;\n    int curr = 1;\n    int i = 2;\n    while (i \u003c= n) {\n        int next = prev + curr;\n        prev = curr;\n        curr = next;\n        i += 1;\n    }\n    return curr;\n}\n"
+      }
+        ]
       }
     ]
   }
