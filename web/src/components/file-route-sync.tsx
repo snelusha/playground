@@ -23,7 +23,7 @@ function filePathFromSplat(splat: string | undefined) {
 function splatFromFilePath(filePath: string) {
 	const trimmed = filePath.trim();
 	if (!trimmed) return DEFAULT_SPLAT;
-	const splat = trimmed.startsWith("/") ? filePath.slice(1) : filePath;
+	const splat = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed;
 	return splat || DEFAULT_SPLAT;
 }
 
@@ -80,7 +80,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	]);
 
 	React.useEffect(() => {
-		if (!ready || !activeFilePath) return;
+		if (!ready || !activeFilePath || !targetSplat) return;
 		if (targetSplat !== currentSplat) {
 			navigate({
 				to: "/$",
