@@ -18,7 +18,14 @@ export const TEMP_ROOT = "/tmp";
 export const TEMP_EXAMPLES_DIR_NAME = "examples";
 /** Canonical path for example files: `/tmp/examples`. */
 export const TEMP_EXAMPLES_ROOT = join(TEMP_ROOT, TEMP_EXAMPLES_DIR_NAME);
+/** Ephemeral share imports land under `/tmp/shared/...` (not persisted). */
+export const TEMP_SHARED_DIR_NAME = "shared";
+export const TEMP_SHARED_ROOT = join(TEMP_ROOT, TEMP_SHARED_DIR_NAME);
 export const LOCAL_ROOT = "/local";
+
+export function isTempSharedPath(path: string): boolean {
+	return isUnder(path, TEMP_SHARED_ROOT);
+}
 
 export type Namespace = "temp" | "local";
 

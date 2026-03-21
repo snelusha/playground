@@ -1,8 +1,10 @@
 import { AbstractFS } from "@/lib/fs/core/abstract-fs";
+import { join } from "@/lib/fs/core/path-utils";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
-const TEMP_PREFIX = "/tmp";
+/** Must match `TEMP_SHARED_ROOT` in `layered-fs.ts`. */
+const TEMP_SHARED_ROOT = join("/tmp", "shared");
 
 function sanitizeSuggestedName(name: string): string {
 	const s = name.replace(/[/\\]/g, "").replace(/\0/g, "").trim();
@@ -36,7 +38,8 @@ export class EphemeralFS extends AbstractFS {
 	}
 
 	/**
-	 * Writes shared content under `/tmp` only (not persisted). Returns a file path to open, or null.
+	 * Writes shared content under `/tmp/shared/...` only (not persisted).
+	 * Returns a file path to open, or null.
 	 */
 	importSharedRoot(
 		suggestedName: string,
@@ -46,11 +49,11 @@ export class EphemeralFS extends AbstractFS {
 		const base = sanitizeSuggestedName(suggestedName);
 		let unique = base;
 		let i = 1;
-		while (this.stat(`${TEMP_PREFIX}/${unique}`)) {
+		while (this.stat(`${TEMP_SHARED_ROOT}/${unique}`)) {
 			unique = `${base}-${i}`;
 			i++;
 		}
-		const target = `${TEMP_PREFIX}/${unique}`;
+		const target = `${TEMP_SHARED_ROOT}/${unique}`;
 		if (root.kind === "file") {
 			if (!this.writeFile(target, root.content)) return null;
 			return target;

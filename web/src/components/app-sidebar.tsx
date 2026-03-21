@@ -49,7 +49,10 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useShareLink } from "@/hooks/share";
 
+import { localspaceSidebarEntries } from "@/lib/fs/localspace-sidebar";
+import { isTempSharedPath } from "@/lib/fs/layered-fs";
 import { hoistTempExamples } from "@/lib/fs/temp-examples";
+import { cn } from "@/lib/utils";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
@@ -76,9 +79,16 @@ function FileTreeFileNode({ node, path, onSharePath }: FileTreeNodeProps) {
 		if (isMobile) toggleSidebar();
 	}
 
+	const dimmed = isTempSharedPath(path);
+
 	return (
 		<SidebarMenuItem>
-			<div className="group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent">
+			<div
+				className={cn(
+					"group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent",
+					dimmed && "opacity-75 text-muted-foreground",
+				)}
+			>
 				<SidebarMenuButton
 					isActive={activeFilePath === path}
 					onClick={handleClick}
@@ -170,13 +180,20 @@ function FileTreeDirNode({
 		toggleDir(path);
 	};
 
+	const dimmed = isTempSharedPath(path);
+
 	return (
 		<Collapsible
 			open={expanded}
 			className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
 		>
 			<SidebarMenuItem>
-				<div className="group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent">
+				<div
+					className={cn(
+						"group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent",
+						dimmed && "opacity-75 text-muted-foreground",
+					)}
+				>
 					<SidebarMenuButton className="w-full" onClick={handleToggle}>
 						<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
 						<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
@@ -304,6 +321,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 		[tempTree],
 	);
 	const localTree = useLocalTree();
+	const localspaceEntries = React.useMemo(
+		() => localspaceSidebarEntries(localTree, tempTree),
+		[localTree, tempTree],
+	);
 
 	const activeFilePath = useActiveFilePath();
 	const { setFileOperationDialog } = useFileTreeActions();
@@ -365,20 +386,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					</div>
 					<SidebarGroupContent className="mt-2">
 						<SidebarMenu>
-							{localTree.map((node, index) => {
-								const path = `/local/${node.name}`;
-								return (
-									<FileTreeNode
-										key={node.name}
-										node={node}
-										path={path}
-										onSharePath={copyShareLink}
-										defaultOpen={
-											index === 0 || !!activeFilePath?.startsWith(`${path}/`)
-										}
-									/>
-								);
-							})}
+							{localspaceEntries.map(({ node, path }, index) => (
+								<FileTreeNode
+									key={path}
+									node={node}
+									path={path}
+									onSharePath={copyShareLink}
+									defaultOpen={
+										index === 0 ||
+										!!activeFilePath?.startsWith(`${path}/`)
+									}
+								/>
+							))}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>

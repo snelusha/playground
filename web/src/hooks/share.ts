@@ -50,7 +50,7 @@ export function useShareLink() {
 	return { copyShareLink };
 }
 
-/** Consumes `?share=` on load: imports into /tmp, syncs route, or sets an error message. */
+/** Consumes `?share=` on load: imports into `/tmp/shared/...`, syncs route, or sets an error message. */
 export function useShareImport(): string | null {
 	const navigate = useNavigate();
 	const { share: token } = useSearch({ from: "/$" }) as ShareSearch;
