@@ -23,11 +23,6 @@
         "content": "import ballerina/io;\n\npublic function main() {\n    int n = 10;\n    int i = 0;\n    while (i \u003c n) {\n        io:println(\"F(\", i, \") = \", fibonacci(i));\n        i += 1;\n    }\n}\n\nfunction fibonacci(int n) returns int {\n    if (n \u003c= 1) {\n        return n;\n    }\n    int prev = 0;\n    int curr = 1;\n    int i = 2;\n    while (i \u003c= n) {\n        int next = prev + curr;\n        prev = curr;\n        curr = next;\n        i += 1;\n    }\n    return curr;\n}\n"
       }
         ]
-      },
-      {
-        "kind": "dir",
-        "name": "shared",
-        "children": []
       }
     ]
   }
