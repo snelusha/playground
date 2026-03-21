@@ -1,6 +1,8 @@
 import * as React from "react";
 
-import { useParams, useNavigate } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+
+import type { ShareSearch } from "@/lib/share/share-search";
 
 import { useFileTreeStore, useFileTreeActions } from "@/stores/file-tree-store";
 
@@ -20,7 +22,7 @@ function filePathFromSplat(splat: string | undefined) {
 	return `/${normalized}`;
 }
 
-function splatFromFilePath(filePath: string) {
+export function splatFromFilePath(filePath: string) {
 	const trimmed = filePath.trim();
 	if (!trimmed) return DEFAULT_SPLAT;
 	const splat = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed;
@@ -30,6 +32,9 @@ function splatFromFilePath(filePath: string) {
 export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const params = useParams({ strict: false }) as { _splat?: string };
 	const navigate = useNavigate();
+	const { share: shareToken } = useSearch({
+		from: "/$",
+	}) as ShareSearch;
 
 	const ready = useFileTreeStore((s) => s.ready);
 	const activeFilePath = useFileTreeStore((s) => s.activeFile?.path ?? null);
@@ -63,6 +68,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 
 	React.useEffect(() => {
 		if (!ready) return;
+		if (shareToken) return;
 
 		if (!filePathFromUrl) {
 			openDefaultFileAndSyncRoute();
@@ -73,6 +79,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		else openDefaultFileAndSyncRoute();
 	}, [
 		ready,
+		shareToken,
 		filePathFromUrl,
 		existsFile,
 		openFile,
@@ -81,6 +88,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 
 	React.useEffect(() => {
 		if (!ready || !activeFilePath || !targetSplat) return;
+		if (shareToken) return;
 		if (targetSplat !== currentSplat) {
 			navigate({
 				to: "/$",
@@ -88,7 +96,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 				replace: true,
 			});
 		}
-	}, [ready, activeFilePath, targetSplat, currentSplat, navigate]);
+	}, [ready, shareToken, activeFilePath, targetSplat, currentSplat, navigate]);
 
 	return children;
 }

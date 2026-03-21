@@ -2,9 +2,51 @@ import { AbstractFS } from "@/lib/fs/core/abstract-fs";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
+const TEMP_PREFIX = "/tmp";
+
+function sanitizeSuggestedName(name: string): string {
+	const s = name.replace(/[/\\]/g, "").replace(/\0/g, "").trim();
+	if (!s || s === "." || s === "..") return "shared";
+	return s.slice(0, 120);
+}
+
+function findFirstFilePath(fs: AbstractFS, dirPath: string): string | null {
+	const entries = fs.readDir(dirPath);
+	if (!entries) return null;
+	const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name));
+	for (const e of sorted) {
+		const p = `${dirPath}/${e.name}`;
+		if (!e.isDir) return p;
+		const sub = findFirstFilePath(fs, p);
+		if (sub) return sub;
+	}
+	return null;
+}
+
 export class EphemeralFS extends AbstractFS {
 	constructor(initial: FileNode[] = []) {
 		super();
 		this._seed(initial);
+	}
+
+	/**
+	 * Writes shared content under `/tmp` only (not persisted). Returns a file path to open, or null.
+	 */
+	importSharedRoot(suggestedName: string, root: FileNode): string | null {
+		const base = sanitizeSuggestedName(suggestedName);
+		let unique = base;
+		let i = 1;
+		while (this.stat(`${TEMP_PREFIX}/${unique}`)) {
+			unique = `${base}-${i}`;
+			i++;
+		}
+		const target = `${TEMP_PREFIX}/${unique}`;
+		if (root.kind === "file") {
+			if (!this.writeFile(target, root.content)) return null;
+			return target;
+		}
+		if (!this.mkdirAll(target)) return null;
+		this._seed(root.children, target);
+		return findFirstFilePath(this, target);
 	}
 }

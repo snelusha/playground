@@ -2,8 +2,10 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { immer } from "zustand/middleware/immer";
 
+import { dirname, isRootPath } from "@/lib/fs/core/path-utils";
 import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
+import type { SharePayloadV1 } from "@/lib/share/share-payload.types";
 
 const DEFAULT_MAIN_BAL = `import ballerina/io;
 
@@ -73,6 +75,8 @@ type FileTreeActions = {
 	toggleDir(path: string): void;
 	expandDir(path: string): void;
 	collapseDir(path: string): void;
+
+	applySharedImport(payload: SharePayloadV1): boolean;
 
 	_syncTrees(): void;
 };
@@ -269,6 +273,21 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				});
 			},
 
+			applySharedImport(payload) {
+				const openPath = _fs().importShareToEphemeral(payload);
+				if (!openPath) return false;
+				set((s) => {
+					let cur = dirname(openPath);
+					while (!isRootPath(cur)) {
+						s.expandedPaths.add(cur);
+						cur = dirname(cur);
+					}
+				});
+				get()._syncTrees();
+				get().openFile(openPath);
+				return true;
+			},
+
 			_syncTrees() {
 				const fs = _fs();
 				set((s) => {
@@ -312,5 +331,6 @@ export const useFileTreeActions = () =>
 			toggleDir: s.toggleDir,
 			expandDir: s.expandDir,
 			collapseDir: s.collapseDir,
+			applySharedImport: s.applySharedImport,
 		})),
 	);

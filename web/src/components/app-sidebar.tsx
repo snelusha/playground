@@ -10,6 +10,7 @@ import {
 	Delete02Icon,
 	Edit02Icon,
 	PackageIcon,
+	Share08Icon,
 } from "@hugeicons/core-free-icons";
 
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ import {
 } from "@/stores/file-tree-store";
 
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useShareLink } from "@/hooks/use-share-link";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
@@ -53,9 +55,10 @@ type FileTreeNodeProps = {
 	node: FileNode;
 	path: string;
 	defaultOpen?: boolean;
+	onSharePath: (path: string) => void;
 };
 
-function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
+function FileTreeFileNode({ node, path, onSharePath }: FileTreeNodeProps) {
 	const isMobile = useIsMobile();
 
 	const { toggleSidebar } = useSidebar();
@@ -107,7 +110,14 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 							<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
 							<span>Rename</span>
 						</DropdownMenuItem>
-
+						<DropdownMenuItem
+							onClick={() => {
+								onSharePath(path);
+							}}
+						>
+							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+							<span>Share</span>
+						</DropdownMenuItem>
 						<DropdownMenuItem
 							variant="destructive"
 							onClick={() =>
@@ -132,12 +142,14 @@ type FileTreeDirNodeProps = {
 	node: Extract<FileNode, { kind: "dir" }>;
 	path: string;
 	defaultOpen?: boolean;
+	onSharePath: (path: string) => void;
 };
 
 function FileTreeDirNode({
 	node,
 	path,
 	defaultOpen = false,
+	onSharePath,
 }: FileTreeDirNodeProps) {
 	const isMobile = useIsMobile();
 	const activeFilePath = useActiveFilePath();
@@ -211,6 +223,14 @@ function FileTreeDirNode({
 								<span>Rename</span>
 							</DropdownMenuItem>
 							<DropdownMenuItem
+								onClick={() => {
+									onSharePath(path);
+								}}
+							>
+								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+								<span>Share</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem
 								variant="destructive"
 								onClick={() =>
 									setFileOperationDialog({
@@ -236,6 +256,7 @@ function FileTreeDirNode({
 										key={child.name}
 										node={child}
 										path={childPath}
+										onSharePath={onSharePath}
 										defaultOpen={
 											!!activeFilePath &&
 											activeFilePath.startsWith(`${childPath}/`)
@@ -251,9 +272,25 @@ function FileTreeDirNode({
 	);
 }
 
-function FileTreeNode({ node, path, defaultOpen }: FileTreeNodeProps) {
-	if (node.kind === "file") return <FileTreeFileNode node={node} path={path} />;
-	return <FileTreeDirNode node={node} path={path} defaultOpen={defaultOpen} />;
+function FileTreeNode({
+	node,
+	path,
+	defaultOpen,
+	onSharePath,
+}: FileTreeNodeProps) {
+	if (node.kind === "file") {
+		return (
+			<FileTreeFileNode node={node} path={path} onSharePath={onSharePath} />
+		);
+	}
+	return (
+		<FileTreeDirNode
+			node={node}
+			path={path}
+			defaultOpen={defaultOpen}
+			onSharePath={onSharePath}
+		/>
+	);
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -264,6 +301,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	const activeFilePath = useActiveFilePath();
 	const { setFileOperationDialog } = useFileTreeActions();
+	const { copyShareLink } = useShareLink();
 
 	return (
 		<Sidebar {...props}>
@@ -279,6 +317,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 										key={node.name}
 										node={node}
 										path={path}
+										onSharePath={copyShareLink}
 										defaultOpen={
 											index === 0 || !!activeFilePath?.startsWith(`${path}/`)
 										}
@@ -327,6 +366,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 										key={node.name}
 										node={node}
 										path={path}
+										onSharePath={copyShareLink}
 										defaultOpen={
 											index === 0 || !!activeFilePath?.startsWith(`${path}/`)
 										}

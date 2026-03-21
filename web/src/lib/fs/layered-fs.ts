@@ -1,4 +1,12 @@
-import { isRootPath, isUnder } from "@/lib/fs/core/path-utils";
+import type { AbstractFS } from "@/lib/fs/core/abstract-fs";
+import type { FileNode } from "@/lib/fs/core/file-node.types";
+import type { SharePayloadV1 } from "@/lib/share/share-payload.types";
+import {
+	basename,
+	isRootPath,
+	isUnder,
+	pathSegments,
+} from "@/lib/fs/core/path-utils";
 
 import type { FS } from "@/lib/fs/core/fs.interface";
 import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
@@ -65,6 +73,51 @@ export class LayeredFS implements FS {
 
 	localTree() {
 		return this.local.transformToTree("/local");
+	}
+
+	/**
+	 * Builds a {@link FileNode} for a file or directory at `path` (under `/tmp` or `/local`).
+	 */
+	exportPathToFileNode(path: string): FileNode | null {
+		if (
+			isRootPath(path) ||
+			path === TEMP_ROOT ||
+			path === LOCAL_ROOT ||
+			!this._namespace(path)
+		) {
+			return null;
+		}
+
+		for (const seg of pathSegments(path)) {
+			if (seg === ".." || seg === ".") return null;
+		}
+
+		const info = this.stat(path);
+		if (!info) return null;
+
+		const name = basename(path);
+		if (!name) return null;
+
+		if (!info.isDir) {
+			const file = this.open(path);
+			if (!file) return null;
+			return { kind: "file", name, content: file.content };
+		}
+
+		const target = this._target(path) as AbstractFS | null;
+		if (!target) return null;
+		return {
+			kind: "dir",
+			name,
+			children: target.transformToTree(path),
+		};
+	}
+
+	/**
+	 * Imports a decoded share into the ephemeral (temp) layer only — not persisted.
+	 */
+	importShareToEphemeral(payload: SharePayloadV1): string | null {
+		return this.temp.importSharedRoot(payload.name, payload.root);
 	}
 
 	private _moveToTarget(
