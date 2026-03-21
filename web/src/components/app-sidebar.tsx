@@ -37,6 +37,8 @@ import {
 
 import { FileTreeDialog } from "@/components/file-tree-dialog";
 
+import { resolveExamples } from "@/lib/file-tree-utils";
+
 import {
 	useActiveFilePath,
 	useFileTreeActions,
@@ -262,6 +264,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const tempTree = useTempTree();
 	const localTree = useLocalTree();
 
+	const { nodes: exampleNodes, basePath: examplesBasePath } = React.useMemo(
+		() => resolveExamples(tempTree),
+		[tempTree],
+	);
+
 	const activeFilePath = useActiveFilePath();
 	const { setFileOperationDialog } = useFileTreeActions();
 
@@ -272,8 +279,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					<SidebarGroupLabel>Examples</SidebarGroupLabel>
 					<SidebarGroupContent className="mt-2">
 						<SidebarMenu>
-							{tempTree.map((node, index) => {
-								const path = `/tmp/${node.name}`;
+							{exampleNodes.map((node, index) => {
+								const path = `${examplesBasePath}/${node.name}`;
 								return (
 									<FileTreeNode
 										key={node.name}
