@@ -5,6 +5,7 @@ import {
 	basename,
 	isRootPath,
 	isUnder,
+	join,
 	pathSegments,
 } from "@/lib/fs/core/path-utils";
 
@@ -13,8 +14,10 @@ import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
 import type { LocalStorageFS } from "@/lib/fs/local-storage-fs";
 
 export const TEMP_ROOT = "/tmp";
-/** Seed examples live under this path (sidebar shows these children at the top level). */
-export const TEMP_EXAMPLES_ROOT = "/tmp/examples";
+/** Matches the `examples` directory in seeded ephemeral FS (`examples.json` / `example_gen`). */
+export const TEMP_EXAMPLES_DIR_NAME = "examples";
+/** Canonical path for example files: `/tmp/examples`. */
+export const TEMP_EXAMPLES_ROOT = join(TEMP_ROOT, TEMP_EXAMPLES_DIR_NAME);
 export const LOCAL_ROOT = "/local";
 
 export type Namespace = "temp" | "local";
