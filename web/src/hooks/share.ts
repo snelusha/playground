@@ -50,7 +50,7 @@ export function useShareLink() {
 	return { copyShareLink };
 }
 
-/** Consumes `?share=` on load: imports into `/tmp/shared/...`, syncs route, or sets an error message. */
+/** Consumes `?share=` on load: imports into `/tmp/shared/...`, sets splat, keeps `?share=` (see FileRouteSync). */
 export function useShareImport(): string | null {
 	const navigate = useNavigate();
 	const { share: token } = useSearch({ from: "/$" }) as ShareSearch;
@@ -89,10 +89,12 @@ export function useShareImport(): string | null {
 			const path = useFileTreeStore.getState().activeFile?.path;
 			if (!path) return;
 
+			// Keep `?share=` in the URL so FileRouteSync does not overwrite the route from
+			// the file tree (which would drop the token and break refresh / re-sharing).
 			navigate({
 				to: "/$",
 				params: { _splat: path.startsWith("/") ? path.slice(1) : path },
-				search: { share: undefined },
+				search: { share: token },
 				replace: true,
 			});
 		})();

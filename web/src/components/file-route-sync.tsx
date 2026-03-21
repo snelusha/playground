@@ -61,6 +61,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 			navigate({
 				to: "/$",
 				params: { _splat: DEFAULT_SPLAT },
+				search: (prev) => prev,
 				replace: true,
 			});
 		}
@@ -93,6 +94,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 			navigate({
 				to: "/$",
 				params: { _splat: targetSplat },
+				search: (prev) => prev,
 				replace: true,
 			});
 		}
