@@ -42,12 +42,14 @@ import {
 	useActiveFilePath,
 	useFileTreeActions,
 	useLocalTree,
-	useTempTree,
+	useTempExamplesTree,
 	useExpandedPaths,
 } from "@/stores/file-tree-store";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useShareLink } from "@/hooks/share";
+
+import { TEMP_EXAMPLES_ROOT } from "@/lib/fs/layered-fs";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
@@ -296,7 +298,7 @@ function FileTreeNode({
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const isMobile = useIsMobile();
 
-	const tempTree = useTempTree();
+	const examplesTree = useTempExamplesTree();
 	const localTree = useLocalTree();
 
 	const activeFilePath = useActiveFilePath();
@@ -310,8 +312,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					<SidebarGroupLabel>Examples</SidebarGroupLabel>
 					<SidebarGroupContent className="mt-2">
 						<SidebarMenu>
-							{tempTree.map((node, index) => {
-								const path = `/tmp/${node.name}`;
+							{examplesTree.map((node, index) => {
+								const path = `${TEMP_EXAMPLES_ROOT}/${node.name}`;
 								return (
 									<FileTreeNode
 										key={node.name}

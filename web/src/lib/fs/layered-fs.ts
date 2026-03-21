@@ -13,6 +13,8 @@ import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
 import type { LocalStorageFS } from "@/lib/fs/local-storage-fs";
 
 export const TEMP_ROOT = "/tmp";
+/** Seed examples live under this path (sidebar shows these children at the top level). */
+export const TEMP_EXAMPLES_ROOT = "/tmp/examples";
 export const LOCAL_ROOT = "/local";
 
 export type Namespace = "temp" | "local";
@@ -69,6 +71,11 @@ export class LayeredFS implements FS {
 
 	tempTree() {
 		return this.temp.transformToTree("/tmp");
+	}
+
+	/** Children of {@link TEMP_EXAMPLES_ROOT} for the Examples sidebar (not the wrapping `examples` folder). */
+	tempExamplesTree() {
+		return this.temp.transformToTree(TEMP_EXAMPLES_ROOT);
 	}
 
 	localTree() {

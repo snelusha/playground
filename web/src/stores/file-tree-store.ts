@@ -39,6 +39,8 @@ export type FileOperationDialog = {
 
 type FileTreeState = {
 	tempTree: FileNode[];
+	/** Direct children of `/tmp/examples` for the Examples sidebar. */
+	tempExamplesTree: FileNode[];
 	localTree: FileNode[];
 	activeFile: ActiveFile | null;
 	ready: boolean;
@@ -92,6 +94,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 
 		return {
 			tempTree: [],
+			tempExamplesTree: [],
 			localTree: [],
 			activeFile: null,
 			ready: false,
@@ -104,6 +107,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				set((s) => {
 					if (!fs) return;
 					s.tempTree = fs.tempTree();
+					s.tempExamplesTree = fs.tempExamplesTree();
 					s.localTree = fs.localTree();
 					s.ready = true;
 				});
@@ -292,6 +296,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				const fs = _fs();
 				set((s) => {
 					s.tempTree = fs.tempTree();
+					s.tempExamplesTree = fs.tempExamplesTree();
 					s.localTree = fs.localTree();
 				});
 			},
@@ -300,6 +305,8 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 );
 
 export const useTempTree = () => useFileTreeStore((s) => s.tempTree);
+export const useTempExamplesTree = () =>
+	useFileTreeStore((s) => s.tempExamplesTree);
 export const useLocalTree = () => useFileTreeStore((s) => s.localTree);
 
 export const useActiveFile = () => useFileTreeStore((s) => s.activeFile);
