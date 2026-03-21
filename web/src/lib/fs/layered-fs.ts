@@ -73,11 +73,6 @@ export class LayeredFS implements FS {
 		return this.temp.transformToTree("/tmp");
 	}
 
-	/** Children of {@link TEMP_EXAMPLES_ROOT} for the Examples sidebar (not the wrapping `examples` folder). */
-	tempExamplesTree() {
-		return this.temp.transformToTree(TEMP_EXAMPLES_ROOT);
-	}
-
 	localTree() {
 		return this.local.transformToTree("/local");
 	}

@@ -42,16 +42,34 @@ import {
 	useActiveFilePath,
 	useFileTreeActions,
 	useLocalTree,
-	useTempExamplesTree,
+	useTempTree,
 	useExpandedPaths,
 } from "@/stores/file-tree-store";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useShareLink } from "@/hooks/share";
 
-import { TEMP_EXAMPLES_ROOT } from "@/lib/fs/layered-fs";
+import {
+	TEMP_EXAMPLES_ROOT,
+	TEMP_ROOT,
+} from "@/lib/fs/layered-fs";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
+
+/** Sidebar lists children of `/tmp/examples` without showing the `examples` folder row. */
+function examplesSidebarView(tempTree: FileNode[]): {
+	nodes: FileNode[];
+	pathPrefix: string;
+} {
+	const examplesDir = tempTree.find(
+		(n): n is Extract<FileNode, { kind: "dir" }> =>
+			n.kind === "dir" && n.name === "examples",
+	);
+	if (examplesDir) {
+		return { nodes: examplesDir.children, pathPrefix: TEMP_EXAMPLES_ROOT };
+	}
+	return { nodes: tempTree, pathPrefix: TEMP_ROOT };
+}
 
 type FileTreeNodeProps = {
 	node: FileNode;
@@ -298,7 +316,9 @@ function FileTreeNode({
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const isMobile = useIsMobile();
 
-	const examplesTree = useTempExamplesTree();
+	const tempTree = useTempTree();
+	const { nodes: examplesNodes, pathPrefix: examplesPathPrefix } =
+		React.useMemo(() => examplesSidebarView(tempTree), [tempTree]);
 	const localTree = useLocalTree();
 
 	const activeFilePath = useActiveFilePath();
@@ -312,8 +332,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					<SidebarGroupLabel>Examples</SidebarGroupLabel>
 					<SidebarGroupContent className="mt-2">
 						<SidebarMenu>
-							{examplesTree.map((node, index) => {
-								const path = `${TEMP_EXAMPLES_ROOT}/${node.name}`;
+							{examplesNodes.map((node, index) => {
+								const path = `${examplesPathPrefix}/${node.name}`;
 								return (
 									<FileTreeNode
 										key={node.name}
