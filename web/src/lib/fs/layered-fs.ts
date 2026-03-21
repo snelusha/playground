@@ -1,6 +1,6 @@
 import type { AbstractFS } from "@/lib/fs/core/abstract-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
-import type { SharePayloadV1 } from "@/lib/share/share-payload.types";
+import type { SharePayload } from "@/lib/share/share-link";
 import {
 	basename,
 	isRootPath,
@@ -116,7 +116,7 @@ export class LayeredFS implements FS {
 	/**
 	 * Imports a decoded share into the ephemeral (temp) layer only — not persisted.
 	 */
-	importShareToEphemeral(payload: SharePayloadV1): string | null {
+	importShareToEphemeral(payload: SharePayload): string | null {
 		return this.temp.importSharedRoot(payload.name, payload.root);
 	}
 

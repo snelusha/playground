@@ -5,7 +5,7 @@ import { immer } from "zustand/middleware/immer";
 import { dirname, isRootPath } from "@/lib/fs/core/path-utils";
 import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
-import type { SharePayloadV1 } from "@/lib/share/share-payload.types";
+import type { SharePayload } from "@/lib/share/share-link";
 
 const DEFAULT_MAIN_BAL = `import ballerina/io;
 
@@ -76,7 +76,7 @@ type FileTreeActions = {
 	expandDir(path: string): void;
 	collapseDir(path: string): void;
 
-	applySharedImport(payload: SharePayloadV1): boolean;
+	applySharedImport(payload: SharePayload): boolean;
 
 	_syncTrees(): void;
 };

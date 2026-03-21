@@ -47,7 +47,7 @@ import {
 } from "@/stores/file-tree-store";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useShareLink } from "@/hooks/use-share-link";
+import { useShareLink } from "@/hooks/share";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 

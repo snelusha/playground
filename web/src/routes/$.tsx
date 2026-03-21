@@ -5,7 +5,7 @@ import { Editor } from "@/components/editor";
 import { ShareLinkHandler } from "@/components/share-link-handler";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { parseShareSearch } from "@/lib/share/share-search";
+import { parseShareSearch } from "@/lib/share/share-link";
 
 import { FSProvider } from "@/providers/fs-provider";
 

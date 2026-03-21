@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 
-import type { ShareSearch } from "@/lib/share/share-search";
+import type { ShareSearch } from "@/lib/share/share-link";
 
 import { useFileTreeStore, useFileTreeActions } from "@/stores/file-tree-store";
 
