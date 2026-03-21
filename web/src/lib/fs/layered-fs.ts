@@ -117,7 +117,11 @@ export class LayeredFS implements FS {
 	 * Imports a decoded share into the ephemeral (temp) layer only — not persisted.
 	 */
 	importShareToEphemeral(payload: SharePayload): string | null {
-		return this.temp.importSharedRoot(payload.name, payload.root);
+		return this.temp.importSharedRoot(
+			payload.name,
+			payload.root,
+			payload.openRelativePath,
+		);
 	}
 
 	private _moveToTarget(

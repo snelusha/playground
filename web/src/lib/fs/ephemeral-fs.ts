@@ -10,6 +10,12 @@ function sanitizeSuggestedName(name: string): string {
 	return s.slice(0, 120);
 }
 
+function pathSegmentOk(seg: string): boolean {
+	if (!seg || seg === "." || seg === "..") return false;
+	if (/[/\\]/.test(seg) || seg.includes("\0")) return false;
+	return seg.length <= 255;
+}
+
 function findFirstFilePath(fs: AbstractFS, dirPath: string): string | null {
 	const entries = fs.readDir(dirPath);
 	if (!entries) return null;
@@ -32,7 +38,11 @@ export class EphemeralFS extends AbstractFS {
 	/**
 	 * Writes shared content under `/tmp` only (not persisted). Returns a file path to open, or null.
 	 */
-	importSharedRoot(suggestedName: string, root: FileNode): string | null {
+	importSharedRoot(
+		suggestedName: string,
+		root: FileNode,
+		openRelativePath?: string,
+	): string | null {
 		const base = sanitizeSuggestedName(suggestedName);
 		let unique = base;
 		let i = 1;
@@ -47,6 +57,19 @@ export class EphemeralFS extends AbstractFS {
 		}
 		if (!this.mkdirAll(target)) return null;
 		this._seed(root.children, target);
+
+		const rel = openRelativePath?.trim();
+		if (rel) {
+			const segs = rel.split("/").filter(Boolean);
+			if (segs.length && segs.every(pathSegmentOk)) {
+				let candidate = target;
+				for (const seg of segs) {
+					candidate = `${candidate}/${seg}`;
+				}
+				const st = this.stat(candidate);
+				if (st && !st.isDir) return candidate;
+			}
+		}
 		return findFirstFilePath(this, target);
 	}
 }

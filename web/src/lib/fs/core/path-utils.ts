@@ -37,3 +37,16 @@ export function isRootPath(path: string): boolean {
 export function isUnder(path: string, root: string): boolean {
 	return path === root || path.startsWith(`${root}/`);
 }
+
+/**
+ * If `path` equals `ancestor` or is under it, returns the relative path (POSIX, may be empty).
+ * Otherwise returns null.
+ */
+export function relativePathFromAncestor(
+	ancestor: string,
+	path: string,
+): string | null {
+	if (path === ancestor) return "";
+	if (!isUnder(path, ancestor)) return null;
+	return path.slice(ancestor.length + 1);
+}

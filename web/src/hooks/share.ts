@@ -9,6 +9,7 @@ import {
 	buildSharePageUrl,
 	decodeShareToken,
 	encodeShareToken,
+	enrichShareFromActiveEditor,
 	type SharePayload,
 	type ShareSearch,
 } from "@/lib/share/share-link";
@@ -23,10 +24,19 @@ export function useShareLink() {
 			const root = fs.exportPathToFileNode(path);
 			if (!root) return;
 
+			const active = useFileTreeStore.getState().activeFile;
+			const activeEditor = active?.path
+				? { path: active.path, content: active.content }
+				: null;
+
+			const { root: mergedRoot, openRelativePath } =
+				enrichShareFromActiveEditor(path, root, activeEditor);
+
 			const payload: SharePayload = {
 				v: 1,
 				name: basename(path),
-				root,
+				root: mergedRoot,
+				...(openRelativePath ? { openRelativePath } : {}),
 			};
 
 			try {

@@ -1,5 +1,7 @@
 import { getRouterBasePath } from "@/lib/router-utils";
 
+import { relativePathFromAncestor } from "@/lib/fs/core/path-utils";
+
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 /** Share envelope (versioned for future formats). */
@@ -7,6 +9,8 @@ export type SharePayload = {
 	v: 1;
 	name: string;
 	root: FileNode;
+	/** Path under the shared root to open after import (POSIX). Set when sharing a folder and a nested file is active. */
+	openRelativePath?: string;
 };
 
 export type ShareSearch = {
@@ -96,10 +100,20 @@ function validNode(
 	return false;
 }
 
+function validOpenRelativePath(s: unknown): boolean {
+	if (s === undefined) return true;
+	if (typeof s !== "string" || s.length > 4096) return false;
+	for (const seg of s.split("/")) {
+		if (seg && !safeSeg(seg)) return false;
+	}
+	return true;
+}
+
 function validPayload(x: unknown): x is SharePayload {
 	if (!x || typeof x !== "object") return false;
 	const p = x as Record<string, unknown>;
 	if (p.v !== 1 || typeof p.name !== "string" || !safeSeg(p.name)) return false;
+	if (!validOpenRelativePath(p.openRelativePath)) return false;
 	return validNode(p.root, 0, { c: 0 });
 }
 
@@ -158,4 +172,64 @@ export function buildSharePageUrl(token: string): string {
 	const url = new URL(pathname, window.location.origin);
 	url.searchParams.set("share", token);
 	return url.href;
+}
+
+/** Overlays unsaved editor text onto the exported tree when the active file lies under `sharedFsPath`. */
+export function mergeFileContentAtRelativePath(
+	root: FileNode,
+	relativePath: string,
+	content: string,
+): FileNode {
+	if (root.kind === "file") {
+		if (relativePath !== "") return root;
+		return { ...root, content };
+	}
+	const segs = relativePath.split("/").filter(Boolean);
+	if (segs.length === 0) return root;
+	return {
+		...root,
+		children: mergeInChildren(root.children, segs, content),
+	};
+}
+
+function mergeInChildren(
+	children: FileNode[],
+	segments: string[],
+	content: string,
+): FileNode[] {
+	const [head, ...rest] = segments;
+	return children.map((child) => {
+		if (child.name !== head) return child;
+		if (rest.length === 0) {
+			if (child.kind === "file") return { ...child, content };
+			return child;
+		}
+		if (child.kind === "dir") {
+			return {
+				...child,
+				children: mergeInChildren(child.children, rest, content),
+			};
+		}
+		return child;
+	});
+}
+
+/**
+ * Applies current editor buffer for the active file when it is the shared item or inside it.
+ * For directory shares, sets `openRelativePath` so the recipient opens the same nested file.
+ */
+export function enrichShareFromActiveEditor(
+	sharedFsPath: string,
+	root: FileNode,
+	active: { path: string; content: string } | null,
+): { root: FileNode; openRelativePath?: string } {
+	if (!active) return { root };
+	const rel = relativePathFromAncestor(sharedFsPath, active.path);
+	if (rel === null) return { root };
+
+	const merged = mergeFileContentAtRelativePath(root, rel, active.content);
+	if (root.kind === "dir" && rel !== "") {
+		return { root: merged, openRelativePath: rel };
+	}
+	return { root: merged };
 }
