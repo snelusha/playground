@@ -8,6 +8,11 @@ import { FileRouteSync } from "@/components/file-route-sync";
 import { Editor } from "@/components/editor";
 
 export const Route = createFileRoute("/$")({
+	validateSearch: (search: Record<string, unknown>) => {
+		const raw = search.raw;
+		if (typeof raw !== "string" || !raw.trim()) return {};
+		return { share: raw };
+	},
 	component: SplatComponent,
 });
 
