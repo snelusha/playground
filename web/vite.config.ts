@@ -23,6 +23,7 @@ function githubPagesSpa(): Plugin {
 }
 
 export default defineConfig({
+	base: "/playground/",
 	plugins: [
 		tanstackRouter({
 			target: "react",
