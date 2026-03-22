@@ -37,3 +37,10 @@ export function isRootPath(path: string): boolean {
 export function isUnder(path: string, root: string): boolean {
 	return path === root || path.startsWith(`${root}/`);
 }
+
+/** True if `rel` is a non-empty relative path with no `.` or `..` segments (safe to join under a trusted root). */
+export function isSafeRelativePath(rel: string): boolean {
+	const trimmed = rel.trim();
+	if (!trimmed) return false;
+	return pathSegments(trimmed).every((s) => s !== "." && s !== "..");
+}

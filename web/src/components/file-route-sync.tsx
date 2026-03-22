@@ -1,7 +1,8 @@
 import * as React from "react";
 
-import { useParams, useNavigate } from "@tanstack/react-router";
+import { useParams, useNavigate, useSearch } from "@tanstack/react-router";
 
+import { deserializeSharePayload } from "@/lib/share";
 import { useFileTreeStore, useFileTreeActions } from "@/stores/file-tree-store";
 
 const DEFAULT_FILE = "/tmp/01-orders.bal";
@@ -29,11 +30,17 @@ function splatFromFilePath(filePath: string) {
 
 export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const params = useParams({ strict: false }) as { _splat?: string };
-	const navigate = useNavigate();
+	const navigate = useNavigate({ from: "/$" });
+	const { share } = useSearch({ from: "/$", strict: false }) as {
+		share?: string;
+	};
 
 	const ready = useFileTreeStore((s) => s.ready);
 	const activeFilePath = useFileTreeStore((s) => s.activeFile?.path ?? null);
-	const { openFile, existsFile } = useFileTreeActions();
+	const { openFile, existsFile, applySharedFileNodeToTemp } =
+		useFileTreeActions();
+
+	const shareProcessedRef = React.useRef<string | null>(null);
 
 	const splat = params._splat;
 
@@ -61,8 +68,57 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		}
 	}, [openFile, existsFile, navigate]);
 
+	const stripShareSearch = React.useCallback(() => {
+		navigate({
+			search: (prev) => {
+				const { share: _removed, ...rest } = prev as Record<string, unknown>;
+				return rest;
+			},
+			replace: true,
+		});
+	}, [navigate]);
+
 	React.useEffect(() => {
 		if (!ready) return;
+
+		if (share) {
+			if (shareProcessedRef.current === share) return;
+
+			const payload = deserializeSharePayload(share);
+			if (!payload) {
+				stripShareSearch();
+				return;
+			}
+
+			shareProcessedRef.current = share;
+
+			const openPath = applySharedFileNodeToTemp(
+				payload.root,
+				payload.openRelativePath,
+			);
+			if (openPath) {
+				openFile(openPath);
+				navigate({
+					to: "/$",
+					params: { _splat: splatFromFilePath(openPath) },
+					search: (prev) => {
+						const { share: _removed, ...rest } = prev as Record<
+							string,
+							unknown
+						>;
+						return rest;
+					},
+					replace: true,
+				});
+			} else {
+				shareProcessedRef.current = null;
+				stripShareSearch();
+				openDefaultFileAndSyncRoute();
+			}
+			return;
+		}
+
+		shareProcessedRef.current = null;
 
 		if (!filePathFromUrl) {
 			openDefaultFileAndSyncRoute();
@@ -73,10 +129,14 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		else openDefaultFileAndSyncRoute();
 	}, [
 		ready,
+		share,
 		filePathFromUrl,
 		existsFile,
 		openFile,
 		openDefaultFileAndSyncRoute,
+		applySharedFileNodeToTemp,
+		navigate,
+		stripShareSearch,
 	]);
 
 	React.useEffect(() => {

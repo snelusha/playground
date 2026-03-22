@@ -10,6 +10,7 @@ import {
 	Delete02Icon,
 	Edit02Icon,
 	PackageIcon,
+	Share08Icon,
 } from "@hugeicons/core-free-icons";
 
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,15 @@ import {
 
 import { FileTreeDialog } from "@/components/file-tree-dialog";
 
-import { resolveExamples } from "@/lib/file-tree-utils";
+import { resolveExamples, resolveSharedImports } from "@/lib/file-tree-utils";
+import {
+	buildShareUrl,
+	copyToClipboardSilent,
+	relativePathForSharedImport,
+	serializeSharePayload,
+} from "@/lib/share";
+
+import { useFS } from "@/providers/fs-provider";
 
 import {
 	useActiveFilePath,
@@ -65,6 +74,7 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 	const activeFilePath = useActiveFilePath();
 
 	const { openFile, saveFile, setFileOperationDialog } = useFileTreeActions();
+	const fs = useFS();
 
 	function handleClick() {
 		// TODO: This is a bit hacky, we should ideally have a separate "switchFile" action that doesn't mark the file as dirty
@@ -109,7 +119,23 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 							<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
 							<span>Rename</span>
 						</DropdownMenuItem>
-
+						<DropdownMenuItem
+							onClick={() => {
+								const snapshot = fs.pathToFileNode(path);
+								if (!snapshot) return;
+								const openRel = relativePathForSharedImport(
+									snapshot,
+									path,
+									activeFilePath,
+								);
+								copyToClipboardSilent(
+									buildShareUrl(serializeSharePayload(snapshot, openRel)),
+								);
+							}}
+						>
+							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+							<span>Share</span>
+						</DropdownMenuItem>
 						<DropdownMenuItem
 							variant="destructive"
 							onClick={() =>
@@ -146,6 +172,7 @@ function FileTreeDirNode({
 
 	const expandedPaths = useExpandedPaths();
 	const { setFileOperationDialog, toggleDir } = useFileTreeActions();
+	const fs = useFS();
 
 	const [hasInteracted, setHasInteracted] = React.useState(false);
 	const expanded = (!hasInteracted && defaultOpen) || expandedPaths.has(path);
@@ -213,6 +240,23 @@ function FileTreeDirNode({
 								<span>Rename</span>
 							</DropdownMenuItem>
 							<DropdownMenuItem
+								onClick={() => {
+									const snapshot = fs.pathToFileNode(path);
+									if (!snapshot) return;
+									const openRel = relativePathForSharedImport(
+										snapshot,
+										path,
+										activeFilePath,
+									);
+									copyToClipboardSilent(
+										buildShareUrl(serializeSharePayload(snapshot, openRel)),
+									);
+								}}
+							>
+								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+								<span>Share</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem
 								variant="destructive"
 								onClick={() =>
 									setFileOperationDialog({
@@ -266,6 +310,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	const { nodes: exampleNodes, basePath: examplesBasePath } = React.useMemo(
 		() => resolveExamples(tempTree),
+		[tempTree],
+	);
+
+	const { nodes: sharedNodes, basePath: sharedBasePath } = React.useMemo(
+		() => resolveSharedImports(tempTree),
 		[tempTree],
 	);
 
@@ -331,11 +380,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 								const path = `/local/${node.name}`;
 								return (
 									<FileTreeNode
-										key={node.name}
+										key={`local:${node.name}`}
 										node={node}
 										path={path}
 										defaultOpen={
 											index === 0 || !!activeFilePath?.startsWith(`${path}/`)
+										}
+									/>
+								);
+							})}
+							{sharedNodes.map((node, index) => {
+								const path = `${sharedBasePath}/${node.name}`;
+								return (
+									<FileTreeNode
+										key={`shared:${node.name}`}
+										node={node}
+										path={path}
+										defaultOpen={
+											(localTree.length === 0 && index === 0) ||
+											!!activeFilePath?.startsWith(`${path}/`) ||
+											activeFilePath === path
 										}
 									/>
 								);

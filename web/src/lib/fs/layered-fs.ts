@@ -1,7 +1,9 @@
 import {
 	basename,
 	isRootPath,
+	isSafeRelativePath,
 	isUnder,
+	join,
 	pathSegments,
 } from "@/lib/fs/core/path-utils";
 
@@ -12,6 +14,8 @@ import type { LocalStorageFS } from "@/lib/fs/local-storage-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 export const TEMP_ROOT = "/tmp";
+/** Ephemeral imports from share links (not LocalStorageFS). */
+export const SHARED_IMPORT_ROOT = join(TEMP_ROOT, "shared");
 export const LOCAL_ROOT = "/local";
 
 export type Namespace = "temp" | "local";
@@ -72,6 +76,21 @@ export class LayeredFS implements FS {
 
 	localTree() {
 		return this.local.transformToTree("/local");
+	}
+
+	/** Writes the snapshot under {@link SHARED_IMPORT_ROOT} (ephemeral; shown under Localspace in the UI). Returns a file path to open, or `null` if the tree has no files. */
+	importSharedFileNodeIntoTemp(
+		node: FileNode,
+		preferredRelativePath?: string | null,
+	): string | null {
+		this.temp.importFileNodeUnder(SHARED_IMPORT_ROOT, node);
+		const trimmed = preferredRelativePath?.trim();
+		if (trimmed && isSafeRelativePath(trimmed)) {
+			const candidate = join(SHARED_IMPORT_ROOT, trimmed);
+			const info = this.stat(candidate);
+			if (info && !info.isDir) return candidate;
+		}
+		return findFirstFilePathInNode(node, SHARED_IMPORT_ROOT);
 	}
 
 	pathToFileNode(path: string): FileNode | null {
@@ -158,4 +177,14 @@ export class LayeredFS implements FS {
 		if (!target) return false;
 		return fn(target);
 	}
+}
+
+function findFirstFilePathInNode(node: FileNode, parentPath: string): string | null {
+	if (node.kind === "file") return `${parentPath}/${node.name}`;
+	const dirPath = `${parentPath}/${node.name}`;
+	for (const child of node.children) {
+		const p = findFirstFilePathInNode(child, dirPath);
+		if (p) return p;
+	}
+	return null;
 }

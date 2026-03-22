@@ -1,4 +1,4 @@
-import { TEMP_ROOT } from "@/lib/fs/layered-fs";
+import { SHARED_IMPORT_ROOT, TEMP_ROOT } from "@/lib/fs/layered-fs";
 import { join } from "@/lib/fs/core/path-utils";
 
 import type { FileNode } from "./fs/core/file-node.types";
@@ -19,5 +19,18 @@ export function resolveExamples(children: FileNode[]): ResolvedExamples {
 	return {
 		nodes: examplesDir.children,
 		basePath: EXAMPLES_ROOT,
+	};
+}
+
+/** Children under `/tmp/shared` (ephemeral share imports), for listing beside LocalStorageFS in Localspace. */
+export function resolveSharedImports(children: FileNode[]): ResolvedExamples {
+	const sharedDir = children.find(
+		(n): n is Extract<FileNode, { kind: "dir" }> =>
+			n.kind === "dir" && n.name === "shared",
+	);
+	if (!sharedDir) return { nodes: [], basePath: SHARED_IMPORT_ROOT };
+	return {
+		nodes: sharedDir.children,
+		basePath: SHARED_IMPORT_ROOT,
 	};
 }

@@ -75,6 +75,12 @@ type FileTreeActions = {
 	collapseDir(path: string): void;
 
 	_syncTrees(): void;
+
+	/** Imports a shared snapshot into `/tmp/shared` (ephemeral) and refreshes trees. Returns a file path to open, or `null` if empty. */
+	applySharedFileNodeToTemp(
+		node: FileNode,
+		openRelativePath?: string | null,
+	): string | null;
 };
 
 export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
@@ -276,6 +282,15 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 					s.localTree = fs.localTree();
 				});
 			},
+
+			applySharedFileNodeToTemp(node, openRelativePath) {
+				const openPath = _fs().importSharedFileNodeIntoTemp(
+					node,
+					openRelativePath,
+				);
+				get()._syncTrees();
+				return openPath;
+			},
 		};
 	}),
 );
@@ -312,5 +327,6 @@ export const useFileTreeActions = () =>
 			toggleDir: s.toggleDir,
 			expandDir: s.expandDir,
 			collapseDir: s.collapseDir,
+			applySharedFileNodeToTemp: s.applySharedFileNodeToTemp,
 		})),
 	);
