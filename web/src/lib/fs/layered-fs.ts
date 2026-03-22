@@ -1,8 +1,15 @@
-import { isRootPath, isUnder } from "@/lib/fs/core/path-utils";
+import {
+	basename,
+	isRootPath,
+	isUnder,
+	pathSegments,
+} from "@/lib/fs/core/path-utils";
 
 import type { FS } from "@/lib/fs/core/fs.interface";
+import type { AbstractFS } from "@/lib/fs/core/abstract-fs";
 import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
 import type { LocalStorageFS } from "@/lib/fs/local-storage-fs";
+import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 export const TEMP_ROOT = "/tmp";
 export const LOCAL_ROOT = "/local";
@@ -65,6 +72,39 @@ export class LayeredFS implements FS {
 
 	localTree() {
 		return this.local.transformToTree("/local");
+	}
+
+	pathToFileNode(path: string): FileNode | null {
+		if (isRootPath(path) || path === TEMP_ROOT || path === LOCAL_ROOT)
+			return null;
+		for (const seg of pathSegments(path)) {
+			if (seg === ".." || seg === ".") return null;
+		}
+
+		const info = this.stat(path);
+		if (!info) return null;
+
+		const name = basename(path);
+		if (!name) return null;
+
+		if (!info.isDir) {
+			const file = this.open(path);
+			if (!file) return null;
+			return {
+				kind: "file",
+				name,
+				content: file.content,
+			};
+		}
+
+		const target = this._target(path) as AbstractFS | null;
+		if (!target) return null;
+
+		return {
+			kind: "dir",
+			name,
+			children: target.transformToTree(path),
+		};
 	}
 
 	private _moveToTarget(
