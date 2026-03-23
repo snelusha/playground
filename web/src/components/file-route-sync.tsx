@@ -2,7 +2,11 @@ import * as React from "react";
 
 import { useParams, useNavigate } from "@tanstack/react-router";
 
-import { useFileTreeStore, useFileTreeActions } from "@/stores/file-tree-store";
+import {
+	useFileTreeActions,
+	useFileTreeStore,
+	useActiveFilePath,
+} from "@/stores/file-tree-store";
 
 import { useShare } from "@/hooks/use-share";
 
@@ -26,32 +30,35 @@ function splatFromFilePath(filePath: string): string {
 }
 
 export function FileRouteSync({ children }: React.PropsWithChildren) {
-	const { _splat: splat } = useParams({ strict: false }) as {
-		_splat?: string;
-	};
+	const { _splat: splat } = useParams({ strict: false }) as { _splat?: string };
 	const navigate = useNavigate({ from: "/$" });
 
-	const ready = useFileTreeStore((s) => s.ready);
-	const activeFilePath = useFileTreeStore((s) => s.activeFile?.path ?? null);
-	const { openFile, existsFile } = useFileTreeActions();
 	const { isProcessingShare } = useShare();
+
+	const ready = useFileTreeStore((s) => s.ready);
+	const activeFilePath = useActiveFilePath();
+	const { openFile, existsFile } = useFileTreeActions();
 
 	const currentSplat = normalizeSplat(splat) ?? "";
 	const filePathFromUrl = filePathFromSplat(splat);
 	const targetSplat = activeFilePath ? splatFromFilePath(activeFilePath) : null;
+
+	const activeFilePathRef = React.useRef(activeFilePath);
+	React.useLayoutEffect(() => {
+		activeFilePathRef.current = activeFilePath;
+	});
 
 	const openDefaultFileAndSyncRoute = React.useCallback(() => {
 		if (existsFile(DEFAULT_FILE)) {
 			openFile(DEFAULT_FILE);
 			navigate({ to: "/$", params: { _splat: DEFAULT_SPLAT }, replace: true });
 		}
-	}, [openFile, existsFile, navigate]);
+	}, [existsFile, openFile, navigate]);
 
 	React.useEffect(() => {
 		if (!ready || isProcessingShare) return;
 
-		const currentActiveFilePath =
-			useFileTreeStore.getState().activeFile?.path ?? null;
+		const currentActiveFilePath = activeFilePathRef.current;
 
 		if (!filePathFromUrl) {
 			if (currentActiveFilePath && existsFile(currentActiveFilePath)) return;
