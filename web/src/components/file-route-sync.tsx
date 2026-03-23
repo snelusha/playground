@@ -54,6 +54,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		() => (activeFilePath ? splatFromFilePath(activeFilePath) : null),
 		[activeFilePath],
 	);
+	const lastAppliedUrlFilePathRef = React.useRef<string | null>(null);
 
 	const openDefaultFileAndSyncRoute = React.useCallback(() => {
 		if (existsFile(DEFAULT_FILE)) {
@@ -70,13 +71,27 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		if (!ready || isProcessingShare) return;
 
 		if (!filePathFromUrl) {
+			lastAppliedUrlFilePathRef.current = null;
 			if (activeFilePath && existsFile(activeFilePath)) return;
 			openDefaultFileAndSyncRoute();
 			return;
 		}
 
-		if (existsFile(filePathFromUrl)) openFile(filePathFromUrl);
-		else openDefaultFileAndSyncRoute();
+		if (filePathFromUrl === activeFilePath) {
+			lastAppliedUrlFilePathRef.current = filePathFromUrl;
+			return;
+		}
+
+		// Only react when URL target changed; avoids URL<->state tug-of-war.
+		if (lastAppliedUrlFilePathRef.current === filePathFromUrl) return;
+
+		if (existsFile(filePathFromUrl)) {
+			openFile(filePathFromUrl);
+			lastAppliedUrlFilePathRef.current = filePathFromUrl;
+			return;
+		}
+
+		openDefaultFileAndSyncRoute();
 	}, [
 		ready,
 		isProcessingShare,
