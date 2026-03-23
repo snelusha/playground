@@ -24,8 +24,7 @@ function filePathFromSplat(splat: string | undefined): string | null {
 }
 
 function splatFromFilePath(filePath: string): string {
-	const trimmed = filePath.trim();
-	const splat = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed;
+	const splat = filePath.startsWith("/") ? filePath.slice(1) : filePath;
 	return splat || DEFAULT_SPLAT;
 }
 
@@ -41,68 +40,53 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 
 	const currentSplat = normalizeSplat(splat) ?? "";
 	const filePathFromUrl = filePathFromSplat(splat);
-	const targetSplat = activeFilePath ? splatFromFilePath(activeFilePath) : null;
 
+	// Effect 1 — URL → file
+	// Reads activeFilePath via ref so changes to it don't re-trigger this
+	// effect — only genuine URL navigations should drive file opens.
 	const activeFilePathRef = React.useRef(activeFilePath);
-	const skipNextDefaultOpenRef = React.useRef(false);
 	React.useLayoutEffect(() => {
 		activeFilePathRef.current = activeFilePath;
 	});
 
-	const openDefaultFileAndSyncRoute = React.useCallback(() => {
-		if (existsFile(DEFAULT_FILE)) {
-			openFile(DEFAULT_FILE);
-			navigate({ to: "/$", params: { _splat: DEFAULT_SPLAT }, replace: true });
-		}
-	}, [existsFile, openFile, navigate]);
-
 	React.useEffect(() => {
 		if (!ready || isProcessingShare) return;
 
-		const currentActiveFilePath = activeFilePathRef.current;
+		const activePath = activeFilePathRef.current;
 
-		if (!filePathFromUrl) {
-			if (skipNextDefaultOpenRef.current) {
-				skipNextDefaultOpenRef.current = false;
-				return;
-			}
-			if (currentActiveFilePath && existsFile(currentActiveFilePath)) return;
-			openDefaultFileAndSyncRoute();
+		// Requested file exists — open it if not already active.
+		if (filePathFromUrl && existsFile(filePathFromUrl)) {
+			if (filePathFromUrl !== activePath) openFile(filePathFromUrl);
 			return;
 		}
 
-		if (filePathFromUrl === currentActiveFilePath) return;
-
-		if (existsFile(filePathFromUrl)) {
-			openFile(filePathFromUrl);
-			return;
+		// No valid URL target — fall back to default if nothing is open.
+		if (!activePath || !existsFile(activePath)) {
+			openFile(DEFAULT_FILE);
+			navigate({ to: "/$", params: { _splat: DEFAULT_SPLAT }, replace: true });
 		}
-
-		openDefaultFileAndSyncRoute();
 	}, [
 		ready,
 		isProcessingShare,
 		filePathFromUrl,
 		existsFile,
 		openFile,
-		openDefaultFileAndSyncRoute,
+		navigate,
 	]);
 
+	// Effect 2 — file → URL
+	// Mirrors any active file change (open, delete, rename) back to the URL.
 	React.useEffect(() => {
 		if (!ready || isProcessingShare) return;
-		if (activeFilePath) return;
-		if (!currentSplat) return;
 
-		skipNextDefaultOpenRef.current = true;
-		navigate({ to: "/$", params: { _splat: "" }, replace: true });
-	}, [ready, isProcessingShare, activeFilePath, currentSplat, navigate]);
+		const expectedSplat = activeFilePath
+			? splatFromFilePath(activeFilePath)
+			: "";
 
-	React.useEffect(() => {
-		if (!ready || !activeFilePath || !targetSplat) return;
-		if (targetSplat !== currentSplat) {
-			navigate({ to: "/$", params: { _splat: targetSplat }, replace: true });
+		if (expectedSplat !== currentSplat) {
+			navigate({ to: "/$", params: { _splat: expectedSplat }, replace: true });
 		}
-	}, [ready, activeFilePath, targetSplat, currentSplat, navigate]);
+	}, [ready, isProcessingShare, activeFilePath, currentSplat, navigate]);
 
 	return children;
 }
