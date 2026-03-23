@@ -41,9 +41,6 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const currentSplat = normalizeSplat(splat) ?? "";
 	const filePathFromUrl = filePathFromSplat(splat);
 
-	// Effect 1 — URL → file
-	// Reads activeFilePath via ref so changes to it don't re-trigger this
-	// effect — only genuine URL navigations should drive file opens.
 	const activeFilePathRef = React.useRef(activeFilePath);
 	React.useLayoutEffect(() => {
 		activeFilePathRef.current = activeFilePath;
@@ -54,14 +51,12 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 
 		const activePath = activeFilePathRef.current;
 
-		// Requested file exists — open it if not already active.
 		if (filePathFromUrl && existsFile(filePathFromUrl)) {
 			if (filePathFromUrl !== activePath) openFile(filePathFromUrl);
 			return;
 		}
 
-		// No valid URL target — fall back to default if nothing is open.
-		if (!activePath || !existsFile(activePath)) {
+		if (filePathFromUrl && (!activePath || !existsFile(activePath))) {
 			openFile(DEFAULT_FILE);
 			navigate({ to: "/$", params: { _splat: DEFAULT_SPLAT }, replace: true });
 		}
@@ -74,8 +69,6 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		navigate,
 	]);
 
-	// Effect 2 — file → URL
-	// Mirrors any active file change (open, delete, rename) back to the URL.
 	React.useEffect(() => {
 		if (!ready || isProcessingShare) return;
 
