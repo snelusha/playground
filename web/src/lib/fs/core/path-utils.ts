@@ -1,3 +1,5 @@
+import { SHARED_ROOT } from "@/lib/fs/fs-roots";
+
 export function pathSegments(path: string): string[] {
 	return path.split("/").filter(Boolean);
 }
@@ -36,4 +38,33 @@ export function isRootPath(path: string): boolean {
 
 export function isUnder(path: string, root: string): boolean {
 	return path === root || path.startsWith(`${root}/`);
+}
+
+export function isSafeRelativePath(path: string): boolean {
+	const trimmed = path.trim();
+	if (!trimmed) return false;
+	return pathSegments(trimmed).every((s) => s !== "." && s !== "..");
+}
+
+export function getRelativePath(
+	mountPath: string,
+	activePath?: string | null,
+): string | null {
+	if (!activePath) return null;
+	const base = mountPath.replace(/\/$/, "");
+	if (activePath === base) return null;
+	if (!isUnder(activePath, base)) return null;
+	return activePath.slice(base.length + 1);
+}
+
+export function isSharedPath(path: string): boolean {
+	return isUnder(path, SHARED_ROOT);
+}
+
+export function isActiveOrAncestor(
+	path: string,
+	activeFilePath: string | null | undefined,
+): boolean {
+	if (!activeFilePath) return false;
+	return activeFilePath === path || isUnder(activeFilePath, path);
 }

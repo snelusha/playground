@@ -75,6 +75,8 @@ type FileTreeActions = {
 	collapseDir(path: string): void;
 
 	_syncTrees(): void;
+
+	loadSharedFiles(root: FileNode, openRelativePath?: string | null): boolean;
 };
 
 export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
@@ -276,6 +278,23 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 					s.localTree = fs.localTree();
 				});
 			},
+
+			loadSharedFiles(
+				root: FileNode,
+				openRelativePath?: string | null,
+			): boolean {
+				const openPath = _fs().graftSharedTree(root, openRelativePath);
+
+				set((s) => {
+					s.tempTree = _fs().tempTree();
+					s.localTree = _fs().localTree();
+				});
+
+				if (!openPath) return false;
+
+				get().openFile(openPath);
+				return true;
+			},
 		};
 	}),
 );
@@ -312,5 +331,6 @@ export const useFileTreeActions = () =>
 			toggleDir: s.toggleDir,
 			expandDir: s.expandDir,
 			collapseDir: s.collapseDir,
+			loadSharedFiles: s.loadSharedFiles,
 		})),
 	);

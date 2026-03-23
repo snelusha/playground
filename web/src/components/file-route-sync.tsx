@@ -4,7 +4,9 @@ import { useParams, useNavigate } from "@tanstack/react-router";
 
 import { useFileTreeStore, useFileTreeActions } from "@/stores/file-tree-store";
 
-const DEFAULT_FILE = "/tmp/01-orders.bal";
+import { useShare } from "@/hooks/use-share";
+
+const DEFAULT_FILE = "/tmp/examples/01-orders.bal";
 const DEFAULT_SPLAT = DEFAULT_FILE.replace(/^\/+/, "");
 
 function normalizeSplat(splat: string | undefined) {
@@ -29,11 +31,14 @@ function splatFromFilePath(filePath: string) {
 
 export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const params = useParams({ strict: false }) as { _splat?: string };
-	const navigate = useNavigate();
+
+	const navigate = useNavigate({ from: "/$" });
 
 	const ready = useFileTreeStore((s) => s.ready);
 	const activeFilePath = useFileTreeStore((s) => s.activeFile?.path ?? null);
 	const { openFile, existsFile } = useFileTreeActions();
+
+	const { isProcessingShare } = useShare();
 
 	const splat = params._splat;
 
@@ -62,9 +67,10 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	}, [openFile, existsFile, navigate]);
 
 	React.useEffect(() => {
-		if (!ready) return;
+		if (!ready || isProcessingShare) return;
 
 		if (!filePathFromUrl) {
+			if (activeFilePath && existsFile(activeFilePath)) return;
 			openDefaultFileAndSyncRoute();
 			return;
 		}
@@ -73,7 +79,9 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		else openDefaultFileAndSyncRoute();
 	}, [
 		ready,
+		isProcessingShare,
 		filePathFromUrl,
+		activeFilePath,
 		existsFile,
 		openFile,
 		openDefaultFileAndSyncRoute,
