@@ -46,6 +46,8 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		activeFilePathRef.current = activeFilePath;
 	});
 
+	const clearedByDeletionRef = React.useRef(false);
+
 	React.useEffect(() => {
 		if (!ready || isProcessingShare) return;
 
@@ -56,7 +58,12 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 			return;
 		}
 
-		if (filePathFromUrl && (!activePath || !existsFile(activePath))) {
+		if (clearedByDeletionRef.current) {
+			clearedByDeletionRef.current = false;
+			return;
+		}
+
+		if (!activePath) {
 			openFile(DEFAULT_FILE);
 			navigate({ to: "/$", params: { _splat: DEFAULT_SPLAT }, replace: true });
 		}
@@ -77,6 +84,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 			: "";
 
 		if (expectedSplat !== currentSplat) {
+			if (!activeFilePath) clearedByDeletionRef.current = true;
 			navigate({ to: "/$", params: { _splat: expectedSplat }, replace: true });
 		}
 	}, [ready, isProcessingShare, activeFilePath, currentSplat, navigate]);
