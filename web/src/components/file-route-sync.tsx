@@ -44,6 +44,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const targetSplat = activeFilePath ? splatFromFilePath(activeFilePath) : null;
 
 	const activeFilePathRef = React.useRef(activeFilePath);
+	const skipNextDefaultOpenRef = React.useRef(false);
 	React.useLayoutEffect(() => {
 		activeFilePathRef.current = activeFilePath;
 	});
@@ -61,6 +62,10 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		const currentActiveFilePath = activeFilePathRef.current;
 
 		if (!filePathFromUrl) {
+			if (skipNextDefaultOpenRef.current) {
+				skipNextDefaultOpenRef.current = false;
+				return;
+			}
 			if (currentActiveFilePath && existsFile(currentActiveFilePath)) return;
 			openDefaultFileAndSyncRoute();
 			return;
@@ -82,6 +87,15 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		openFile,
 		openDefaultFileAndSyncRoute,
 	]);
+
+	React.useEffect(() => {
+		if (!ready || isProcessingShare) return;
+		if (activeFilePath) return;
+		if (!currentSplat) return;
+
+		skipNextDefaultOpenRef.current = true;
+		navigate({ to: "/$", params: { _splat: "" }, replace: true });
+	}, [ready, isProcessingShare, activeFilePath, currentSplat, navigate]);
 
 	React.useEffect(() => {
 		if (!ready || !activeFilePath || !targetSplat) return;
