@@ -8,10 +8,14 @@ import { decodeSharePayload, omitSearchParam } from "@/lib/share";
 
 import { useFileTreeActions, useFileTreeStore } from "@/stores/file-tree-store";
 
+import { useShareNotice } from "@/hooks/use-share-notice";
+
 export function useShare() {
 	const navigate = useNavigate({ from: "/$" });
 
 	const { share } = useSearch({ from: "/$" }) as { share?: string };
+
+	const { show: showNotice, ...shareNotice } = useShareNotice();
 
 	const processed = React.useRef<string | null>(null);
 
@@ -45,11 +49,16 @@ export function useShare() {
 			const loaded = loadSharedFiles(payload.root, payload.openRelativePath);
 			processed.current = loaded ? share : null;
 			if (!loaded) toast.error("Could not load shared files");
+			else showNotice();
+
 			dropShareParam();
 		});
-	}, [ready, share, loadSharedFiles, dropShareParam]);
+	}, [ready, share, loadSharedFiles, dropShareParam, showNotice]);
 
 	const isProcessingShare = !!share && processed.current !== share;
 
-	return { isProcessingShare };
+	return {
+		isProcessingShare,
+		shareNotice,
+	};
 }
