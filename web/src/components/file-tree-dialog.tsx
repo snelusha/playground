@@ -80,14 +80,14 @@ const FILE_TREE_DIALOG_CONFIG: Record<FileOperationType, FileTreeDialogConfig> =
 		"fork-file": {
 			title: "Fork file to local space",
 			description:
-				"Something already exists at that path. Enter a different name for the fork in local space.",
+				"That file already exists in Local space. Choose another name to fork it there.",
 			placeholder: "{{entity}}",
 			alreadyExistsMessage: "A file with this name already exists.",
 		},
 		"fork-folder": {
 			title: "Fork folder to local space",
 			description:
-				"Something already exists at that path. Enter a different name for the fork in local space.",
+				"That folder already exists in Local space. Choose another name to fork it there.",
 			placeholder: "{{entity}}",
 			alreadyExistsMessage: "A folder with this name already exists.",
 		},
