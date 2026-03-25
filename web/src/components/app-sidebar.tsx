@@ -10,6 +10,7 @@ import {
 	Delete02Icon,
 	Edit02Icon,
 	PackageIcon,
+	Share08Icon,
 } from "@hugeicons/core-free-icons";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,8 @@ import {
 
 import { FileTreeDialog } from "@/components/file-tree-dialog";
 
+import { getExamplesSubtree, getSharedSubtree } from "@/lib/file-tree-utils";
+
 import {
 	useActiveFilePath,
 	useFileTreeActions,
@@ -45,9 +48,15 @@ import {
 	useExpandedPaths,
 } from "@/stores/file-tree-store";
 
+import { useFS } from "@/providers/fs-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+import { copyShareLinkToClipboard } from "@/lib/share";
+import { isActiveOrAncestor, isSharedPath } from "@/lib/fs/core/path-utils";
+import { cn } from "@/lib/utils";
+
 import type { FileNode } from "@/lib/fs/core/file-node.types";
+import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
 
 type FileTreeNodeProps = {
 	node: FileNode;
@@ -56,6 +65,8 @@ type FileTreeNodeProps = {
 };
 
 function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
+	const fs = useFS();
+
 	const isMobile = useIsMobile();
 
 	const { toggleSidebar } = useSidebar();
@@ -73,7 +84,12 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 
 	return (
 		<SidebarMenuItem>
-			<div className="group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent">
+			<div
+				className={cn(
+					"group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent",
+					isSharedPath(path) && "opacity-75 text-muted-foreground",
+				)}
+			>
 				<SidebarMenuButton
 					isActive={activeFilePath === path}
 					onClick={handleClick}
@@ -107,7 +123,14 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 							<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
 							<span>Rename</span>
 						</DropdownMenuItem>
-
+						<DropdownMenuItem
+							onClick={() =>
+								void copyShareLinkToClipboard(fs, path, activeFilePath)
+							}
+						>
+							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+							<span>Share</span>
+						</DropdownMenuItem>
 						<DropdownMenuItem
 							variant="destructive"
 							onClick={() =>
@@ -139,9 +162,11 @@ function FileTreeDirNode({
 	path,
 	defaultOpen = false,
 }: FileTreeDirNodeProps) {
-	const isMobile = useIsMobile();
-	const activeFilePath = useActiveFilePath();
+	const fs = useFS();
 
+	const isMobile = useIsMobile();
+
+	const activeFilePath = useActiveFilePath();
 	const expandedPaths = useExpandedPaths();
 	const { setFileOperationDialog, toggleDir } = useFileTreeActions();
 
@@ -162,7 +187,12 @@ function FileTreeDirNode({
 			className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
 		>
 			<SidebarMenuItem>
-				<div className="group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent">
+				<div
+					className={cn(
+						"group/row relative w-full rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-hover/row:**:data-[sidebar=menu-button]:bg-transparent",
+						isSharedPath(path) && "opacity-75 text-muted-foreground",
+					)}
+				>
 					<SidebarMenuButton className="w-full" onClick={handleToggle}>
 						<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
 						<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
@@ -209,6 +239,14 @@ function FileTreeDirNode({
 							>
 								<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
 								<span>Rename</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onClick={() =>
+									void copyShareLinkToClipboard(fs, path, activeFilePath)
+								}
+							>
+								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+								<span>Share</span>
 							</DropdownMenuItem>
 							<DropdownMenuItem
 								variant="destructive"
@@ -262,38 +300,45 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const tempTree = useTempTree();
 	const localTree = useLocalTree();
 
+	const { entries: exampleEntries } = React.useMemo(
+		() => getExamplesSubtree(tempTree),
+		[tempTree],
+	);
+
+	const { entries: sharedEntries } = React.useMemo(
+		() => getSharedSubtree(tempTree),
+		[tempTree],
+	);
+
 	const activeFilePath = useActiveFilePath();
 	const { setFileOperationDialog } = useFileTreeActions();
+
+	const noLocalFiles = localTree.length === 0;
 
 	return (
 		<Sidebar {...props}>
 			<SidebarContent>
 				<SidebarGroup>
-					<SidebarGroupLabel>Examples</SidebarGroupLabel>
+					<SidebarGroupLabel className="uppercase">Examples</SidebarGroupLabel>
 					<SidebarGroupContent className="mt-2">
 						<SidebarMenu>
-							{tempTree.map((node, index) => {
-								const path = `/tmp/${node.name}`;
-								return (
-									<FileTreeNode
-										key={node.name}
-										node={node}
-										path={path}
-										defaultOpen={
-											index === 0 || !!activeFilePath?.startsWith(`${path}/`)
-										}
-									/>
-								);
-							})}
+							{exampleEntries.map(({ node, path }) => (
+								<FileTreeNode
+									key={node.name}
+									node={node}
+									path={path}
+									defaultOpen={isActiveOrAncestor(path, activeFilePath)}
+								/>
+							))}
 						</SidebarMenu>
 					</SidebarGroupContent>
 				</SidebarGroup>
-
 				<SidebarSeparator />
-
 				<SidebarGroup>
 					<div className="flex items-center justify-between">
-						<SidebarGroupLabel>Localspace</SidebarGroupLabel>
+						<SidebarGroupLabel className="uppercase">
+							Localspace
+						</SidebarGroupLabel>
 						<DropdownMenu>
 							<DropdownMenuTrigger
 								render={<Button variant="ghost" size="icon-xs" />}
@@ -320,15 +365,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 					</div>
 					<SidebarGroupContent className="mt-2">
 						<SidebarMenu>
+							{sharedEntries.map(({ node, path }) => (
+								<FileTreeNode
+									key={`shared:${node.name}`}
+									node={node}
+									path={path}
+									defaultOpen={isActiveOrAncestor(path, activeFilePath)}
+								/>
+							))}
 							{localTree.map((node, index) => {
-								const path = `/local/${node.name}`;
+								const path = `${LOCAL_ROOT}/${node.name}`;
 								return (
 									<FileTreeNode
-										key={node.name}
+										key={`local:${node.name}`}
 										node={node}
 										path={path}
 										defaultOpen={
-											index === 0 || !!activeFilePath?.startsWith(`${path}/`)
+											isActiveOrAncestor(path, activeFilePath) ||
+											(noLocalFiles && index === 0)
 										}
 									/>
 								);
