@@ -16,7 +16,7 @@ export function useShare() {
 	const ready = useFileTreeStore((s) => s.ready);
 	const { loadSharedFiles } = useFileTreeActions();
 
-	const stripShare = React.useCallback(() => {
+	const dropShareParam = React.useCallback(() => {
 		navigate({
 			search: (prev) =>
 				omitSearchParam(prev as Record<string, unknown>, "share"),
@@ -35,15 +35,15 @@ export function useShare() {
 		decodeSharePayload(share).then((payload) => {
 			if (!payload) {
 				processed.current = null;
-				stripShare();
+				dropShareParam();
 				return;
 			}
 
 			const loaded = loadSharedFiles(payload.root, payload.openRelativePath);
 			processed.current = loaded ? share : null;
-			stripShare();
+			dropShareParam();
 		});
-	}, [ready, share, loadSharedFiles, stripShare]);
+	}, [ready, share, loadSharedFiles, dropShareParam]);
 
 	const isProcessingShare = !!share && processed.current !== share;
 

@@ -38,8 +38,6 @@ import {
 
 import { FileTreeDialog } from "@/components/file-tree-dialog";
 
-import { toast } from "sonner";
-
 import { getExamplesSubtree, getSharedSubtree } from "@/lib/file-tree-utils";
 
 import {
@@ -50,10 +48,8 @@ import {
 	useExpandedPaths,
 } from "@/stores/file-tree-store";
 
-import { useFS } from "@/providers/fs-provider";
+import { useCopyShareLink } from "@/hooks/use-copy-share-link";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-import { copyShareLinkToClipboard } from "@/lib/share";
 import { isActiveOrAncestor, isSharedPath } from "@/lib/fs/core/path-utils";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +64,7 @@ type FileTreeNodeProps = {
 };
 
 function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
-	const fs = useFS();
+	const { copyShareLink } = useCopyShareLink();
 
 	const isMobile = useIsMobile();
 
@@ -126,12 +122,7 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 							<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
 							<span>Rename</span>
 						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={async () => {
-								await copyShareLinkToClipboard(fs, path, activeFilePath);
-								toast.success("Share link copied to clipboard");
-							}}
-						>
+						<DropdownMenuItem onClick={() => void copyShareLink(path)}>
 							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 							<span>Share</span>
 						</DropdownMenuItem>
@@ -166,7 +157,7 @@ function FileTreeDirNode({
 	path,
 	defaultOpen = false,
 }: FileTreeDirNodeProps) {
-	const fs = useFS();
+	const { copyShareLink } = useCopyShareLink();
 
 	const isMobile = useIsMobile();
 
@@ -244,12 +235,7 @@ function FileTreeDirNode({
 								<HugeiconsIcon icon={Edit02Icon} strokeWidth={1.5} />
 								<span>Rename</span>
 							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() => {
-									void copyShareLinkToClipboard(fs, path, activeFilePath);
-									toast.success("Share link copied to clipboard");
-								}}
-							>
+							<DropdownMenuItem onClick={() => void copyShareLink(path)}>
 								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 								<span>Share</span>
 							</DropdownMenuItem>

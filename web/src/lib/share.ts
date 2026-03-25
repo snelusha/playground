@@ -98,7 +98,7 @@ export function omitSearchParam(
 	return rest;
 }
 
-export async function getShareUrl(
+export async function generateShareUrl(
 	fs: LayeredFS,
 	nodePath: string,
 	activeFilePath: string | null,
@@ -112,14 +112,4 @@ export async function getShareUrl(
 			: null;
 
 	return appendShareParam(await encodeSharePayload(root, openRelativePath));
-}
-
-export async function copyShareLinkToClipboard(
-	fs: LayeredFS,
-	nodePath: string,
-	activeFilePath: string | null,
-): Promise<void> {
-	const url = await getShareUrl(fs, nodePath, activeFilePath);
-	if (!url) return;
-	void navigator.clipboard.writeText(url).catch(() => {});
 }
