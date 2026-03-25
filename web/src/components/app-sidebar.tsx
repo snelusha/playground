@@ -57,8 +57,9 @@ import { copyShareLinkToClipboard } from "@/lib/share";
 import { isActiveOrAncestor, isSharedPath } from "@/lib/fs/core/path-utils";
 import { cn } from "@/lib/utils";
 
-import type { FileNode } from "@/lib/fs/core/file-node.types";
 import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
+
+import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 type FileTreeNodeProps = {
 	node: FileNode;
@@ -128,7 +129,7 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 						<DropdownMenuItem
 							onClick={async () => {
 								await copyShareLinkToClipboard(fs, path, activeFilePath);
-								// toast.success()
+								toast.success("Share link copied to clipboard");
 							}}
 						>
 							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
@@ -244,9 +245,10 @@ function FileTreeDirNode({
 								<span>Rename</span>
 							</DropdownMenuItem>
 							<DropdownMenuItem
-								onClick={() =>
-									void copyShareLinkToClipboard(fs, path, activeFilePath)
-								}
+								onClick={() => {
+									void copyShareLinkToClipboard(fs, path, activeFilePath);
+									toast.success("Share link copied to clipboard");
+								}}
 							>
 								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 								<span>Share</span>
