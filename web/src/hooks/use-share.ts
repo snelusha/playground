@@ -25,27 +25,24 @@ export function useShare() {
 	}, [navigate]);
 
 	React.useEffect(() => {
-		if (!ready) return;
-
-		if (!share) {
+		if (!ready || !share) {
 			processed.current = null;
 			return;
 		}
 
 		if (processed.current === share) return;
 
-		const payload = decodeSharePayload(share);
+		decodeSharePayload(share).then((payload) => {
+			if (!payload) {
+				processed.current = null;
+				stripShare();
+				return;
+			}
 
-		if (!payload) {
-			processed.current = null;
+			const loaded = loadSharedFiles(payload.root, payload.openRelativePath);
+			processed.current = loaded ? share : null;
 			stripShare();
-			return;
-		}
-
-		const loaded = loadSharedFiles(payload.root, payload.openRelativePath);
-		processed.current = loaded ? share : null;
-
-		stripShare();
+		});
 	}, [ready, share, loadSharedFiles, stripShare]);
 
 	const isProcessingShare = !!share && processed.current !== share;

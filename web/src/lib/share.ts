@@ -12,14 +12,24 @@ export type SharePayload = {
 	openRelativePath?: string;
 };
 
-function utf8ToBase64(text: string): string {
+async function compressAndEncode(text: string): Promise<string> {
 	const bytes = new TextEncoder().encode(text);
-	return btoa(String.fromCharCode(...bytes));
+	const stream = new CompressionStream("gzip");
+	const writer = stream.writable.getWriter();
+	void writer.write(bytes);
+	void writer.close();
+	const compressed = await new Response(stream.readable).arrayBuffer();
+	return btoa(String.fromCharCode(...new Uint8Array(compressed)));
 }
 
-function base64ToUtf8(b64: string): string {
+async function decodeAndDecompress(b64: string): Promise<string> {
 	const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-	return new TextDecoder().decode(bytes);
+	const stream = new DecompressionStream("gzip");
+	const writer = stream.writable.getWriter();
+	void writer.write(bytes);
+	void writer.close();
+	const decompressed = await new Response(stream.readable).arrayBuffer();
+	return new TextDecoder().decode(decompressed);
 }
 
 function isFileNode(value: unknown): value is FileNode {
@@ -38,18 +48,20 @@ function isFileNode(value: unknown): value is FileNode {
 	return false;
 }
 
-export function encodeSharePayload(
+export async function encodeSharePayload(
 	root: FileNode,
 	openRelativePath?: string | null,
-): string {
-	return utf8ToBase64(
+): Promise<string> {
+	return compressAndEncode(
 		JSON.stringify({ root, ...(openRelativePath && { openRelativePath }) }),
 	);
 }
 
-export function decodeSharePayload(encoded: string): SharePayload | null {
+export async function decodeSharePayload(
+	encoded: string,
+): Promise<SharePayload | null> {
 	try {
-		const json = base64ToUtf8(encoded);
+		const json = await decodeAndDecompress(encoded);
 		const parsed: unknown = JSON.parse(json);
 		if (isFileNode(parsed)) return { root: parsed };
 		if (
@@ -72,7 +84,7 @@ export function decodeSharePayload(encoded: string): SharePayload | null {
 	}
 }
 
-export function createShareUrl(encodedPayload: string) {
+export function appendShareParam(encodedPayload: string): string {
 	const url = new URL(import.meta.env.BASE_URL, window.location.origin);
 	url.searchParams.set("share", encodedPayload);
 	return url.toString();
@@ -86,29 +98,28 @@ export function omitSearchParam(
 	return rest;
 }
 
-export function copyShareLinkToClipboard(
+export async function getShareUrl(
 	fs: LayeredFS,
 	nodePath: string,
 	activeFilePath: string | null,
-): void {
+): Promise<string | null> {
 	const root = toFileNode(fs, nodePath);
-	if (!root) return;
+	if (!root) return null;
 
-	if (root.kind === "file") {
-		const encoded = encodeSharePayload(root);
-		const url = createShareUrl(encoded);
-		void navigator.clipboard.writeText(url).catch(() => {});
-		return;
-	}
+	const openRelativePath =
+		root.kind === "dir"
+			? getRelativePathInTree(root, nodePath, activeFilePath)
+			: null;
 
-	const openRelativePath = getRelativePathInTree(
-		root,
-		nodePath,
-		activeFilePath,
-	);
-	const encoded = openRelativePath
-		? encodeSharePayload(root, openRelativePath)
-		: encodeSharePayload(root);
-	const url = createShareUrl(encoded);
+	return appendShareParam(await encodeSharePayload(root, openRelativePath));
+}
+
+export async function copyShareLinkToClipboard(
+	fs: LayeredFS,
+	nodePath: string,
+	activeFilePath: string | null,
+): Promise<void> {
+	const url = await getShareUrl(fs, nodePath, activeFilePath);
+	if (!url) return;
 	void navigator.clipboard.writeText(url).catch(() => {});
 }

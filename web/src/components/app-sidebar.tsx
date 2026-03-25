@@ -38,6 +38,8 @@ import {
 
 import { FileTreeDialog } from "@/components/file-tree-dialog";
 
+import { toast } from "sonner";
+
 import { getExamplesSubtree, getSharedSubtree } from "@/lib/file-tree-utils";
 
 import {
@@ -124,9 +126,10 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 							<span>Rename</span>
 						</DropdownMenuItem>
 						<DropdownMenuItem
-							onClick={() =>
-								void copyShareLinkToClipboard(fs, path, activeFilePath)
-							}
+							onClick={async () => {
+								await copyShareLinkToClipboard(fs, path, activeFilePath);
+								// toast.success()
+							}}
 						>
 							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 							<span>Share</span>
