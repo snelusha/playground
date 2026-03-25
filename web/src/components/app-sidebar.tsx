@@ -11,6 +11,7 @@ import {
 	Edit02Icon,
 	PackageIcon,
 	Share08Icon,
+	GitForkIcon,
 } from "@hugeicons/core-free-icons";
 
 import { Button } from "@/components/ui/button";
@@ -126,6 +127,12 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 							<span>Share</span>
 						</DropdownMenuItem>
+						{isSharedPath(path) && (
+							<DropdownMenuItem onClick={() => {}}>
+								<HugeiconsIcon icon={GitForkIcon} strokeWidth={1.5} />
+								<span>Fork</span>
+							</DropdownMenuItem>
+						)}
 						<DropdownMenuItem
 							variant="destructive"
 							onClick={() =>
@@ -239,6 +246,12 @@ function FileTreeDirNode({
 								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 								<span>Share</span>
 							</DropdownMenuItem>
+							{isSharedPath(path) && (
+								<DropdownMenuItem onClick={() => {}}>
+									<HugeiconsIcon icon={GitForkIcon} strokeWidth={1.5} />
+									<span>Fork</span>
+								</DropdownMenuItem>
+							)}
 							<DropdownMenuItem
 								variant="destructive"
 								onClick={() =>
