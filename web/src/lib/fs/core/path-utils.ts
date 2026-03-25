@@ -82,6 +82,18 @@ export function getForkTargetPath(
 	return join(LOCAL_ROOT, parts.join("/"));
 }
 
+export function ancestorDirPathsForFile(filePath: string): string[] {
+	const out: string[] = [];
+	let p = dirname(filePath);
+	while (p && p !== "/" && p !== "") {
+		out.push(p);
+		const next = dirname(p);
+		if (next === p) break;
+		p = next;
+	}
+	return out;
+}
+
 export function isActiveOrAncestor(
 	path: string,
 	activeFilePath: string | null | undefined,

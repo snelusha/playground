@@ -211,9 +211,9 @@ function FileTreeDirNode({
 	const expanded = (!hasInteracted && defaultOpen) || expandedPaths.has(path);
 
 	const handleToggle = () => {
-		if (!hasInteracted && defaultOpen) {
+		if (!hasInteracted) {
 			setHasInteracted(true);
-			return;
+			if (defaultOpen && !expandedPaths.has(path)) return;
 		}
 		toggleDir(path);
 	};
