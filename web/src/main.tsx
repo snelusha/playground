@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 
 import { RouterProvider, createRouter } from "@tanstack/react-router"
 
+import { Toaster } from "@/components/ui/sonner";
+
 import { enableMapSet } from "immer";
 
 import { getRouterBasePath } from "@/lib/router-utils";
@@ -28,5 +30,6 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
 		<RouterProvider router={router} />
+		<Toaster />
 	</StrictMode>,
 );
