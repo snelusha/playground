@@ -93,6 +93,18 @@ const FILE_TREE_DIALOG_CONFIG: Record<FileOperationType, FileTreeDialogConfig> =
 		},
 	};
 
+const FILE_TREE_SUBMIT_LABEL: Record<FileOperationType, string> = {
+	"new-file": "Create",
+	"new-folder": "Create",
+	"new-package": "Create",
+	"rename-file": "Rename",
+	"rename-folder": "Rename",
+	"delete-file": "Delete",
+	"delete-folder": "Delete",
+	"fork-file": "Fork",
+	"fork-folder": "Fork",
+};
+
 function interpolateDialogTemplate(
 	template: string,
 	vars: Record<string, string>,
@@ -161,7 +173,6 @@ function useFileTreeDialog() {
 	const hasPathSeparator = /[\\/]/.test(name);
 
 	const isRename = type?.startsWith("rename") ?? false;
-	const isFork = type === "fork-file" || type === "fork-folder";
 	const isDelete = type === "delete-file" || type === "delete-folder";
 	const isSamePath = isRename && targetPath === path;
 	const alreadyExists = !!targetPath && !isSamePath && exists(targetPath);
@@ -220,8 +231,6 @@ function useFileTreeDialog() {
 		name,
 		setName,
 		entityName,
-		isRename,
-		isFork,
 		isDelete,
 		alreadyExists,
 		isActionDisabled,
@@ -237,8 +246,6 @@ export function FileTreeDialog() {
 		name,
 		setName,
 		entityName,
-		isRename,
-		isFork,
 		isDelete,
 		alreadyExists,
 		isActionDisabled,
@@ -311,13 +318,7 @@ export function FileTreeDialog() {
 							disabled={isActionDisabled}
 							autoFocus={isDelete}
 						>
-							{isDelete
-								? "Delete"
-								: isFork
-									? "Fork"
-									: isRename
-										? "Rename"
-										: "Create"}
+							{FILE_TREE_SUBMIT_LABEL[type]}
 						</Button>
 					</DialogFooter>
 				</form>
