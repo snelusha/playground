@@ -15,6 +15,7 @@ import {
 	useFileOperationDialog,
 	useFileTreeActions,
 } from "@/stores/file-tree-store";
+import { dirname, getForkTargetPath } from "@/lib/fs/core/path-utils";
 
 type FileOperationType =
 	| "new-file"
@@ -23,7 +24,9 @@ type FileOperationType =
 	| "rename-file"
 	| "rename-folder"
 	| "delete-file"
-	| "delete-folder";
+	| "delete-folder"
+	| "fork-file"
+	| "fork-folder";
 
 interface FileTreeDialogConfig {
 	placeholder?: string;
@@ -74,6 +77,20 @@ const FILE_TREE_DIALOG_CONFIG: Record<FileOperationType, FileTreeDialogConfig> =
 			description:
 				"This will permanently delete '{{entity}}'. This action cannot be undone.",
 		},
+		"fork-file": {
+			title: "Fork file to local space",
+			description:
+				"Something already exists at that path. Enter a different name for the fork in local space.",
+			placeholder: "{{entity}}",
+			alreadyExistsMessage: "A file with this name already exists.",
+		},
+		"fork-folder": {
+			title: "Fork folder to local space",
+			description:
+				"Something already exists at that path. Enter a different name for the fork in local space.",
+			placeholder: "{{entity}}",
+			alreadyExistsMessage: "A folder with this name already exists.",
+		},
 	};
 
 function interpolateDialogTemplate(
@@ -119,6 +136,7 @@ function useFileTreeDialog() {
 		renameFile,
 		setFileOperationDialog,
 		exists,
+		expandDir,
 	} = useFileTreeActions();
 
 	const [name, setName] = React.useState("");
@@ -133,14 +151,17 @@ function useFileTreeDialog() {
 		if (fileOperationDialog) setName(fileOperationDialog.defaultName ?? "");
 	}, [fileOperationDialog]);
 
-	const targetPath = React.useMemo(
-		() => (path && type ? getTargetPath(type, path, name) : null),
-		[name, type, path],
-	);
+	const targetPath = React.useMemo(() => {
+		if (!path || !type) return null;
+		if (type === "fork-file" || type === "fork-folder")
+			return getForkTargetPath(path, name);
+		return getTargetPath(type, path, name);
+	}, [name, type, path]);
 
 	const hasPathSeparator = /[\\/]/.test(name);
 
 	const isRename = type?.startsWith("rename") ?? false;
+	const isFork = type === "fork-file" || type === "fork-folder";
 	const isDelete = type === "delete-file" || type === "delete-folder";
 	const isSamePath = isRename && targetPath === path;
 	const alreadyExists = !!targetPath && !isSamePath && exists(targetPath);
@@ -184,6 +205,10 @@ function useFileTreeDialog() {
 			case "rename-folder":
 				renameFile(path, targetPath);
 				break;
+			case "fork-file":
+			case "fork-folder":
+				if (renameFile(path, targetPath)) expandDir(dirname(targetPath));
+				break;
 		}
 
 		close();
@@ -196,6 +221,7 @@ function useFileTreeDialog() {
 		setName,
 		entityName,
 		isRename,
+		isFork,
 		isDelete,
 		alreadyExists,
 		isActionDisabled,
@@ -212,6 +238,7 @@ export function FileTreeDialog() {
 		setName,
 		entityName,
 		isRename,
+		isFork,
 		isDelete,
 		alreadyExists,
 		isActionDisabled,
@@ -284,7 +311,13 @@ export function FileTreeDialog() {
 							disabled={isActionDisabled}
 							autoFocus={isDelete}
 						>
-							{isDelete ? "Delete" : isRename ? "Rename" : "Create"}
+							{isDelete
+								? "Delete"
+								: isFork
+									? "Fork"
+									: isRename
+										? "Rename"
+										: "Create"}
 						</Button>
 					</DialogFooter>
 				</form>

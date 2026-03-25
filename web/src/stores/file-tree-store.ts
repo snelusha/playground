@@ -30,7 +30,9 @@ export type FileOperationDialog = {
 		| "rename-file"
 		| "rename-folder"
 		| "delete-file"
-		| "delete-folder";
+		| "delete-folder"
+		| "fork-file"
+		| "fork-folder";
 	path: string;
 	defaultName?: string;
 } | null;

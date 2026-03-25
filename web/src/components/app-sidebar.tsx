@@ -51,7 +51,13 @@ import {
 
 import { useCopyShareLink } from "@/hooks/use-copy-share-link";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { isActiveOrAncestor, isSharedPath } from "@/lib/fs/core/path-utils";
+import {
+	basename,
+	dirname,
+	isActiveOrAncestor,
+	isSharedPath,
+	sharedToLocalDestination,
+} from "@/lib/fs/core/path-utils";
 import { cn } from "@/lib/utils";
 
 import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
@@ -73,7 +79,14 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 
 	const activeFilePath = useActiveFilePath();
 
-	const { openFile, saveFile, setFileOperationDialog } = useFileTreeActions();
+	const {
+		openFile,
+		saveFile,
+		setFileOperationDialog,
+		renameFile,
+		exists,
+		expandDir,
+	} = useFileTreeActions();
 
 	function handleClick() {
 		// TODO: This is a bit hacky, we should ideally have a separate "switchFile" action that doesn't mark the file as dirty
@@ -128,7 +141,22 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 							<span>Share</span>
 						</DropdownMenuItem>
 						{isSharedPath(path) && (
-							<DropdownMenuItem onClick={() => {}}>
+							<DropdownMenuItem
+								onClick={() => {
+									saveFile();
+									const dest = sharedToLocalDestination(path);
+									if (!dest) return;
+									if (exists(dest)) {
+										setFileOperationDialog({
+											type: "fork-file",
+											path,
+											defaultName: basename(path),
+										});
+									} else if (renameFile(path, dest)) {
+										expandDir(dirname(dest));
+									}
+								}}
+							>
 								<HugeiconsIcon icon={GitForkIcon} strokeWidth={1.5} />
 								<span>Fork</span>
 							</DropdownMenuItem>
@@ -170,7 +198,14 @@ function FileTreeDirNode({
 
 	const activeFilePath = useActiveFilePath();
 	const expandedPaths = useExpandedPaths();
-	const { setFileOperationDialog, toggleDir } = useFileTreeActions();
+	const {
+		setFileOperationDialog,
+		toggleDir,
+		saveFile,
+		renameFile,
+		exists,
+		expandDir,
+	} = useFileTreeActions();
 
 	const [hasInteracted, setHasInteracted] = React.useState(false);
 	const expanded = (!hasInteracted && defaultOpen) || expandedPaths.has(path);
@@ -247,7 +282,22 @@ function FileTreeDirNode({
 								<span>Share</span>
 							</DropdownMenuItem>
 							{isSharedPath(path) && (
-								<DropdownMenuItem onClick={() => {}}>
+								<DropdownMenuItem
+									onClick={() => {
+										saveFile();
+										const dest = sharedToLocalDestination(path);
+										if (!dest) return;
+										if (exists(dest)) {
+											setFileOperationDialog({
+												type: "fork-folder",
+												path,
+												defaultName: basename(path),
+											});
+										} else if (renameFile(path, dest)) {
+											expandDir(dirname(dest));
+										}
+									}}
+								>
 									<HugeiconsIcon icon={GitForkIcon} strokeWidth={1.5} />
 									<span>Fork</span>
 								</DropdownMenuItem>

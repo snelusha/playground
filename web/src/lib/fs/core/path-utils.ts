@@ -1,4 +1,4 @@
-import { SHARED_ROOT } from "@/lib/fs/fs-roots";
+import { LOCAL_ROOT, SHARED_ROOT } from "@/lib/fs/fs-roots";
 
 export function pathSegments(path: string): string[] {
 	return path.split("/").filter(Boolean);
@@ -59,6 +59,27 @@ export function getRelativePath(
 
 export function isSharedPath(path: string): boolean {
 	return isUnder(path, SHARED_ROOT);
+}
+
+export function sharedToLocalDestination(sharedPath: string): string | null {
+	const rel = getRelativePath(SHARED_ROOT, sharedPath);
+	if (rel === null) return null;
+	return join(LOCAL_ROOT, rel);
+}
+
+export function getForkTargetPath(
+	sourceSharedPath: string,
+	newBasename: string,
+): string | null {
+	const trimmed = newBasename.trim();
+	if (!trimmed) return null;
+	if (/[\\/]/.test(trimmed)) return null;
+	const rel = getRelativePath(SHARED_ROOT, sourceSharedPath);
+	if (rel === null) return null;
+	const parts = pathSegments(rel);
+	if (parts.length === 0) return null;
+	parts[parts.length - 1] = trimmed;
+	return join(LOCAL_ROOT, parts.join("/"));
 }
 
 export function isActiveOrAncestor(
