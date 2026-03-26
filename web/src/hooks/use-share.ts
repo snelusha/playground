@@ -20,7 +20,7 @@ export function useShare() {
 	const processed = React.useRef<string | null>(null);
 
 	const ready = useFileTreeStore((s) => s.ready);
-	const { loadSharedFiles } = useFileTreeActions();
+	const { loadSharedFiles, openFile } = useFileTreeActions();
 
 	const dropShareParam = React.useCallback(() => {
 		navigate({
@@ -38,7 +38,11 @@ export function useShare() {
 
 		if (processed.current === share) return;
 
+		let cancelled = false;
+
 		decodeSharePayload(share).then((payload) => {
+			if (cancelled) return;
+
 			if (!payload) {
 				processed.current = null;
 				toast.error("Invalid share link");
@@ -46,14 +50,24 @@ export function useShare() {
 				return;
 			}
 
-			const loaded = loadSharedFiles(payload.root, payload.openRelativePath);
+			const { loaded, openPath } = loadSharedFiles(
+				payload.root,
+				payload.openRelativePath,
+			);
 			processed.current = loaded ? share : null;
 			if (!loaded) toast.error("Could not load shared files");
-			else showNotice();
+			else {
+				if (openPath !== null) openFile(openPath);
+				showNotice();
+			}
 
 			dropShareParam();
 		});
-	}, [ready, share, loadSharedFiles, dropShareParam, showNotice]);
+
+		return () => {
+			cancelled = true;
+		};
+	}, [ready, share, loadSharedFiles, openFile, dropShareParam, showNotice]);
 
 	const isProcessingShare = !!share && processed.current !== share;
 

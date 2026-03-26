@@ -218,7 +218,8 @@ function useFileTreeDialog() {
 				break;
 			case "fork-file":
 			case "fork-folder":
-				if (renameFile(path, targetPath)) expandDir(dirname(targetPath));
+				if (!renameFile(path, targetPath)) return;
+				expandDir(dirname(targetPath));
 				break;
 		}
 

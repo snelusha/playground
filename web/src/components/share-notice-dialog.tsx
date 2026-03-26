@@ -65,7 +65,7 @@ export function ShareNoticeDialog({
 
 				<p className="text-xs/relaxed text-muted-foreground">
 					Files marked with <InlineIcon icon={AlertSquareIcon} /> are temporary.
-					To keep a copy in your Localspace, choose{" "}
+					To keep a copy in your Localspace, choose&nbsp;
 					<InlineIcon icon={GitForkIcon} /> Fork from the row menu (
 					<InlineIcon icon={MoreVerticalIcon} />) for the file.
 				</p>
