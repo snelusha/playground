@@ -80,7 +80,10 @@ type FileTreeActions = {
 
 	_syncTrees(): void;
 
-	loadSharedFiles(root: FileNode, openRelativePath?: string | null): boolean;
+	loadSharedFiles(
+		root: FileNode,
+		openRelativePath?: string | null,
+	): { loaded: boolean; openPath: string | null };
 };
 
 export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
@@ -296,18 +299,17 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			loadSharedFiles(
 				root: FileNode,
 				openRelativePath?: string | null,
-			): boolean {
-				const openPath = _fs().graftSharedTree(root, openRelativePath);
-
-				set((s) => {
-					s.tempTree = _fs().tempTree();
-					s.localTree = _fs().localTree();
-				});
-
-				if (!openPath) return false;
-
-				get().openFile(openPath);
-				return true;
+			): { loaded: boolean; openPath: string | null } {
+				try {
+					const openPath = _fs().graftSharedTree(root, openRelativePath);
+					set((s) => {
+						s.tempTree = _fs().tempTree();
+						s.localTree = _fs().localTree();
+					});
+					return { loaded: true, openPath };
+				} catch {
+					return { loaded: false, openPath: null };
+				}
 			},
 		};
 	}),

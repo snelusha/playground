@@ -54,7 +54,9 @@ export function getRelativePath(
 	const base = mountPath.replace(/\/$/, "");
 	if (activePath === base) return null;
 	if (!isUnder(activePath, base)) return null;
-	return activePath.slice(base.length + 1);
+	const rel = activePath.slice(base.length + 1);
+	if (!isSafeRelativePath(rel)) return null;
+	return rel;
 }
 
 export function isSharedPath(path: string): boolean {
@@ -74,6 +76,7 @@ export function getForkTargetPath(
 	const trimmed = newBasename.trim();
 	if (!trimmed) return null;
 	if (/[\\/]/.test(trimmed)) return null;
+	if (trimmed === "." || trimmed === "..") return null;
 	const rel = getRelativePath(SHARED_ROOT, sourceSharedPath);
 	if (rel === null) return null;
 	const parts = pathSegments(rel);

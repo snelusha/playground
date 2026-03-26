@@ -18,8 +18,16 @@ async function compressAndEncode(text: string): Promise<string> {
 	const writer = stream.writable.getWriter();
 	void writer.write(bytes);
 	void writer.close();
-	const compressed = await new Response(stream.readable).arrayBuffer();
-	return btoa(String.fromCharCode(...new Uint8Array(compressed)));
+	const compressed = new Uint8Array(
+		await new Response(stream.readable).arrayBuffer(),
+	);
+
+	const chunkSize = 8192;
+	let binary = "";
+	for (let i = 0; i < compressed.length; i += chunkSize) {
+		binary += String.fromCharCode(...compressed.subarray(i, i + chunkSize));
+	}
+	return btoa(binary);
 }
 
 async function decodeAndDecompress(b64: string): Promise<string> {
@@ -32,15 +40,24 @@ async function decodeAndDecompress(b64: string): Promise<string> {
 	return new TextDecoder().decode(decompressed);
 }
 
+function isSafeNodeName(name: unknown): name is string {
+	return (
+		typeof name === "string" &&
+		name.length > 0 &&
+		name !== "." &&
+		name !== ".." &&
+		!name.includes("/")
+	);
+}
+
 function isFileNode(value: unknown): value is FileNode {
 	if (!value || typeof value !== "object") return false;
 	const o = value as Record<string, unknown>;
-	if (o.kind === "file") {
-		return typeof o.name === "string" && typeof o.content === "string";
-	}
+	if (o.kind === "file")
+		return isSafeNodeName(o.name) && typeof o.content === "string";
 	if (o.kind === "dir") {
 		return (
-			typeof o.name === "string" &&
+			isSafeNodeName(o.name) &&
 			Array.isArray(o.children) &&
 			o.children.every(isFileNode)
 		);

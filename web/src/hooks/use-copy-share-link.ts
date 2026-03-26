@@ -13,10 +13,13 @@ export function useCopyShareLink() {
 
 	const copyShareLink = React.useCallback(
 		async (nodePath: string) => {
-			const url = await generateShareUrl(fs, nodePath, activeFilePath);
-			if (!url) return;
-
 			try {
+				const url = await generateShareUrl(fs, nodePath, activeFilePath);
+				if (!url) {
+					toast.error("Could not generate share link");
+					return;
+				}
+
 				await navigator.clipboard.writeText(url);
 				toast.success("Share link copied to clipboard");
 			} catch {
