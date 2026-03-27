@@ -1,0 +1,73 @@
+// Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com).
+//
+// WSO2 LLC. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+
+public type FooDepartment record {
+    string dptName = "";
+    FooPerson[] employees = [];
+};
+
+public type FooPerson record {
+    string name = "default first name";
+    string lname = "";
+    map<any> adrs = {};
+    int age = 999;
+    FooFamily family = {};
+    FooPerson parent = {};
+};
+
+type FooFamily record {
+    string spouse = "";
+    int noOfChildren = 0;
+    string[] children = [];
+};
+
+public type FooEmployee record {
+    string fname = "";
+    string lname = "";
+    int age = 0;
+    private :
+       type record {
+            string city = "";
+            string state = "";
+            string zipcode = "";
+        } address = {};
+};
+
+public function createStruct() returns (FooPerson) {
+    map<any> address1 = {};
+    map<any> address = {"country":"USA", "state":"CA"};
+    FooPerson emp = {name:"Jack", adrs:address, age:25};
+    return emp;
+}
+
+public function createStructOfStruct () returns (FooDepartment) {
+
+    map<any> address = {"country":"USA", "state":"CA"};
+    FooPerson emp1 = {name:"Jack", adrs:address, age:25};
+    FooPerson emp2 = {};
+    FooPerson[] emps = [emp1, emp2];
+    FooDepartment dpt = {employees:emps};
+
+    return dpt;
+}
+
+public function createAnonStruct() returns (FooEmployee) {
+
+    FooEmployee e = {fname:"sam", lname:"json", age:100,
+                     address:{city:"Los Altos", state:"CA", zipcode:"95123"}};
+    return e;
+}

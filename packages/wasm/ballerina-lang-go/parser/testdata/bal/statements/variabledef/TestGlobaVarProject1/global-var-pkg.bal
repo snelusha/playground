@@ -1,0 +1,56 @@
+// Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com).
+//
+// WSO2 LLC. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+import globalvarpkg.variable;
+
+float glbVarFloat = <float> variable:getGlbVarAnyInt();
+
+any glbVarAny = getAnyGlobalVar();
+
+int glbVarInt = variable:getIntValue();
+
+function getGlobalVars() returns [int, string, float, any] {
+    return [variable:getGlbVarInt(), variable:getGlbVarString(), variable:getGlbVarFloat(), variable:getGlbVarAny()];
+}
+
+function changeGlobalVar(int addVal) returns (float) {
+    variable:setGlbVarFloatChange(77.0 + <float> addVal);
+    float value = variable:getGlbVarFloatChange();
+    return value;
+}
+
+function getGlobalFloatVar() returns (float) {
+    _ = changeGlobalVar(3);
+    return variable:getGlbVarFloatChange();
+}
+
+function getAssignedGlobalVarFloat() returns (float) {
+    return glbVarFloat;
+}
+
+function getAnyGlobalVar() returns (any) {
+    float val = 45545.0;
+    return val;
+}
+
+function getGlobalVarAny() returns (any) {
+    return glbVarAny;
+}
+
+function getGlobalVarInt() returns (int) {
+    return glbVarInt;
+}
+
