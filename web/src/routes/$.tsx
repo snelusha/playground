@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { TooltipProvider } from "@/components/ui/tooltip";
-
 import { FSProvider } from "@/providers/fs-provider";
 
 import { FileRouteSync } from "@/components/file-route-sync";
@@ -18,12 +16,10 @@ export const Route = createFileRoute("/$")({
 
 function SplatComponent() {
 	return (
-		<TooltipProvider>
-			<FSProvider>
-				<FileRouteSync>
-					<Editor />
-				</FileRouteSync>
-			</FSProvider>
-		</TooltipProvider>
+		<FSProvider>
+			<FileRouteSync>
+				<Editor />
+			</FileRouteSync>
+		</FSProvider>
 	);
 }
