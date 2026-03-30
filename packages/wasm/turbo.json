@@ -2,6 +2,7 @@
 	"extends": ["//"],
 	"tasks": {
 		"build": {
+			"env": ["LocalAppData"],
 			"inputs": ["**/*.go", "go.mod", "go.sum"],
 			"outputs": ["dist/**"]
 		}
