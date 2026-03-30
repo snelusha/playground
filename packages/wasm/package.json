@@ -1,8 +1,8 @@
 {
-    "name": "@playground/wasm",
-    "private": true,
-    "scripts": {
-        "clean": "rm -rf dist",
-        "build": "GOOS=js GOARCH=wasm go build -o dist/ballerina.wasm ."
-    }
+	"name": "@playground/wasm",
+	"private": true,
+	"scripts": {
+		"build": "GOOS=js GOARCH=wasm go build -o dist/ballerina.wasm .",
+		"clean": "git clean -xdf .turbo dist"
+	}
 }

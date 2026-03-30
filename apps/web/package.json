@@ -4,9 +4,10 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"preview": "vite preview",
 		"build": "tsc -b && vite build",
-		"copy:wasm": "cp ../../packages/wasm/dist/ballerina.wasm public/ballerina.wasm"
+		"preview": "vite preview",
+		"copy:wasm": "cp ../../packages/wasm/dist/ballerina.wasm public/ballerina.wasm",
+		"clean": "git clean -xdf .turbo dist node_modules"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.3.0",
