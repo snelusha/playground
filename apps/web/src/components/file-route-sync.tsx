@@ -11,6 +11,7 @@ import {
 } from "@/stores/file-tree-store";
 
 import { useShare } from "@/hooks/use-share";
+import { useGistImport } from "@/hooks/use-gist-import";
 
 const DEFAULT_FILE = "/tmp/examples/01-orders.bal";
 const DEFAULT_SPLAT = DEFAULT_FILE.replace(/^\/+/, "");
@@ -35,6 +36,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const navigate = useNavigate({ from: "/$" });
 
 	const { isProcessingShare, shareNotice } = useShare();
+	const { isProcessingGist } = useGistImport();
 
 	const ready = useFileTreeStore((s) => s.ready);
 	const activeFilePath = useActiveFilePath();
@@ -51,7 +53,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const clearedByDeletionRef = React.useRef(false);
 
 	React.useEffect(() => {
-		if (!ready || isProcessingShare) return;
+		if (!ready || isProcessingShare || isProcessingGist) return;
 
 		const activePath = activeFilePathRef.current;
 
@@ -72,6 +74,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	}, [
 		ready,
 		isProcessingShare,
+		isProcessingGist,
 		filePathFromUrl,
 		existsFile,
 		openFile,
@@ -79,7 +82,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	]);
 
 	React.useEffect(() => {
-		if (!ready || isProcessingShare) return;
+		if (!ready || isProcessingShare || isProcessingGist) return;
 
 		const expectedSplat = activeFilePath
 			? splatFromFilePath(activeFilePath)
@@ -89,7 +92,14 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 			if (!activeFilePath) clearedByDeletionRef.current = true;
 			navigate({ to: "/$", params: { _splat: expectedSplat }, replace: true });
 		}
-	}, [ready, isProcessingShare, activeFilePath, currentSplat, navigate]);
+	}, [
+		ready,
+		isProcessingShare,
+		isProcessingGist,
+		activeFilePath,
+		currentSplat,
+		navigate,
+	]);
 
 	return (
 		<>

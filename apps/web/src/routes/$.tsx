@@ -8,8 +8,12 @@ import { Editor } from "@/components/editor";
 export const Route = createFileRoute("/$")({
 	validateSearch: (search: Record<string, unknown>) => {
 		const share = search.share;
-		if (typeof share !== "string" || !share.trim()) return {};
-		return { share: share.trim() };
+		const gist = search.gist;
+
+		const out: Record<string, string> = {};
+		if (typeof share === "string" && share.trim()) out.share = share.trim();
+		if (typeof gist === "string" && gist.trim()) out.gist = gist.trim();
+		return out;
 	},
 	component: SplatComponent,
 });
