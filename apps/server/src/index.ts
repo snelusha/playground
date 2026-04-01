@@ -1,7 +1,6 @@
-import { WsTransport } from "./transport";
-import { RemoteFS } from "./remote-fs";
+import { RemoteFS, WsTransport } from "@playground/remote-fs";
 
-const transport = new WsTransport("ws://localhost:6969");
+const transport = new WsTransport("ws://localhost:3000");
 const fs = new RemoteFS(transport);
 
 const file = await fs.open("src/main.bal");

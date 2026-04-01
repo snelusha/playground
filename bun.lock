@@ -12,6 +12,7 @@
     "apps/server": {
       "name": "server",
       "dependencies": {
+        "@playground/remote-fs": "workspace:*",
         "ws": "^8.20.0",
       },
       "devDependencies": {
@@ -29,6 +30,7 @@
         "@fontsource-variable/jetbrains-mono": "^5.2.8",
         "@hugeicons/core-free-icons": "^4.0.0",
         "@hugeicons/react": "^1.1.6",
+        "@playground/remote-fs": "workspace:*",
         "@tailwindcss/vite": "^4.2.1",
         "@tanstack/react-router": "^1.168.1",
         "class-variance-authority": "^0.7.1",
@@ -54,6 +56,13 @@
         "globals": "^17.4.0",
         "typescript": "~5.9.3",
         "vite": "^8.0.0",
+      },
+    },
+    "packages/remote-fs": {
+      "name": "@playground/remote-fs",
+      "version": "0.0.0",
+      "peerDependencies": {
+        "typescript": "^5",
       },
     },
     "packages/wasm": {
@@ -264,6 +273,8 @@
     "@open-draft/until": ["@open-draft/until@2.1.0", "", {}, "sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.122.0", "", {}, "sha512-oLAl5kBpV4w69UtFZ9xqcmTi+GENWOcPF7FCrczTiBbmC0ibXxCwyvZGbO39rCVEuLGAZM84DH0pUIyyv/YJzA=="],
+
+    "@playground/remote-fs": ["@playground/remote-fs@workspace:packages/remote-fs"],
 
     "@playground/wasm": ["@playground/wasm@workspace:packages/wasm"],
 

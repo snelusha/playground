@@ -40,7 +40,7 @@ export function useShare() {
 
 		let cancelled = false;
 
-		decodeSharePayload(share).then((payload) => {
+		void decodeSharePayload(share).then(async (payload) => {
 			if (cancelled) return;
 
 			if (!payload) {
@@ -50,14 +50,14 @@ export function useShare() {
 				return;
 			}
 
-			const { loaded, openPath } = loadSharedFiles(
+			const { loaded, openPath } = await loadSharedFiles(
 				payload.root,
 				payload.openRelativePath,
 			);
 			processed.current = loaded ? share : null;
 			if (!loaded) toast.error("Could not load shared files");
 			else {
-				if (openPath !== null) openFile(openPath);
+				if (openPath !== null) await openFile(openPath);
 				showNotice();
 			}
 

@@ -1,5 +1,3 @@
-// ─── remote-fs.ts (client) ────────────────────────────────────────────────
-
 import type { WsTransport } from "./transport";
 import type { AsyncFS } from "./async-fs";
 import type { FileEntry, StatEntry, DirEntry, WatchEvent } from "./types";

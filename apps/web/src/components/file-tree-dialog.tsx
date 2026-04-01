@@ -170,12 +170,28 @@ function useFileTreeDialog() {
 		return getTargetPath(type, path, name);
 	}, [name, type, path]);
 
+	const [existsTarget, setExistsTarget] = React.useState(false);
+
+	React.useEffect(() => {
+		if (!targetPath) {
+			setExistsTarget(false);
+			return;
+		}
+		let cancelled = false;
+		void exists(targetPath).then((v) => {
+			if (!cancelled) setExistsTarget(v);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [targetPath, exists]);
+
 	const hasPathSeparator = /[\\/]/.test(name);
 
 	const isRename = type?.startsWith("rename") ?? false;
 	const isDelete = type === "delete-file" || type === "delete-folder";
 	const isSamePath = isRename && targetPath === path;
-	const alreadyExists = !!targetPath && !isSamePath && exists(targetPath);
+	const alreadyExists = !!targetPath && !isSamePath && existsTarget;
 	const isActionDisabled = isDelete
 		? false
 		: !name.trim() || hasPathSeparator || alreadyExists || isSamePath;
@@ -193,37 +209,39 @@ function useFileTreeDialog() {
 		e.preventDefault();
 		if (!fileOperationDialog || !type || !path) return;
 
-		if (isDelete) {
-			if (type === "delete-file") deleteFile(path);
-			else if (type === "delete-folder") deleteDir(path);
+		void (async () => {
+			if (isDelete) {
+				if (type === "delete-file") await deleteFile(path);
+				else if (type === "delete-folder") await deleteDir(path);
+				close();
+				return;
+			}
+
+			if (isActionDisabled || !targetPath) return;
+
+			switch (type) {
+				case "new-file":
+					await createNewFile(targetPath);
+					break;
+				case "new-folder":
+					await createNewDir(targetPath);
+					break;
+				case "new-package":
+					await createNewPackage(path, name);
+					break;
+				case "rename-file":
+				case "rename-folder":
+					await renameFile(path, targetPath);
+					break;
+				case "fork-file":
+				case "fork-folder":
+					if (!(await renameFile(path, targetPath))) return;
+					expandDir(dirname(targetPath));
+					break;
+			}
+
 			close();
-			return;
-		}
-
-		if (isActionDisabled || !targetPath) return;
-
-		switch (type) {
-			case "new-file":
-				createNewFile(targetPath);
-				break;
-			case "new-folder":
-				createNewDir(targetPath);
-				break;
-			case "new-package":
-				createNewPackage(path, name);
-				break;
-			case "rename-file":
-			case "rename-folder":
-				renameFile(path, targetPath);
-				break;
-			case "fork-file":
-			case "fork-folder":
-				if (!renameFile(path, targetPath)) return;
-				expandDir(dirname(targetPath));
-				break;
-		}
-
-		close();
+		})();
 	};
 
 	return {

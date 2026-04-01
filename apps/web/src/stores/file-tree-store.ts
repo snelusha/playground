@@ -4,7 +4,7 @@ import { immer } from "zustand/middleware/immer";
 
 import { ancestorDirPathsForFile } from "@/lib/fs/core/path-utils";
 
-import type { LayeredFS } from "@/lib/fs/layered-fs";
+import type { PlaygroundAsyncFS } from "@/lib/fs/playground-async-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 const DEFAULT_MAIN_BAL = `import ballerina/io;
@@ -42,6 +42,8 @@ export type FileOperationDialog = {
 type FileTreeState = {
 	tempTree: FileNode[];
 	localTree: FileNode[];
+	remoteTree: FileNode[];
+	remoteConnected: boolean;
 	activeFile: ActiveFile | null;
 	ready: boolean;
 
@@ -51,26 +53,26 @@ type FileTreeState = {
 };
 
 type FileTreeActions = {
-	init(fs: LayeredFS): void;
+	init(fs: PlaygroundAsyncFS): void;
 
-	openFile(path: string): void;
-	saveFile(): boolean;
-	createFile(path: string): boolean;
-	deleteFile(path: string): boolean;
-	renameFile(oldPath: string, newPath: string): boolean;
+	openFile(path: string): Promise<void>;
+	saveFile(): Promise<boolean>;
+	createFile(path: string): Promise<boolean>;
+	deleteFile(path: string): Promise<boolean>;
+	renameFile(oldPath: string, newPath: string): Promise<boolean>;
 
-	createDir(path: string): boolean;
-	deleteDir(path: string): boolean;
+	createDir(path: string): Promise<boolean>;
+	deleteDir(path: string): Promise<boolean>;
 
 	updateFileContent(content: string): void;
 
-	exists(path: string): boolean;
-	existsFile(path: string): boolean;
+	exists(path: string): Promise<boolean>;
+	existsFile(path: string): Promise<boolean>;
 
-	createNewFile(path: string): boolean;
-	createNewDir(path: string): boolean;
+	createNewFile(path: string): Promise<boolean>;
+	createNewDir(path: string): Promise<boolean>;
 
-	createNewPackage(path: string, name: string): boolean;
+	createNewPackage(path: string, name: string): Promise<boolean>;
 
 	setFileOperationDialog(dialog: FileOperationDialog): void;
 
@@ -78,19 +80,19 @@ type FileTreeActions = {
 	expandDir(path: string): void;
 	collapseDir(path: string): void;
 
-	_syncTrees(): void;
+	_syncTrees(): Promise<void>;
 
 	loadSharedFiles(
 		root: FileNode,
 		openRelativePath?: string | null,
-	): { loaded: boolean; openPath: string | null };
+	): Promise<{ loaded: boolean; openPath: string | null }>;
 };
 
 export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 	immer((set, get) => {
-		let fs: LayeredFS | null = null;
+		let fs: PlaygroundAsyncFS | null = null;
 
-		const _fs = (): LayeredFS => {
+		const _fs = (): PlaygroundAsyncFS => {
 			if (!fs) throw new Error("[FileTreeStore] FS not initialised");
 			return fs;
 		};
@@ -98,6 +100,8 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 		return {
 			tempTree: [],
 			localTree: [],
+			remoteTree: [],
+			remoteConnected: false,
 			activeFile: null,
 			ready: false,
 			fileOperationDialog: null,
@@ -107,15 +111,18 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				if (fs) return;
 				fs = instance;
 				set((s) => {
-					if (!fs) return;
-					s.tempTree = fs.tempTree();
-					s.localTree = fs.localTree();
-					s.ready = true;
+					s.remoteConnected = instance.remoteEnabled();
 				});
+				void (async () => {
+					await get()._syncTrees();
+					set((s) => {
+						s.ready = true;
+					});
+				})();
 			},
 
-			openFile(path) {
-				const file = _fs().open(path);
+			async openFile(path) {
+				const file = await _fs().open(path);
 				if (!file) return;
 				const dirs = ancestorDirPathsForFile(path);
 				set((s) => {
@@ -128,37 +135,40 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				});
 			},
 
-			saveFile() {
+			async saveFile() {
 				const { activeFile } = get();
 				if (!activeFile || !activeFile.dirty) return false;
-				const result = _fs().writeFile(activeFile.path, activeFile.content);
+				const result = await _fs().writeFile(
+					activeFile.path,
+					activeFile.content,
+				);
 				if (!result) return false;
 				set((s) => {
 					if (s.activeFile) s.activeFile.dirty = false;
 				});
-				get()._syncTrees();
+				await get()._syncTrees();
 				return true;
 			},
 
-			createFile(path) {
-				const result = _fs().writeFile(path, "");
+			async createFile(path) {
+				const result = await _fs().writeFile(path, "");
 				if (!result) return false;
-				get()._syncTrees();
+				await get()._syncTrees();
 				return true;
 			},
 
-			deleteFile(path) {
-				const result = _fs().remove(path);
+			async deleteFile(path) {
+				const result = await _fs().remove(path);
 				if (!result) return false;
 				set((s) => {
 					if (s.activeFile?.path === path) s.activeFile = null;
 				});
-				get()._syncTrees();
+				await get()._syncTrees();
 				return true;
 			},
 
-			renameFile(oldPath, newPath) {
-				const result = _fs().move(oldPath, newPath);
+			async renameFile(oldPath, newPath) {
+				const result = await _fs().move(oldPath, newPath);
 				if (!result) return false;
 				set((s) => {
 					if (!s.activeFile) return;
@@ -178,19 +188,19 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						}
 					}
 				});
-				get()._syncTrees();
+				await get()._syncTrees();
 				return true;
 			},
 
-			createDir(path) {
-				const result = _fs().mkdirAll(path);
+			async createDir(path) {
+				const result = await _fs().mkdirAll(path);
 				if (!result) return false;
-				get()._syncTrees();
+				await get()._syncTrees();
 				return true;
 			},
 
-			deleteDir(path) {
-				const result = _fs().remove(path);
+			async deleteDir(path) {
+				const result = await _fs().remove(path);
 				if (!result) return false;
 				set((s) => {
 					const activePath = s.activeFile?.path;
@@ -198,7 +208,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						s.activeFile = null;
 					}
 				});
-				get()._syncTrees();
+				await get()._syncTrees();
 				return true;
 			},
 
@@ -211,52 +221,52 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				});
 			},
 
-			exists(path) {
+			async exists(path) {
 				try {
-					return !!_fs().stat(path);
+					return !!(await _fs().stat(path));
 				} catch {
 					return false;
 				}
 			},
 
-			existsFile(path) {
+			async existsFile(path) {
 				try {
-					const info = _fs().stat(path);
+					const info = await _fs().stat(path);
 					return !!info && !info.isDir;
 				} catch {
 					return false;
 				}
 			},
 
-			createNewFile(path) {
-				const result = _fs().writeFile(path, "");
+			async createNewFile(path) {
+				const result = await _fs().writeFile(path, "");
 				if (!result) return false;
-				get()._syncTrees();
-				get().openFile(path);
+				await get()._syncTrees();
+				await get().openFile(path);
 				return true;
 			},
 
-			createNewDir(path) {
-				const result = _fs().mkdirAll(path);
+			async createNewDir(path) {
+				const result = await _fs().mkdirAll(path);
 				if (!result) return false;
-				get()._syncTrees();
+				await get()._syncTrees();
 				return true;
 			},
 
-			createNewPackage(path, name) {
+			async createNewPackage(path, name) {
 				const dirPath = `${path}/${name}`;
-				const dirResult = _fs().mkdirAll(dirPath);
+				const dirResult = await _fs().mkdirAll(dirPath);
 				if (!dirResult) return false;
 				const tomlPath = `${dirPath}/Ballerina.toml`;
 				const balPath = `${dirPath}/main.bal`;
-				const tomlResult = _fs().writeFile(
+				const tomlResult = await _fs().writeFile(
 					tomlPath,
 					DEFAULT_BALLERINA_TOML.replace("{name}", name),
 				);
-				const balResult = _fs().writeFile(balPath, DEFAULT_MAIN_BAL);
+				const balResult = await _fs().writeFile(balPath, DEFAULT_MAIN_BAL);
 				if (!tomlResult || !balResult) return false;
-				get()._syncTrees();
-				get().openFile(balPath);
+				await get()._syncTrees();
+				await get().openFile(balPath);
 				return true;
 			},
 
@@ -288,23 +298,19 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				});
 			},
 
-			_syncTrees() {
-				const fs = _fs();
+			async _syncTrees() {
+				const pfs = _fs();
+				const remote = await pfs.remoteTree();
 				set((s) => {
-					s.tempTree = fs.tempTree();
-					s.localTree = fs.localTree();
+					s.tempTree = pfs.tempTree();
+					s.localTree = pfs.localTree();
+					s.remoteTree = remote;
 				});
 			},
 
-			loadSharedFiles(
-				root: FileNode,
-				openRelativePath?: string | null,
-			): { loaded: boolean; openPath: string | null } {
+			async loadSharedFiles(root, openRelativePath) {
 				const openPath = _fs().graftSharedTree(root, openRelativePath);
-				set((s) => {
-					s.tempTree = _fs().tempTree();
-					s.localTree = _fs().localTree();
-				});
+				await get()._syncTrees();
 				return { loaded: true, openPath };
 			},
 		};
@@ -313,6 +319,9 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 
 export const useTempTree = () => useFileTreeStore((s) => s.tempTree);
 export const useLocalTree = () => useFileTreeStore((s) => s.localTree);
+export const useRemoteTree = () => useFileTreeStore((s) => s.remoteTree);
+export const useRemoteConnected = () =>
+	useFileTreeStore((s) => s.remoteConnected);
 
 export const useActiveFile = () => useFileTreeStore((s) => s.activeFile);
 export const useActiveFilePath = () =>

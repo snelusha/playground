@@ -2,7 +2,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { FileEntry, StatEntry, DirEntry } from "./types";
+import type { FileEntry, StatEntry, DirEntry } from "@playground/remote-fs";
 
 export class NodeFS {
 	private readonly root: string;

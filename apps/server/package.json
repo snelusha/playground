@@ -10,7 +10,8 @@
 	"peerDependencies": {
 		"typescript": "^5"
 	},
-	"dependencies": {
-		"ws": "^8.20.0"
-	}
+  "dependencies": {
+    "@playground/remote-fs": "workspace:*",
+    "ws": "^8.20.0"
+  }
 }

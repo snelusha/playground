@@ -26,6 +26,7 @@ import {
 	basename,
 	dirname,
 	ext,
+	isRemotePath,
 	isRootPath,
 	join,
 } from "@/lib/fs/core/path-utils";
@@ -36,6 +37,8 @@ import { useActiveFile, useFileTreeActions } from "@/stores/file-tree-store";
 
 import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
+
+import { toast } from "sonner";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
 
@@ -126,7 +129,13 @@ function OutputPane() {
 	);
 }
 
-function EditorPane({ onRun }: { onRun: () => void }) {
+function EditorPane({
+	onRun,
+	runDisabled,
+}: {
+	onRun: () => void;
+	runDisabled: boolean;
+}) {
 	const activeFile = useActiveFile();
 
 	const { updateFileContent } = useFileTreeActions();
@@ -156,7 +165,7 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 					className="h-full rounded-none"
 					variant="ghost"
 					onClick={onRun}
-					disabled={!activeFile || getLanguage(activeFile.path) !== "ballerina"}
+					disabled={runDisabled}
 				>
 					<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
 					<span>Run</span>
@@ -205,8 +214,14 @@ function EditorContent() {
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
 
-	const handleRun = React.useCallback(() => {
+	const handleRun = React.useCallback(async () => {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
+		if (isRemotePath(activeFile.path)) {
+			toast.message(
+				"Run is not available for remote files. Copy the project to Local or Examples.",
+			);
+			return;
+		}
 
 		const oldConsole = console.log;
 		let captured = "";
@@ -217,8 +232,7 @@ function EditorContent() {
 		};
 
 		try {
-			// FIXME: We should automatically save files on change.
-			saveFile();
+			await saveFile();
 
 			const target = getBallerinaExecutionTarget(fs, activeFile.path);
 			const runResult = run(target);
@@ -231,6 +245,11 @@ function EditorContent() {
 
 		openOutputWith(captured);
 	}, [activeFile, fs, saveFile, run, openOutputWith]);
+
+	const runDisabled =
+		!activeFile ||
+		getLanguage(activeFile.path) !== "ballerina" ||
+		isRemotePath(activeFile.path);
 
 	useHotkeys(
 		"mod+enter",
@@ -252,7 +271,7 @@ function EditorContent() {
 			<SidebarInset className="flex flex-col h-dvh overflow-hidden">
 				<EditorHeader />
 				<main className="flex flex-col lg:flex-row flex-1 min-h-0">
-					<EditorPane onRun={handleRun} />
+					<EditorPane onRun={handleRun} runDisabled={runDisabled} />
 					<OutputPane />
 				</main>
 			</SidebarInset>

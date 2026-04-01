@@ -44,6 +44,8 @@ import {
 	useActiveFilePath,
 	useFileTreeActions,
 	useLocalTree,
+	useRemoteConnected,
+	useRemoteTree,
 	useTempTree,
 	useExpandedPaths,
 } from "@/stores/file-tree-store";
@@ -61,7 +63,7 @@ import {
 } from "@/lib/fs/core/path-utils";
 import { cn } from "@/lib/utils";
 
-import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
+import { LOCAL_ROOT, REMOTE_ROOT } from "@/lib/fs/fs-roots";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
@@ -92,10 +94,11 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 	} = useFileTreeActions();
 
 	function handleClick() {
-		// TODO: This is a bit hacky, we should ideally have a separate "switchFile" action that doesn't mark the file as dirty
-		saveFile();
-		openFile(path);
-		if (isMobile) toggleSidebar();
+		void (async () => {
+			await saveFile();
+			await openFile(path);
+			if (isMobile) toggleSidebar();
+		})();
 	}
 
 	return (
@@ -295,18 +298,20 @@ function FileTreeDirNode({
 							{isSharedPath(path) && (
 								<DropdownMenuItem
 									onClick={() => {
-										saveFile();
-										const dest = sharedToLocalDestination(path);
-										if (!dest) return;
-										if (exists(dest)) {
-											setFileOperationDialog({
-												type: "fork-folder",
-												path,
-												defaultName: basename(path),
-											});
-										} else if (renameFile(path, dest)) {
-											expandDir(dirname(dest));
-										}
+										void (async () => {
+											await saveFile();
+											const dest = sharedToLocalDestination(path);
+											if (!dest) return;
+											if (await exists(dest)) {
+												setFileOperationDialog({
+													type: "fork-folder",
+													path,
+													defaultName: basename(path),
+												});
+											} else if (await renameFile(path, dest)) {
+												expandDir(dirname(dest));
+											}
+										})();
 									}}
 								>
 									<HugeiconsIcon icon={GitForkIcon} strokeWidth={1.5} />
@@ -364,6 +369,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	const tempTree = useTempTree();
 	const localTree = useLocalTree();
+	const remoteTree = useRemoteTree();
+	const remoteConnected = useRemoteConnected();
 
 	const { entries: exampleEntries } = React.useMemo(
 		() => getExamplesSubtree(tempTree),
@@ -453,6 +460,74 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 								);
 							})}
 						</SidebarMenu>
+					</SidebarGroupContent>
+				</SidebarGroup>
+				<SidebarSeparator />
+				<SidebarGroup>
+					<div className="flex items-center justify-between">
+						<SidebarGroupLabel className="uppercase">Remote</SidebarGroupLabel>
+						{remoteConnected && (
+							<DropdownMenu>
+								<DropdownMenuTrigger
+									render={<Button variant="ghost" size="icon-xs" />}
+								>
+									<HugeiconsIcon icon={PlusSignIcon} strokeWidth={1.5} />
+								</DropdownMenuTrigger>
+								<DropdownMenuContent
+									side="bottom"
+									align={isMobile ? "end" : "start"}
+								>
+									<DropdownMenuItem
+										onClick={() =>
+											setFileOperationDialog({
+												type: "new-file",
+												path: REMOTE_ROOT,
+											})
+										}
+									>
+										<HugeiconsIcon icon={File01Icon} strokeWidth={1.5} />
+										<span>New File</span>
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() =>
+											setFileOperationDialog({
+												type: "new-folder",
+												path: REMOTE_ROOT,
+											})
+										}
+									>
+										<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
+										<span>New Folder</span>
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+						)}
+					</div>
+					<SidebarGroupContent className="mt-2">
+						{remoteConnected ? (
+							<SidebarMenu>
+								{remoteTree.map((node, index) => {
+									const path = `${REMOTE_ROOT}/${node.name}`;
+									return (
+										<FileTreeNode
+											key={`remote:${node.name}`}
+											node={node}
+											path={path}
+											defaultOpen={
+												isActiveOrAncestor(path, activeFilePath) ||
+												(remoteTree.length > 0 && index === 0)
+											}
+										/>
+									);
+								})}
+							</SidebarMenu>
+						) : (
+							<p className="text-xs text-muted-foreground px-2 leading-relaxed">
+								Host filesystem appears here when{" "}
+								<code className="text-[11px]">VITE_REMOTE_FS_WS_URL</code> is
+								set and the playground server is running.
+							</p>
+						)}
 					</SidebarGroupContent>
 				</SidebarGroup>
 			</SidebarContent>

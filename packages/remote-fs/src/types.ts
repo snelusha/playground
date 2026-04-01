@@ -1,5 +1,3 @@
-// ─── types.ts (shared between client and server) ──────────────────────────
-
 export interface FileEntry {
 	content: string;
 	size: number;
@@ -24,14 +22,12 @@ export interface WatchEvent {
 	kind: "change" | "delete";
 }
 
-// Outbound (client → server)
 export interface WsRequest {
 	id: string;
 	method: string;
 	params?: Record<string, unknown>;
 }
 
-// Inbound (server → client)
 export interface WsResponse {
 	id: string;
 	result?: unknown;

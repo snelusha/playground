@@ -5,7 +5,7 @@ import fs from "node:fs";
 import type { Duplex } from "node:stream";
 import { WebSocketServer, type WebSocket } from "ws";
 import { NodeFS } from "./node-fs";
-import type { WsRequest, WsResponse, WsPush, WatchEvent } from "./types";
+import type { WsRequest, WsResponse, WsPush, WatchEvent } from "@playground/remote-fs";
 
 const ROOT = process.env.FS_ROOT ?? "./workspace";
 const PORT = Number(process.env.PORT ?? 3000);

@@ -1,5 +1,3 @@
-// ─── transport.ts (client) ────────────────────────────────────────────────
-
 import type {
 	WsRequest,
 	WsResponse,
@@ -15,9 +13,10 @@ function isPush(msg: WsResponse | WsPush): msg is WsPush {
 	return "channel" in msg;
 }
 
+/** Default matches apps/server default PORT=3000 */
 function resolveUrl(override?: string): string {
 	if (override) return override;
-	return "ws://localhost:6969/ws";
+	return "ws://localhost:3000";
 }
 
 export class WsTransport {
@@ -99,7 +98,9 @@ export class WsTransport {
 			}
 		});
 
-		ws.addEventListener("message", ({ data }) => this.handleMessage(data));
+		ws.addEventListener("message", (ev) => {
+			void this.handleMessage(ev.data);
+		});
 
 		ws.addEventListener("close", () => {
 			if (this.ws === ws) this.ws = null;
@@ -115,7 +116,17 @@ export class WsTransport {
 		}
 	}
 
-	private handleMessage(raw: string): void {
+	private async handleMessage(data: unknown): Promise<void> {
+		let raw: string;
+		if (typeof data === "string") {
+			raw = data;
+		} else if (data instanceof Blob) {
+			raw = await data.text();
+		} else {
+			console.warn("[WsTransport] unsupported message payload");
+			return;
+		}
+
 		let msg: WsResponse | WsPush;
 		try {
 			msg = JSON.parse(raw);
