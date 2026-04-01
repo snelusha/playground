@@ -67,6 +67,10 @@ export function isExamplesPath(path: string): boolean {
 	return isUnder(path, EXAMPLES_ROOT);
 }
 
+export function isShareablePath(path: string): boolean {
+	return isExamplesPath(path) || isSharedPath(path);
+}
+
 export function sharedToLocalDestination(sharedPath: string): string | null {
 	const rel = getRelativePath(SHARED_ROOT, sharedPath);
 	if (rel === null) return null;

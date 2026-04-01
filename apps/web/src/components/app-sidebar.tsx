@@ -54,6 +54,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { getExamplesSubtree, getSharedSubtree } from "@/lib/file-tree-utils";
 import {
 	basename,
+	isShareablePath,
 	dirname,
 	isExamplesPath,
 	isActiveOrAncestor,
@@ -146,10 +147,12 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 								<span>Rename</span>
 							</DropdownMenuItem>
 						)}
-						<DropdownMenuItem onClick={() => void copyShareLink(path)}>
-							<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
-							<span>Share</span>
-						</DropdownMenuItem>
+						{isShareablePath(path) && (
+							<DropdownMenuItem onClick={() => void copyShareLink(path)}>
+								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+								<span>Share</span>
+							</DropdownMenuItem>
+						)}
 						{isSharedFile && (
 							<DropdownMenuItem
 								onClick={() => {
@@ -297,10 +300,12 @@ function FileTreeDirNode({
 									<span>Rename</span>
 								</DropdownMenuItem>
 							)}
-							<DropdownMenuItem onClick={() => void copyShareLink(path)}>
-								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
-								<span>Share</span>
-							</DropdownMenuItem>
+							{isShareablePath(path) && (
+								<DropdownMenuItem onClick={() => void copyShareLink(path)}>
+									<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
+									<span>Share</span>
+								</DropdownMenuItem>
+							)}
 							{isSharedDir && (
 								<DropdownMenuItem
 									onClick={() => {
