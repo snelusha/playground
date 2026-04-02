@@ -71,9 +71,14 @@ type FileTreeNodeProps = {
 	node: FileNode;
 	path: string;
 	defaultOpen?: boolean;
+	shareable?: boolean;
 };
 
-function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
+function FileTreeFileNode({
+	node,
+	path,
+	shareable = false,
+}: FileTreeNodeProps) {
 	const { copyShareLink } = useCopyShareLink();
 
 	const isMobile = useIsMobile();
@@ -147,7 +152,7 @@ function FileTreeFileNode({ node, path }: FileTreeNodeProps) {
 								<span>Rename</span>
 							</DropdownMenuItem>
 						)}
-						{isShareablePath(path) && (
+						{shareable && (
 							<DropdownMenuItem onClick={() => void copyShareLink(path)}>
 								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 								<span>Share</span>
@@ -200,12 +205,14 @@ type FileTreeDirNodeProps = {
 	node: Extract<FileNode, { kind: "dir" }>;
 	path: string;
 	defaultOpen?: boolean;
+	shareable?: boolean;
 };
 
 function FileTreeDirNode({
 	node,
 	path,
 	defaultOpen = false,
+	shareable = false,
 }: FileTreeDirNodeProps) {
 	const { copyShareLink } = useCopyShareLink();
 
@@ -300,7 +307,7 @@ function FileTreeDirNode({
 									<span>Rename</span>
 								</DropdownMenuItem>
 							)}
-							{isShareablePath(path) && (
+							{shareable && (
 								<DropdownMenuItem onClick={() => void copyShareLink(path)}>
 									<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
 									<span>Share</span>
@@ -371,8 +378,22 @@ function FileTreeDirNode({
 }
 
 function FileTreeNode({ node, path, defaultOpen }: FileTreeNodeProps) {
-	if (node.kind === "file") return <FileTreeFileNode node={node} path={path} />;
-	return <FileTreeDirNode node={node} path={path} defaultOpen={defaultOpen} />;
+	if (node.kind === "file")
+		return (
+			<FileTreeFileNode
+				node={node}
+				path={path}
+				shareable={isShareablePath(path)}
+			/>
+		);
+	return (
+		<FileTreeDirNode
+			node={node}
+			path={path}
+			defaultOpen={defaultOpen}
+			shareable={true}
+		/>
+	);
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

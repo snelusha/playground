@@ -130,7 +130,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 
 			saveFile() {
 				const { activeFile } = get();
-				if (!activeFile || !activeFile.dirty) return false;
+				if (!activeFile?.dirty) return false;
 				const result = _fs().writeFile(activeFile.path, activeFile.content);
 				if (!result) return false;
 				set((s) => {
@@ -307,7 +307,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						s.localTree = _fs().localTree();
 					});
 					return { loaded: true, openPath };
-				} catch (e) {
+				} catch {
 					return { loaded: false, openPath: null };
 				}
 			},
