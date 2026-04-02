@@ -12,6 +12,7 @@ import { githubLight } from "@fsegurai/codemirror-theme-github-light";
 
 import { languageSupportFor } from "@/lib/codemirror/language";
 import type { EditorLanguageId } from "@/lib/codemirror/language";
+import { playgroundCompletionUi } from "@/lib/codemirror/playground-completion-ui";
 import { playgroundTheme } from "@/lib/codemirror/playground-theme";
 import { cn } from "@/lib/utils";
 import { useEditorStore } from "@/stores/editor-store";
@@ -75,6 +76,7 @@ export function CodeEditor({
 					}
 				}),
 				githubLight,
+				playgroundCompletionUi,
 			],
 		});
 
