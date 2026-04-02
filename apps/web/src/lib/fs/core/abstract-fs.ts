@@ -48,7 +48,7 @@ export class AbstractFS implements FS {
 
 	readDir(path: string): { name: string; isDir: boolean }[] | null {
 		const node = this._getNode(path, false);
-		if (!node || !node.isDir || !node.children) return null;
+		if (!node?.isDir || !node.children) return null;
 		return Object.entries(node.children).map(([name, child]) => ({
 			name,
 			isDir: child.isDir,
