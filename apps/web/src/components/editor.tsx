@@ -132,6 +132,8 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 	const { updateFileContent } = useFileTreeActions();
 
 	const outputOpen = useEditorStore((s) => s.outputOpen);
+	const vimEnabled = useEditorStore((s) => s.vimEnabled);
+	const toggleVim = useEditorStore((s) => s.toggleVim);
 
 	const handleChange = React.useCallback(
 		(next: string) => {
@@ -152,17 +154,30 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 				<span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
-				<Button
-					className="h-full rounded-none"
-					variant="ghost"
-					onClick={onRun}
-					disabled={!activeFile || getLanguage(activeFile.path) !== "ballerina"}
-				>
-					<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-					<span>Run</span>
-				</Button>
+				<div className="flex h-full">
+					<Button
+						className="h-full rounded-none border-l"
+						variant={vimEnabled ? "secondary" : "ghost"}
+						onClick={toggleVim}
+						title="Toggle Vim keybindings"
+					>
+						<span className="text-xs font-medium">Vim</span>
+					</Button>
+					<Button
+						className="h-full rounded-none"
+						variant="ghost"
+						onClick={onRun}
+						disabled={
+							!activeFile || getLanguage(activeFile.path) !== "ballerina"
+						}
+					>
+						<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+						<span>Run</span>
+					</Button>
+				</div>
 			</div>
 			<CodeEditor
+				key={activeFile?.path ?? "__none__"}
 				className="flex-1 min-h-0 w-full"
 				value={activeFile?.content ?? ""}
 				onChange={handleChange}
@@ -239,7 +254,8 @@ function EditorContent() {
 			handleRun();
 		},
 		{
-			enableOnFormTags: ["TEXTAREA"],
+			enableOnFormTags: ["TEXTAREA", "INPUT"],
+			enableOnContentEditable: true,
 			preventDefault: true,
 		},
 	);
