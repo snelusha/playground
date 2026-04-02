@@ -5,8 +5,7 @@ import { EditorView } from "@codemirror/view";
  */
 export const playgroundTheme = EditorView.theme({
 	"&": {
-		fontSize: "13px",
-		lineHeight: "22.5px",
+		fontSize: "14px",
 		height: "100%",
 	},
 	".cm-scroller": {
@@ -18,8 +17,12 @@ export const playgroundTheme = EditorView.theme({
 	".cm-scroller::-webkit-scrollbar": {
 		display: "none",
 	},
+	".cm-line": {
+		lineHeight: "inherit",
+	},
 	".cm-content": {
-		padding: "16px",
+		// padding: "16px",
+		lineHeight: "200%",
 	},
 	".cm-gutters": {
 		backgroundColor: "transparent",
@@ -30,7 +33,7 @@ export const playgroundTheme = EditorView.theme({
 		backgroundColor: "transparent",
 	},
 	".cm-activeLine": {
-		backgroundColor: "var(--muted)",
+		backgroundColor: "transparent",
 	},
 	".cm-cursor, &.cm-focused .cm-cursor": {
 		borderLeftColor: "#3b82f6",

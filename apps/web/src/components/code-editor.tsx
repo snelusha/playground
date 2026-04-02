@@ -8,6 +8,8 @@ import { basicSetup } from "codemirror";
 
 import { indentUnit } from "@codemirror/language";
 
+import { githubLight } from "@fsegurai/codemirror-theme-github-light";
+
 import { languageSupportFor } from "@/lib/codemirror/language";
 import type { EditorLanguageId } from "@/lib/codemirror/language";
 import { playgroundTheme } from "@/lib/codemirror/playground-theme";
@@ -72,6 +74,7 @@ export function CodeEditor({
 						onChangeRef.current?.(update.state.doc.toString());
 					}
 				}),
+				githubLight,
 			],
 		});
 
