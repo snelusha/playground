@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { indentWithTab } from "@codemirror/commands";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { vim } from "@replit/codemirror-vim";
 import { basicSetup } from "codemirror";
@@ -20,6 +20,8 @@ import { useEditorStore } from "@/stores/editor-store";
 interface CodeEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
+	/** Fired on Mod-Enter inside the editor (must use CodeMirror keymap; document hotkeys do not see keys CodeMirror handles). */
+	onModEnter?: () => void;
 	language?: string;
 	className?: string;
 }
@@ -33,6 +35,7 @@ function normalizeLanguage(language: string | undefined): EditorLanguageId {
 export function CodeEditor({
 	value = "",
 	onChange,
+	onModEnter,
 	language = "ballerina",
 	className,
 }: CodeEditorProps) {
@@ -56,6 +59,9 @@ export function CodeEditor({
 	const onChangeRef = React.useRef(onChange);
 	onChangeRef.current = onChange;
 
+	const onModEnterRef = React.useRef(onModEnter);
+	onModEnterRef.current = onModEnter;
+
 	// biome-ignore lint/correctness/useExhaustiveDependencies: `value` is synced in a separate effect; including it here would destroy the view on every keystroke. `vimEnabled` is applied via `vimCompartment.reconfigure` in another effect.
 	React.useEffect(() => {
 		const parent = parentRef.current;
@@ -64,6 +70,17 @@ export function CodeEditor({
 		const state = EditorState.create({
 			doc: value,
 			extensions: [
+				Prec.highest(
+					keymap.of([
+						{
+							key: "Mod-Enter",
+							run: () => {
+								onModEnterRef.current?.();
+								return true;
+							},
+						},
+					]),
+				),
 				vimCompartment.current.of(vimEnabled ? vim() : []),
 				basicSetup,
 				playgroundTheme,

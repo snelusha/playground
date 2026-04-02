@@ -181,6 +181,7 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 				className="flex-1 min-h-0 w-full"
 				value={activeFile?.content ?? ""}
 				onChange={handleChange}
+				onModEnter={onRun}
 				language={activeFile ? getLanguage(activeFile.path) : undefined}
 			/>
 		</div>
@@ -247,6 +248,7 @@ function EditorContent() {
 		openOutputWith(captured);
 	}, [activeFile, fs, saveFile, run, openOutputWith]);
 
+	// When focus is in CodeMirror, key events do not reach `document`; Run is bound via `onModEnter` on `CodeEditor`.
 	useHotkeys(
 		"mod+enter",
 		(e) => {
