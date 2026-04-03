@@ -1,0 +1,12 @@
+{
+	"name": "@playground/balrun",
+	"scripts": {
+		"clean": "git clean -xdf .turbo dist"
+	},
+	"devDependencies": {
+		"@rollup/plugin-typescript": "^12.3.0",
+		"@types/node": "^25.5.2",
+		"rollup": "^4.60.1",
+		"tslib": "^2.8.1"
+	}
+}
