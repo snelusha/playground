@@ -1,5 +1,9 @@
 {
 	"name": "@playground/balrun",
+	"version": "0.3.0",
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"clean": "git clean -xdf .turbo dist"
 	},
