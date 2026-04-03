@@ -240,6 +240,7 @@ function EditorContent() {
 		},
 		{
 			enableOnFormTags: ["TEXTAREA"],
+			enableOnContentEditable: true,
 			preventDefault: true,
 		},
 	);

@@ -55,6 +55,17 @@
 	--ansi-fg-bright-magenta: #a855f7;
 	--ansi-fg-bright-cyan: #22d3ee;
 	--ansi-fg-bright-white: #f9fafb;
+
+	/* CodeMirror syntax (GitHub Light–aligned); overridden in .dark */
+	--cm-keyword: #d73a49;
+	--cm-string: #032f62;
+	--cm-comment: #6a737d;
+	--cm-number: #005cc5;
+	--cm-meta: #6f42c1;
+	--cm-bracket: #24292e;
+	--cm-operator: #d73a49;
+	--cm-property: #005cc5;
+	--cm-atom: #005cc5;
 }
 
 .dark {
@@ -106,6 +117,16 @@
 	--ansi-fg-bright-magenta: #a855f7;
 	--ansi-fg-bright-cyan: #22d3ee;
 	--ansi-fg-bright-white: #f9fafb;
+
+	--cm-keyword: #ff7b72;
+	--cm-string: #a5d6ff;
+	--cm-comment: #8b949e;
+	--cm-number: #79c0ff;
+	--cm-meta: #d2a8ff;
+	--cm-bracket: #c9d1d9;
+	--cm-operator: #ff7b72;
+	--cm-property: #79c0ff;
+	--cm-atom: #79c0ff;
 }
 
 @theme inline {
@@ -172,4 +193,12 @@
 ::selection {
 	color: #3a5bc7;
 	background-color: #edf2fe;
+}
+
+/* CodeMirror selection: align with global ::selection where possible */
+.cm-editor ::selection {
+	background-color: #edf2fe;
+}
+.dark .cm-editor ::selection {
+	background-color: oklch(0.371 0 0 / 40%);
 }

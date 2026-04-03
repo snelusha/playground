@@ -1,10 +1,12 @@
 import * as React from "react";
 
-import { createHighlighter } from "shiki";
+import { basicSetup } from "codemirror";
+import { indentUnit } from "@codemirror/language";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 
+import { languageSupportFor } from "@/lib/codemirror/ballerina-language";
 import { cn } from "@/lib/utils";
-
-import type { BundledLanguage, BundledTheme, HighlighterGeneric } from "shiki";
 
 interface CodeEditorProps {
 	value?: string;
@@ -13,16 +15,50 @@ interface CodeEditorProps {
 	className?: string;
 }
 
-const sharedClasses =
-	"p-4 leading-[22.5px] font-sans whitespace-pre overflow-auto absolute inset-0 box-border [tab-size:2]";
+const languageConf = new Compartment();
 
-function escapeHtml(html: string) {
-	return html
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#039;");
+function baseExtensions(
+	language: string | undefined,
+	onDocChange: (text: string) => void,
+): Extension[] {
+	return [
+		basicSetup,
+		indentUnit.of("  "),
+		EditorView.contentAttributes.of({
+			spellcheck: "false",
+			autocapitalize: "off",
+			autocomplete: "off",
+			autocorrect: "off",
+		}),
+		languageConf.of(languageSupportFor(language)),
+		EditorView.updateListener.of((update) => {
+			if (update.docChanged) onDocChange(update.state.doc.toString());
+		}),
+		EditorView.theme({
+			"&": { height: "100%" },
+			".cm-editor": {
+				backgroundColor: "var(--background)",
+				color: "var(--foreground)",
+			},
+			".cm-scroller": {
+				fontFamily: "inherit",
+			},
+			".cm-content": {
+				padding: "16px",
+				fontSize: "13px",
+				lineHeight: "22.5px",
+				minHeight: "100%",
+			},
+			".cm-gutters": {
+				backgroundColor: "var(--muted)",
+				borderColor: "var(--border)",
+				borderRightWidth: "1px",
+			},
+			".cm-activeLineGutter": {
+				backgroundColor: "transparent",
+			},
+		}),
+	];
 }
 
 export function CodeEditor({
@@ -31,102 +67,53 @@ export function CodeEditor({
 	language = "ballerina",
 	className,
 }: CodeEditorProps) {
-	const [highlighted, setHighlighted] = React.useState("");
-	const highlighterRef = React.useRef<HighlighterGeneric<
-		BundledLanguage,
-		BundledTheme
-	> | null>(null);
-	const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-	const preRef = React.useRef<HTMLPreElement>(null);
-
-	const renderHighlight = React.useCallback(
-		(
-			code: string,
-			hl?: HighlighterGeneric<BundledLanguage, BundledTheme> | null,
-		) => {
-			const instance = hl || highlighterRef.current;
-			if (!instance) return;
-
-			try {
-				const html = instance.codeToHtml(code || " ", {
-					lang: language,
-					theme: "github-light",
-				});
-				const inner = html
-					.replace(/^<pre[^>]*><code[^>]*>/, "")
-					.replace(/<\/code><\/pre>$/, "");
-				setHighlighted(inner);
-			} catch {
-				setHighlighted(escapeHtml(code));
-			}
-		},
-		[language],
-	);
+	const containerRef = React.useRef<HTMLDivElement>(null);
+	const viewRef = React.useRef<EditorView | null>(null);
+	const onChangeRef = React.useRef(onChange);
+	const valueRef = React.useRef(value);
+	const languageRef = React.useRef(language);
+	onChangeRef.current = onChange;
+	valueRef.current = value;
+	languageRef.current = language;
 
 	React.useEffect(() => {
-		let isMounted = true;
+		const parent = containerRef.current;
+		if (!parent) return;
 
-		async function initShiki() {
-			try {
-				const hl = await createHighlighter({
-					themes: ["github-light"],
-					langs: ["ballerina", "toml"],
-				});
+		const state = EditorState.create({
+			doc: valueRef.current,
+			extensions: baseExtensions(languageRef.current, (text) => {
+				onChangeRef.current?.(text);
+			}),
+		});
 
-				if (isMounted) {
-					highlighterRef.current = hl;
-					renderHighlight(textareaRef.current?.value ?? "", hl);
-				}
-			} catch {
-				if (isMounted)
-					setHighlighted(escapeHtml(textareaRef.current?.value ?? ""));
-			}
-		}
+		const view = new EditorView({ state, parent });
+		viewRef.current = view;
 
-		initShiki();
 		return () => {
-			isMounted = false;
-			highlighterRef.current?.dispose();
-			highlighterRef.current = null;
+			view.destroy();
+			viewRef.current = null;
 		};
-	}, [renderHighlight]);
-
-	React.useEffect(() => {
-		renderHighlight(value);
-	}, [value, renderHighlight]);
-
-	const syncScroll = React.useCallback(() => {
-		if (textareaRef.current && preRef.current) {
-			preRef.current.scrollTop = textareaRef.current.scrollTop;
-			preRef.current.scrollLeft = textareaRef.current.scrollLeft;
-		}
 	}, []);
 
-	const handleKeyDown = React.useCallback(
-		(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-			if (e.key !== "Tab") return;
+	React.useEffect(() => {
+		const view = viewRef.current;
+		if (!view) return;
+		view.dispatch({
+			effects: languageConf.reconfigure(languageSupportFor(language)),
+		});
+	}, [language]);
 
-			e.preventDefault();
-			const target = e.currentTarget;
-			const { selectionStart, selectionEnd, value: currentValue } = target;
-
-			const newValue =
-				currentValue.slice(0, selectionStart) +
-				"    " +
-				currentValue.slice(selectionEnd);
-			onChange?.(newValue);
-
-			setTimeout(() => {
-				if (textareaRef.current) {
-					textareaRef.current.setSelectionRange(
-						selectionStart + 4,
-						selectionStart + 4,
-					);
-				}
-			}, 0);
-		},
-		[onChange],
-	);
+	React.useEffect(() => {
+		const view = viewRef.current;
+		if (!view) return;
+		const cur = view.state.doc.toString();
+		if (cur === value) return;
+		view.dispatch({
+			changes: { from: 0, to: cur.length, insert: value },
+			selection: { anchor: 0 },
+		});
+	}, [value]);
 
 	return (
 		<div
@@ -135,30 +122,7 @@ export function CodeEditor({
 				className,
 			)}
 		>
-			<div className="relative grow">
-				<pre
-					ref={preRef}
-					aria-hidden="true"
-					className={cn(sharedClasses, "z-10 pointer-events-none no-scrollbar")}
-					// biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized via Shiki's HTML escaping
-					dangerouslySetInnerHTML={{ __html: `${highlighted}\n` }}
-				/>
-				<textarea
-					ref={textareaRef}
-					value={value}
-					onChange={(e) => onChange?.(e.target.value)}
-					onScroll={syncScroll}
-					onKeyDown={handleKeyDown}
-					spellCheck={false}
-					autoCapitalize="off"
-					autoComplete="off"
-					autoCorrect="off"
-					className={cn(
-						sharedClasses,
-						"z-20 bg-transparent text-transparent caret-blue-500 outline-none resize-none no-scrollbar",
-					)}
-				/>
-			</div>
+			<div ref={containerRef} className="relative grow min-h-0 min-w-0" />
 		</div>
 	);
 }
