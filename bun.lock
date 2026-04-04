@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "@playground/monorepo",
+      "dependencies": {
+        "@fsegurai/codemirror-theme-github-light": "^6.2.4",
+      },
       "devDependencies": {
         "@biomejs/biome": "^2.4.10",
         "turbo": "^2.9.0",
@@ -224,6 +227,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
 
     "@fontsource-variable/jetbrains-mono": ["@fontsource-variable/jetbrains-mono@5.2.8", "", {}, "sha512-WBA9elru6Jdp5df2mES55wuOO0WIrn3kpXnI4+W2ek5u3ZgLS9XS4gmIlcQhiZOWEKl95meYdvK7xI+ETLCq/Q=="],
+
+    "@fsegurai/codemirror-theme-github-light": ["@fsegurai/codemirror-theme-github-light@6.2.4", "", { "peerDependencies": { "@codemirror/language": "^6.0.0", "@codemirror/state": "^6.0.0", "@codemirror/view": "^6.0.0", "@lezer/highlight": "^1.0.0" } }, "sha512-NzbAMBYkgeLDoZVL9K7mX/1pn5vohyIAJh3zAkrlcVM4sFz8Co69HhZUgVyazAT67YOkjgQ8pxbsDbprb5F5Kg=="],
 
     "@hono/node-server": ["@hono/node-server@1.19.11", "", { "peerDependencies": { "hono": "^4" } }, "sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g=="],
 

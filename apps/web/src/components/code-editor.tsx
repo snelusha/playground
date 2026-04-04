@@ -5,6 +5,8 @@ import { indentUnit } from "@codemirror/language";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
+import { githubLight } from "@fsegurai/codemirror-theme-github-light";
+
 import { languageSupportFor } from "@/lib/codemirror/ballerina-language";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +36,7 @@ function baseExtensions(
 		EditorView.updateListener.of((update) => {
 			if (update.docChanged) onDocChange(update.state.doc.toString());
 		}),
+		githubLight,
 		EditorView.theme({
 			"&": { height: "100%" },
 			".cm-editor": {

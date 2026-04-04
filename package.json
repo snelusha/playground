@@ -20,5 +20,8 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.10",
 		"turbo": "^2.9.0"
+	},
+	"dependencies": {
+		"@fsegurai/codemirror-theme-github-light": "^6.2.4"
 	}
 }
