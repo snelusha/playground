@@ -6,7 +6,8 @@ import { indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
 import { keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
-import { ShikiEditor } from "@cmshiki/editor";
+// import { ShikiEditor } from "@cmshiki/editor";
+import { ShikiEditor } from "@/components/shiki-editor";
 
 import { theme } from "@/lib/codemirror/theme";
 import { cn } from "@/lib/utils";
