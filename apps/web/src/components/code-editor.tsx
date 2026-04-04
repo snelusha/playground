@@ -1,164 +1,138 @@
 import * as React from "react";
 
-import { createHighlighter } from "shiki";
+import { basicSetup } from "codemirror";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { indentUnit } from "@codemirror/language";
+import { autocompletion } from "@codemirror/autocomplete";
+import { EditorView, keymap } from "@codemirror/view";
+import { indentWithTab } from "@codemirror/commands";
 
+import { githubLight } from "@fsegurai/codemirror-theme-github-light";
+
+import { theme } from "@/lib/codemirror/theme";
+import { languageSupportFor } from "@/lib/codemirror/language";
 import { cn } from "@/lib/utils";
 
-import type { BundledLanguage, BundledTheme, HighlighterGeneric } from "shiki";
+import type { EditorLanguage } from "@/lib/codemirror/language";
+import type { KeyBinding } from "@codemirror/view";
+
+type HotkeyMap = Record<string, () => void>;
 
 interface CodeEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
-	language?: string;
+	hotkeys?: HotkeyMap;
+	language?: EditorLanguage;
 	className?: string;
 }
 
-const sharedClasses =
-	"p-4 leading-[22.5px] font-sans whitespace-pre overflow-auto absolute inset-0 box-border [tab-size:2]";
+const INDENT = "    ";
 
-function escapeHtml(html: string) {
-	return html
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#039;");
+function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
+	const bindings: KeyBinding[] = Object.keys(hotkeysRef.current ?? {}).map(
+		(key) => ({
+			key,
+			run: () => {
+				hotkeysRef.current?.[key]?.();
+				return true;
+			},
+		}),
+	);
+
+	return Prec.highest(keymap.of(bindings));
+}
+
+function buildExtensions(
+	langCompartment: Compartment,
+	langExtension: ReturnType<typeof languageSupportFor>,
+	hotkeysRef: React.RefObject<HotkeyMap>,
+	onChangeRef: React.RefObject<((value: string) => void) | undefined>,
+) {
+	return [
+		buildHotkeyExtension(hotkeysRef),
+		basicSetup,
+		indentUnit.of(INDENT),
+		keymap.of([indentWithTab]),
+		langCompartment.of(langExtension),
+		theme,
+		githubLight,
+		autocompletion({
+			activateOnTyping: false,
+			override: [],
+		}),
+		EditorView.updateListener.of((update) => {
+			if (update.docChanged) {
+				onChangeRef.current?.(update.state.doc.toString());
+			}
+		}),
+	];
 }
 
 export function CodeEditor({
 	value = "",
 	onChange,
+	hotkeys = {},
 	language = "ballerina",
 	className,
 }: CodeEditorProps) {
-	const [highlighted, setHighlighted] = React.useState("");
-	const highlighterRef = React.useRef<HighlighterGeneric<
-		BundledLanguage,
-		BundledTheme
-	> | null>(null);
-	const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-	const preRef = React.useRef<HTMLPreElement>(null);
+	const parentRef = React.useRef<HTMLDivElement>(null);
+	const editorViewRef = React.useRef<EditorView | null>(null);
+	const languageCompartment = React.useRef(new Compartment());
 
-	const renderHighlight = React.useCallback(
-		(
-			code: string,
-			hl?: HighlighterGeneric<BundledLanguage, BundledTheme> | null,
-		) => {
-			const instance = hl || highlighterRef.current;
-			if (!instance) return;
+	const onChangeRef = React.useRef(onChange);
+	onChangeRef.current = onChange;
 
-			try {
-				const html = instance.codeToHtml(code || " ", {
-					lang: language,
-					theme: "github-light",
-				});
-				const inner = html
-					.replace(/^<pre[^>]*><code[^>]*>/, "")
-					.replace(/<\/code><\/pre>$/, "");
-				setHighlighted(inner);
-			} catch {
-				setHighlighted(escapeHtml(code));
-			}
-		},
+	const hotkeysRef = React.useRef(hotkeys);
+	hotkeysRef.current = hotkeys;
+
+	const languageExtension = React.useMemo(
+		() => languageSupportFor(language) ?? [],
 		[language],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: editor is recreated only on lang change; value is synced separately
 	React.useEffect(() => {
-		let isMounted = true;
+		const parent = parentRef.current;
+		if (!parent) return;
 
-		async function initShiki() {
-			try {
-				const hl = await createHighlighter({
-					themes: ["github-light"],
-					langs: ["ballerina", "toml"],
-				});
+		const state = EditorState.create({
+			doc: value,
+			extensions: buildExtensions(
+				languageCompartment.current,
+				languageExtension,
+				hotkeysRef,
+				onChangeRef,
+			),
+		});
 
-				if (isMounted) {
-					highlighterRef.current = hl;
-					renderHighlight(textareaRef.current?.value ?? "", hl);
-				}
-			} catch {
-				if (isMounted)
-					setHighlighted(escapeHtml(textareaRef.current?.value ?? ""));
-			}
-		}
+		const editorView = new EditorView({ state, parent });
+		editorViewRef.current = editorView;
 
-		initShiki();
 		return () => {
-			isMounted = false;
-			highlighterRef.current?.dispose();
-			highlighterRef.current = null;
+			editorView.destroy();
+			editorViewRef.current = null;
 		};
-	}, [renderHighlight]);
+	}, [languageExtension]);
 
 	React.useEffect(() => {
-		renderHighlight(value);
-	}, [value, renderHighlight]);
+		const editorView = editorViewRef.current;
+		if (!editorView) return;
 
-	const syncScroll = React.useCallback(() => {
-		if (textareaRef.current && preRef.current) {
-			preRef.current.scrollTop = textareaRef.current.scrollTop;
-			preRef.current.scrollLeft = textareaRef.current.scrollLeft;
-		}
-	}, []);
+		const doc = editorView.state.doc.toString();
+		if (doc === value) return;
 
-	const handleKeyDown = React.useCallback(
-		(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-			if (e.key !== "Tab") return;
-
-			e.preventDefault();
-			const target = e.currentTarget;
-			const { selectionStart, selectionEnd, value: currentValue } = target;
-
-			const newValue =
-				currentValue.slice(0, selectionStart) +
-				"    " +
-				currentValue.slice(selectionEnd);
-			onChange?.(newValue);
-
-			setTimeout(() => {
-				if (textareaRef.current) {
-					textareaRef.current.setSelectionRange(
-						selectionStart + 4,
-						selectionStart + 4,
-					);
-				}
-			}, 0);
-		},
-		[onChange],
-	);
+		editorView.dispatch({
+			changes: { from: 0, to: doc.length, insert: value },
+		});
+	}, [value]);
 
 	return (
 		<div
+			ref={parentRef}
 			className={cn(
-				"text-[13px] relative flex overflow-hidden h-full min-h-37.5",
+				"relative overflow-hidden h-full min-h-37.5 cm-editor-host",
 				className,
 			)}
-		>
-			<div className="relative grow">
-				<pre
-					ref={preRef}
-					aria-hidden="true"
-					className={cn(sharedClasses, "z-10 pointer-events-none no-scrollbar")}
-					// biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized via Shiki's HTML escaping
-					dangerouslySetInnerHTML={{ __html: `${highlighted}\n` }}
-				/>
-				<textarea
-					ref={textareaRef}
-					value={value}
-					onChange={(e) => onChange?.(e.target.value)}
-					onScroll={syncScroll}
-					onKeyDown={handleKeyDown}
-					spellCheck={false}
-					autoCapitalize="off"
-					autoComplete="off"
-					autoCorrect="off"
-					className={cn(
-						sharedClasses,
-						"z-20 bg-transparent text-transparent caret-blue-500 outline-none resize-none no-scrollbar",
-					)}
-				/>
-			</div>
-		</div>
+		/>
 	);
 }

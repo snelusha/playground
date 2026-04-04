@@ -38,8 +38,9 @@ import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
+import type { EditorLanguage } from "@/lib/codemirror/language";
 
-function getLanguage(path: string): string {
+function getLanguage(path: string): EditorLanguage {
 	const ex = ext(path);
 	switch (ex) {
 		case "bal":
@@ -163,10 +164,12 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 				</Button>
 			</div>
 			<CodeEditor
-				className="flex-1 min-h-0 w-full"
-				value={activeFile?.content ?? ""}
+				value={activeFile?.content}
 				onChange={handleChange}
-				language={activeFile ? getLanguage(activeFile.path) : undefined}
+				hotkeys={{
+					"Mod-Enter": onRun,
+				}}
+				language={activeFile ? getLanguage(activeFile.path) : "text"}
 			/>
 		</div>
 	);
