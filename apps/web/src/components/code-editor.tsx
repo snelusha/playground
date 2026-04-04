@@ -1,16 +1,14 @@
 import * as React from "react";
 
 import { basicSetup } from "codemirror";
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { Prec, type Extension } from "@codemirror/state";
 import { indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
-import { EditorView, keymap } from "@codemirror/view";
+import { keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
-
-import { githubLight } from "@fsegurai/codemirror-theme-github-light";
+import { ShikiEditor } from "@cmshiki/editor";
 
 import { theme } from "@/lib/codemirror/theme";
-import { languageSupportFor } from "@/lib/codemirror/language";
 import { cn } from "@/lib/utils";
 
 import type { EditorLanguage } from "@/lib/codemirror/language";
@@ -28,6 +26,17 @@ interface CodeEditorProps {
 
 const INDENT = "    ";
 
+function shikiLangFor(lang: EditorLanguage) {
+	switch (lang) {
+		case "ballerina":
+			return "ballerina";
+		case "toml":
+			return "toml";
+		case "text":
+			return "text";
+	}
+}
+
 function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	const bindings: KeyBinding[] = Object.keys(hotkeysRef.current ?? {}).map(
 		(key) => ({
@@ -42,28 +51,16 @@ function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	return Prec.highest(keymap.of(bindings));
 }
 
-function buildExtensions(
-	langCompartment: Compartment,
-	langExtension: ReturnType<typeof languageSupportFor>,
-	hotkeysRef: React.RefObject<HotkeyMap>,
-	onChangeRef: React.RefObject<((value: string) => void) | undefined>,
-) {
+function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 	return [
 		buildHotkeyExtension(hotkeysRef),
 		basicSetup,
 		indentUnit.of(INDENT),
 		keymap.of([indentWithTab]),
-		langCompartment.of(langExtension),
 		theme,
-		githubLight,
 		autocompletion({
 			activateOnTyping: false,
 			override: [],
-		}),
-		EditorView.updateListener.of((update) => {
-			if (update.docChanged) {
-				onChangeRef.current?.(update.state.doc.toString());
-			}
 		}),
 	];
 }
@@ -76,8 +73,9 @@ export function CodeEditor({
 	className,
 }: CodeEditorProps) {
 	const parentRef = React.useRef<HTMLDivElement>(null);
-	const editorViewRef = React.useRef<EditorView | null>(null);
-	const languageCompartment = React.useRef(new Compartment());
+	const editorRef = React.useRef<ShikiEditor | null>(null);
+	const languagePropRef = React.useRef(language);
+	languagePropRef.current = language;
 
 	const onChangeRef = React.useRef(onChange);
 	onChangeRef.current = onChange;
@@ -85,45 +83,50 @@ export function CodeEditor({
 	const hotkeysRef = React.useRef(hotkeys);
 	hotkeysRef.current = hotkeys;
 
-	const languageExtension = React.useMemo(
-		() => languageSupportFor(language) ?? [],
-		[language],
-	);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: editor is recreated only on lang change; value is synced separately
+	// biome-ignore lint/correctness/useExhaustiveDependencies: single mount; value/language synced in other effects
 	React.useEffect(() => {
 		const parent = parentRef.current;
 		if (!parent) return;
 
-		const state = EditorState.create({
+		const editor = new ShikiEditor({
+			parent,
 			doc: value,
-			extensions: buildExtensions(
-				languageCompartment.current,
-				languageExtension,
-				hotkeysRef,
-				onChangeRef,
-			),
+			lang: shikiLangFor(languagePropRef.current),
+			themes: {
+				light: "github-light",
+			},
+			defaultColor: "light",
+			themeStyle: "cm",
+			onUpdate: (update) => {
+				if (update.docChanged) {
+					onChangeRef.current?.(update.state.doc.toString());
+				}
+			},
+			extensions: baseExtensions(hotkeysRef),
 		});
 
-		const editorView = new EditorView({ state, parent });
-		editorViewRef.current = editorView;
+		editorRef.current = editor;
 
 		return () => {
-			editorView.destroy();
-			editorViewRef.current = null;
+			editorRef.current?.destroy();
+			editorRef.current = null;
 		};
-	}, [languageExtension]);
+	}, []);
 
 	React.useEffect(() => {
-		const editorView = editorViewRef.current;
-		if (!editorView) return;
+		const ed = editorRef.current;
+		if (!ed) return;
+		ed.update({ lang: shikiLangFor(language) });
+	}, [language]);
 
-		const doc = editorView.state.doc.toString();
+	React.useEffect(() => {
+		const editor = editorRef.current;
+		if (!editor) return;
+
+		const doc = editor.getValue();
 		if (doc === value) return;
 
-		editorView.dispatch({
-			changes: { from: 0, to: doc.length, insert: value },
-		});
+		editor.setValue(value);
 	}, [value]);
 
 	return (
