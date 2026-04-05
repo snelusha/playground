@@ -172,6 +172,12 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 	);
 }
 
+import {
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from "@/components/ui/hover-card";
+
 function EditorHeader() {
 	return (
 		<header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
@@ -179,7 +185,40 @@ function EditorHeader() {
 				<SidebarTrigger className="-ml-1" />
 				<h1 className="text-sm font-medium">Ballerina Playground</h1>
 			</div>
-			<div>
+			<div className="flex items-center gap-4">
+				<HoverCard>
+					<HoverCardTrigger className="text-xs text-muted-foreground select-none">
+						v0.3.0
+					</HoverCardTrigger>
+					<HoverCardContent
+						className="flex w-full max-w-105 flex-col gap-2 p-3 text-muted-foreground"
+						side="bottom"
+						align="end"
+					>
+						<div className="flex items-center justify-between gap-8 text-xs">
+							<span className="w-fit px-1">Ballerina Interpreter</span>
+							<a
+								className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
+								href="https://github.com/ballerina-platform/ballerina-lang-go/releases/tag/v0.3.0"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<span>v0.3.0</span>
+							</a>
+						</div>
+						<div className="flex items-center justify-between gap-8 text-xs">
+							<span className="w-fit px-1">Playground</span>
+							<a
+								className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
+								href="https://github.com/ballerina-platform/playground/commit/53f699b29cec95c86e514bd4239acffb4938fe8e"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<span>53f699b</span>
+							</a>
+						</div>
+					</HoverCardContent>
+				</HoverCard>
 				<a
 					className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
 					href="https://github.com/ballerina-platform/playground"
