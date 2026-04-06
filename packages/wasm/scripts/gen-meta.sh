@@ -30,7 +30,9 @@ resolve_tag() {
 TAG=$(resolve_tag)
 
 if [ -z "$TAG" ] && git remote get-url origin >/dev/null 2>&1; then
-  git fetch --tags --force --quiet origin >/dev/null 2>&1 || true
+  if ! git fetch --tags --quiet origin >/dev/null 2>&1; then
+    echo "warn: failed to fetch tags from origin; falling back to commit metadata" >&2
+  fi
   TAG=$(resolve_tag)
 fi
 
