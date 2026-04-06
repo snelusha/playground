@@ -70,15 +70,18 @@ func run(this js.Value, args []js.Value) any {
 	}
 
 	backend := projects.NewBallerinaBackend(compilation)
-	bir := backend.BIR()
+	birPkgs := backend.BIRPackages()
 
-	if bir == nil {
-		return jsError(fmt.Errorf("BIR generation failed"))
+	if len(birPkgs) == 0 {
+		return jsError(fmt.Errorf("BIR generation failed: no BIR package produced"))
 	}
 
 	rt := runtime.NewRuntime()
-	if err := rt.Interpret(*bir); err != nil {
-		return jsError(err)
+
+	for _, birPkg := range birPkgs {
+		if err := rt.Interpret(*birPkg); err != nil {
+			return jsError(err)
+		}
 	}
 
 	return nil
