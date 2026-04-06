@@ -23,5 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Generated WebAssembly binary
 public/ballerina.wasm
+public/ballerina-meta.json
+

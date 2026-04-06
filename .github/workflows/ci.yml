@@ -36,5 +36,5 @@ jobs:
         run: bun run lint
 
       - name: Build web app
-        run: bun run build --filter=@playground/web
+        run: bun run build
 

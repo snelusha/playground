@@ -3,15 +3,26 @@
 	"tasks": {
 		"copy:wasm": {
 			"dependsOn": ["@playground/wasm#build"],
-			"inputs": ["../../packages/wasm/dist/ballerina.wasm"],
-			"outputs": ["public/ballerina.wasm"]
+			"inputs": [
+				"../../packages/wasm/dist/ballerina.wasm",
+				"../../packages/wasm/dist/ballerina-meta.json"
+			],
+			"outputs": ["public/ballerina.wasm", "public/ballerina-meta.json"]
 		},
 		"build": {
+			"env": ["COMMIT_SHA"],
 			"dependsOn": ["^build", "copy:wasm"],
 			"outputs": ["dist/**"]
 		},
 		"dev": {
+			"env": ["COMMIT_SHA"],
 			"dependsOn": ["copy:wasm"],
+			"cache": false,
+			"persistent": true
+		},
+		"preview": {
+			"env": ["COMMIT_SHA"],
+			"dependsOn": ["build"],
 			"cache": false,
 			"persistent": true
 		}
