@@ -43,7 +43,9 @@ jobs:
         run: bun install
 
       - name: Build web app 
-        run: bun run build --filter=@playground/web
+        run: bun run build
+        env:
+          COMMIT_SHA: ${{ github.sha }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
