@@ -3,7 +3,12 @@
 	"tasks": {
 		"build": {
 			"env": ["LocalAppData"],
-			"inputs": ["**/*.go", "go.mod", "go.sum"],
+			"inputs": [
+				"**/*.go",
+				"go.mod",
+				"go.sum",
+				"../../.git/modules/packages/wasm/ballerina-lang-go/HEAD"
+			],
 			"outputs": ["dist/**"]
 		}
 	}
