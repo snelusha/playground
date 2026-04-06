@@ -16,14 +16,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
-set -e
-
 # Generates `packages/wasm/dist/ballerina-meta.json` from the submodule state.
 # Uses an exact tag when available; otherwise records the current commit hash.
 
+set -e
+
 cd "$(dirname "$0")/../ballerina-lang-go"
 
-TAG=$(git describe --tags --exact-match 2>/dev/null || true)
+resolve_tag() {
+  git describe --tags --exact-match 2>/dev/null || true
+}
+
+TAG=$(resolve_tag)
+
+if [ -z "$TAG" ] && git remote get-url origin >/dev/null 2>&1; then
+  git fetch --tags --force --quiet origin >/dev/null 2>&1 || true
+  TAG=$(resolve_tag)
+fi
 
 if [ -n "$TAG" ]; then
   VERSION="$TAG"
