@@ -125,7 +125,7 @@ function FileTreeFileNode({
 					{node.name}
 				</SidebarMenuButton>
 				<DropdownMenu>
-					<DropdownMenuTrigger  
+					<DropdownMenuTrigger
 						render={
 							<SidebarMenuAction className="peer-data-[active=true]/menu-button:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 aria-expanded:opacity-100 md:opacity-0" />
 						}
@@ -414,7 +414,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
 	const activeFilePath = useActiveFilePath();
 	const { setFileOperationDialog } = useFileTreeActions();
-
 
 	return (
 		<Sidebar {...props}>
