@@ -29,6 +29,7 @@ function githubPagesSpa(): Plugin {
 
 export default defineConfig(({ mode }) => {
 	return {
+		base: "/playground/",
 		define: {
 			__BALLERINA_VERSION__: JSON.stringify(meta.version),
 			__COMMIT_SHA__: JSON.stringify(
