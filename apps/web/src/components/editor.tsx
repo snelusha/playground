@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
+import { VersionCard } from "@/components/version-card";
 import { ANSI } from "@/components/ansi";
 
 import {
@@ -179,7 +180,8 @@ function EditorHeader() {
 				<SidebarTrigger className="-ml-1" />
 				<h1 className="text-sm font-medium">Ballerina Playground</h1>
 			</div>
-			<div>
+			<div className="flex items-center gap-4">
+				<VersionCard />
 				<a
 					className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
 					href="https://github.com/ballerina-platform/playground"
