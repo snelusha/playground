@@ -8,19 +8,73 @@
         "name": "examples",
         "children": [
           {
-            "kind": "file",
-            "name": "01-orders.bal",
-            "content": "import ballerina/io;\n\n// Shows pending orders with delivery fees\ntype Order record {|\n    string id;\n    string customer;\n    int amount;\n    string zone;\n|};\n\npublic function main() {\n    Order[] orders = [\n        {id: \"ORD001\", customer: \"Alice\", amount: 150, zone: \"Downtown\"},\n        {id: \"ORD002\", customer: \"Bob\", amount: 75, zone: \"Suburb\"},\n        {id: \"ORD003\", customer: \"Carol\", amount: 200, zone: \"Downtown\"}\n    ];\n    map\u003cint\u003e deliveryFee = {\"Downtown\": 5, \"Suburb\": 10};\n\n    io:println(\"=== Pending Orders ===\");\n    foreach int i in 0 ..\u003c orders.length() {\n        Order ord = orders[i];\n        io:println(i + 1, \". \", ord.id, \" | \",\n                ord.customer, \" | $\", ord.amount,\n                \" | \", ord.zone, \" (fee: $\", deliveryFee[ord.zone], \")\");\n    }\n}\n\n"
+            "kind": "dir",
+            "name": "01-response-aggregator",
+            "children": [
+              {
+                "kind": "dir",
+                "name": "modules",
+                "children": [
+                  {
+                    "kind": "dir",
+                    "name": "handler",
+                    "children": [
+                      {
+                        "kind": "file",
+                        "name": "handler.bal",
+                        "content": "import ballerina/io;\n\nimport playground/response_aggregator.types;\n\n// Response flags\npublic const int CACHED = 1 \u003c\u003c 0;\npublic const int PARTIAL = 1 \u003c\u003c 1;\npublic const int PAGINATED = 1 \u003c\u003c 2;\n\n// Processes and displays an API response with its flags and result.\npublic function processResponse(types:ApiResponse res) {\n    io:println(\"\\nEndpoint: \", res.ep, \",\\n  Status: \", res.status);\n\n    if res.flags \u003e= PAGINATED {\n        io:println(\"  [Paginated]\");\n    } else if res.flags == CACHED {\n        io:println(\"  [Cached]\");\n    } else {\n        io:println(\"  [Partial]\");\n    }\n\n    any result = res.result;\n    if result is int {\n        int count = \u003cint\u003eresult;\n        io:println(\"  Count: \", count);\n    } else if result is string {\n        io:println(\"  Info: \", result);\n    }\n}\n\n"
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "dir",
+                    "name": "types",
+                    "children": [
+                      {
+                        "kind": "file",
+                        "name": "types.bal",
+                        "content": "// API response record type definition.\npublic type ApiResponse record {|\n    string ep;\n    int status;\n    int flags;\n    any result;\n|};\n\n"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "file",
+                "name": "Ballerina.toml",
+                "content": "[package]\norg = \"playground\"\nname = \"response_aggregator\"\nversion = \"0.1.0\"\n"
+              },
+              {
+                "kind": "file",
+                "name": "main.bal",
+                "content": "import response_aggregator.handler;\nimport response_aggregator.types;\n\nimport ballerina/io;\n\npublic function main() {\n    types:ApiResponse[] responses = [\n        {ep: \"/users\", status: 200, flags: handler:CACHED, result: 150},\n        {ep: \"/orders\", status: 200, flags: handler:CACHED + handler:PAGINATED, result: \"paginated\"},\n        {ep: \"/products\", status: 206, flags: handler:PARTIAL, result: 42}\n    ];\n    [string, int] healthCheck = [\"/health\", 200];\n\n    io:println(\"Health Check: \", healthCheck[0], \" (\", healthCheck[1], \")\");\n\n    foreach types:ApiResponse res in responses {\n        handler:processResponse(res);\n    }\n}\n\n"
+              }
+            ]
           },
           {
             "kind": "file",
-            "name": "02-response-aggregator.bal",
-            "content": "import ballerina/io;\n\n// Aggregates responses from multiple API endpoints, categorizes them by status\n// and flags, and processes mixed result types.\ntype ApiResponse record {|\n    string ep;\n    int status;\n    int flags;\n    any result;\n|};\n\npublic function main() {\n    // Response flags\n    int cached = 1 \u003c\u003c 0;\n    int partial = 1 \u003c\u003c 1;\n    int paginated = 1 \u003c\u003c 2;\n\n    ApiResponse[] responses = [\n        {ep: \"/users\", status: 200, flags: cached, result: 150},\n        {ep: \"/orders\", status: 200, flags: cached + paginated, result: \"paginated\"},\n        {ep: \"/products\", status: 206, flags: partial, result: 42}\n    ];\n    [string, int] healthCheck = [\"/health\", 200];\n\n    io:println(\"Health Check: \", healthCheck[0], \" (\", healthCheck[1], \")\");\n\n    foreach ApiResponse res in responses {\n        io:println(\"\\nEndpoint: \", res.ep, \",\\n  Status: \", res.status);\n\n        if res.flags \u003e= paginated {\n            io:println(\"  [Paginated]\");\n        } else if res.flags == cached {\n            io:println(\"  [Cached]\");\n        } else {\n            io:println(\"  [Partial]\");\n        }\n\n        any result = res.result;\n        if result is int {\n            int count = \u003cint\u003eresult;\n            io:println(\"  Count: \", count);\n        } else if result is string {\n            io:println(\"  Info: \", result);\n        }\n    }\n}\n"
+            "name": "02-orders.bal",
+            "content": "import ballerina/io;\n\n// Shows pending orders with delivery fees\ntype Order record {|\n    string id;\n    string customer;\n    int amount;\n    string zone;\n|};\n\npublic function main() {\n    Order[] orders = [\n        {id: \"ORD001\", customer: \"Alice\", amount: 150, zone: \"Downtown\"},\n        {id: \"ORD002\", customer: \"Bob\", amount: 75, zone: \"Suburb\"},\n        {id: \"ORD003\", customer: \"Carol\", amount: 200, zone: \"Downtown\"}\n    ];\n    map\u003cint\u003e deliveryFee = {\"Downtown\": 5, \"Suburb\": 10};\n\n    io:println(\"=== Pending Orders ===\");\n    foreach int i in 0 ..\u003c orders.length() {\n        Order ord = orders[i];\n        io:println(i + 1, \". \", ord.id, \" | \",\n                ord.customer, \" | $\", ord.amount,\n                \" | \", ord.zone, \" (fee: $\", deliveryFee[ord.zone], \")\");\n    }\n}\n\n"
           },
           {
             "kind": "file",
             "name": "03-fibonacci.bal",
             "content": "import ballerina/io;\n\npublic function main() {\n    int n = 10;\n    int i = 0;\n    while (i \u003c n) {\n        io:println(\"F(\", i, \") = \", fibonacci(i));\n        i += 1;\n    }\n}\n\nfunction fibonacci(int n) returns int {\n    if (n \u003c= 1) {\n        return n;\n    }\n    int prev = 0;\n    int curr = 1;\n    int i = 2;\n    while (i \u003c= n) {\n        int next = prev + curr;\n        prev = curr;\n        curr = next;\n        i += 1;\n    }\n    return curr;\n}\n"
+          },
+          {
+            "kind": "file",
+            "name": "04-temperature-converter.bal",
+            "content": "import ballerina/io;\n\nfunction validateFahrenheit(int f) returns int|error {\n    if f \u003c -459 {\n        return error(\"invalid fahrenheit: below absolute zero\");\n    }\n    return f;\n}\n\nfunction toCelsius(int f) returns int|error {\n    int valid = check validateFahrenheit(f);\n    return ((valid - 32) * 5) / 9;\n}\n\nfunction averageCelsius(int f1, int f2) returns int|error {\n    int c1 = check toCelsius(f1);\n    int c2 = check toCelsius(f2);\n    return (c1 + c2) / 2;\n}\n\nfunction externalCalibrator(int c) returns int {\n    // Simulate a dependency that may panic for suspicious values.\n    if c \u003e 100 {\n        panic error(\"calibrator overflow\");\n    }\n    return c + 1;\n}\n\nfunction safeConvertedValue(int f) returns int|error {\n    int c = check toCelsius(f);\n    var calibrated = trap externalCalibrator(c);\n    if calibrated is error {\n        return calibrated;\n    }\n    return calibrated;\n}\n\nfunction leaf(int f1, int f2) {\n    _ = checkpanic averageCelsius(f1, f2);\n}\n\nfunction middle(int f1, int f2) {\n    leaf(f1, f2);\n}\n\nfunction top(int f1, int f2) {\n    middle(f1, f2);\n}\n\npublic function main() {\n    io:println(\"=== Temperature Converter ===\");\n    io:println(\"Safe Convert | Input: 98F\");\n    io:println(\"Result | \", safeConvertedValue(98));\n    io:println(\"\\nSafe Convert | Input: -500F\");\n    io:println(\"Result | \", safeConvertedValue(-500));\n    io:println(\"\\nAverage | Inputs: 98F, 32F\");\n    io:println(\"Result | \", averageCelsius(98, 32));\n    io:println(\"\\nStack Trace | top(-500, 32)\");\n\n    top(-500, 32);\n}\n\n"
+          },
+          {
+            "kind": "file",
+            "name": "05-student-grades.bal",
+            "content": "import ballerina/io;\n\ntype Student record {|\n    int id;\n    string name;\n    int grade;\n|};\n\nfunction findById(Student[] students, int studentId) returns Student|error {\n    Student[] rows = from var s in students\n        where s.id == studentId\n        select s;\n\n    if rows.length() == 0 {\n        return error(\"student not found\");\n    }\n\n    return rows[0];\n}\n\nfunction maxGrade(Student[] students) returns int {\n    int best = students[0].grade;\n    foreach Student s in students {\n        if s.grade \u003e best {\n            best = s.grade;\n        }\n    }\n    return best;\n}\n\nfunction averageGrade(Student[] students) returns int {\n    int sum = 0;\n    foreach Student s in students {\n        sum += s.grade;\n    }\n    return sum / students.length();\n}\n\nfunction topStudents(Student[] students) returns Student[] {\n    int best = maxGrade(students);\n    Student[] rows = from var s in students\n        where s.grade == best\n        select s;\n    return rows;\n}\n\npublic function main() {\n    Student[] students = [\n        {id: 101, name: \"Asha\", grade: 78},\n        {id: 102, name: \"Nimal\", grade: 92},\n        {id: 103, name: \"Ravi\", grade: 85},\n        {id: 104, name: \"Sara\", grade: 92}\n    ];\n\n    io:println(\"=== Student Grades ===\");\n    io:println(\"Average Grade | \", averageGrade(students));\n    io:println(\"\\nTop Students\");\n    Student[] tops = topStudents(students);\n    foreach Student s in tops {\n        io:println(\"- \", s.id, \" | \", s.name, \" | \", s.grade);\n    }\n\n    io:println(\"\\nLookup | ID 102\");\n    var row1 = findById(students, 102);\n    if row1 is Student {\n        io:println(\"Found  | \", row1.id, \" | \", row1.name, \" | \", row1.grade);\n    } else {\n        io:println(\"Error  | \", row1);\n    }\n\n    io:println(\"\\nLookup | ID 999\");\n    var row2 = findById(students, 999);\n    if row2 is Student {\n        io:println(\"Found  | \", row2.id, \" | \", row2.name, \" | \", row2.grade);\n    } else {\n        io:println(\"Error  | \", row2);\n    }\n}\n\n"
+          },
+          {
+            "kind": "file",
+            "name": "06-library-checkout.bal",
+            "content": "import ballerina/io;\n\ntype LibraryItem object {\n    function title() returns string;\n    function author() returns string;\n    function borrowMessage(boolean isBorrowed) returns string;\n    function returnMessage(boolean isBorrowed) returns string;\n};\n\nclass Book {\n    *LibraryItem;\n    string name;\n    string writer;\n\n    function init(string name, string writer) {\n        self.name = name;\n        self.writer = writer;\n    }\n\n    function title() returns string {\n        return self.name;\n    }\n\n    function author() returns string {\n        return self.writer;\n    }\n\n    function borrowMessage(boolean isBorrowed) returns string {\n        if isBorrowed {\n            return \"Sorry, \" + self.name + \" is already borrowed.\";\n        }\n        return \"You borrowed \" + self.name + \".\";\n    }\n\n    function returnMessage(boolean isBorrowed) returns string {\n        if !isBorrowed {\n            return \"This book was not borrowed.\";\n        }\n        return \"You returned \" + self.name + \".\";\n    }\n}\n\npublic function main() {\n    LibraryItem book1 = new Book(\"The Hobbit\", \"J.R.R. Tolkien\");\n    LibraryItem book2 = new Book(\"Harry Potter and the Philosopher’s Stone\", \"J.K. Rowling\");\n\n    io:println(\"=== Library Checkout ===\");\n    io:println(\"Book 1 | \", book1.title(), \" | \", book1.author());\n    io:println(\"Book 2 | \", book2.title(), \" | \", book2.author());\n\n    boolean book1Borrowed = false;\n    io:println(\"\\nBorrow #1 | \", book1.borrowMessage(book1Borrowed));\n    book1Borrowed = true;\n    io:println(\"Borrow #2 | \", book1.borrowMessage(book1Borrowed));\n\n    io:println(\"\\nReturn #1 | \", book1.returnMessage(book1Borrowed));\n    book1Borrowed = false;\n    io:println(\"Return #2 | \", book1.returnMessage(book1Borrowed));\n}\n\n"
           }
         ]
       }
