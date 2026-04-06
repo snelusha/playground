@@ -6,7 +6,7 @@
 		"dev": "vite",
 		"build": "tsc -b && vite build",
 		"preview": "vite preview",
-		"copy:wasm": "cp ../../packages/wasm/dist/ballerina.wasm public/ballerina.wasm",
+		"copy:wasm": "cp ../../packages/wasm/dist/ballerina.wasm public/ballerina.wasm && cp ../../packages/wasm/dist/ballerina-meta.json public/ballerina-meta.json",
 		"clean": "git clean -xdf .turbo dist node_modules"
 	},
 	"dependencies": {
