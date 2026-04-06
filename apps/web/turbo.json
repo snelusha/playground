@@ -14,6 +14,12 @@
 			"dependsOn": ["copy:wasm"],
 			"cache": false,
 			"persistent": true
+		},
+		"preview": {
+			"env": ["COMMIT_SHA"],
+			"dependsOn": ["build"],
+			"cache": false,
+			"persistent": true
 		}
 	}
 }
