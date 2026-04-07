@@ -1213,6 +1213,15 @@ export class ShikiEditor<TThemes extends ThemeRegistry = ThemeRegistry> {
 		});
 	}
 
+	reconfigure(
+		compartment: Compartment,
+		extension: Extension | readonly Extension[],
+	) {
+		this.view.dispatch({
+			effects: compartment.reconfigure(extension),
+		});
+	}
+
 	destroy() {
 		this.view.destroy();
 	}

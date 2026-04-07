@@ -21,6 +21,7 @@
 		"@fontsource-variable/jetbrains-mono": "^5.2.8",
 		"@hugeicons/core-free-icons": "^4.1.1",
 		"@hugeicons/react": "^1.1.6",
+		"@replit/codemirror-vim": "^6.3.0",
 		"@tailwindcss/vite": "^4.2.1",
 		"@tanstack/react-router": "^1.168.10",
 		"class-variance-authority": "^0.7.1",

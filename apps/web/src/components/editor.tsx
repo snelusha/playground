@@ -134,6 +134,7 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 	const { updateFileContent } = useFileTreeActions();
 
 	const outputOpen = useEditorStore((s) => s.outputOpen);
+	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleChange = React.useCallback(
 		(next: string) => {
@@ -171,6 +172,8 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 					onChange={handleChange}
 					hotkeys={{
 						"Mod-Enter": onRun,
+						"Mod-Alt-v": toggleEditorMode,
+						"Mod-r": () => window.location.reload(),
 					}}
 					language={activeFile ? getLanguage(activeFile.path) : "text"}
 				/>
@@ -212,6 +215,7 @@ function EditorContent() {
 	const { saveFile } = useFileTreeActions();
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
+	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleRun = React.useCallback(() => {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
@@ -240,17 +244,13 @@ function EditorContent() {
 		openOutputWith(captured);
 	}, [activeFile, fs, saveFile, run, openOutputWith]);
 
-	useHotkeys(
-		"mod+enter",
-		(e) => {
-			e.preventDefault();
-			handleRun();
-		},
-		{
-			enableOnFormTags: ["TEXTAREA"],
-			preventDefault: true,
-		},
-	);
+	useHotkeys("mod+enter", () => handleRun(), {
+		preventDefault: true,
+	});
+
+	useHotkeys("mod+alt+v", () => toggleEditorMode(), {
+		preventDefault: true,
+	});
 
 	if (!isReady) return <WasmLoadingScreen progress={progress} />;
 

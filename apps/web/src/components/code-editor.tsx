@@ -1,13 +1,18 @@
 import * as React from "react";
 
 import { basicSetup } from "codemirror";
-import { Prec } from "@codemirror/state";
-import { indentUnit } from "@codemirror/language";
+import { Compartment, Prec } from "@codemirror/state";
+import { StreamLanguage, indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
+import { clike } from "@codemirror/legacy-modes/mode/clike";
+import { Vim, vim } from "@replit/codemirror-vim";
 
 import { ShikiEditor } from "@/components/shiki-editor";
+
+import { useEditorStore } from "@/stores/editor-store";
+import { useFileTreeActions } from "@/stores/file-tree-store";
 
 import { cn } from "@/lib/utils";
 
@@ -27,6 +32,14 @@ interface CodeEditorProps {
 }
 
 const INDENT = "    ";
+
+// This is a hack to bring smart indentation for Ballerina
+// since there's no official CodeMirror support
+const ballerinaMode = StreamLanguage.define(
+	clike({
+		name: "ballerina",
+	}),
+);
 
 function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	const bindings: KeyBinding[] = Object.keys(hotkeysRef.current ?? {}).map(
@@ -53,6 +66,7 @@ function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 			activateOnTyping: false,
 			override: [],
 		}),
+		ballerinaMode,
 	];
 }
 
@@ -97,6 +111,16 @@ const theme = EditorView.theme({
 		outline: "none",
 		borderRadius: "0",
 	},
+	".cm-vim-panel": {
+		backgroundColor: "var(--background)",
+		color: "var(--foreground)",
+	},
+	".cm-vim-panel input": {
+		fontFamily: "var(--font-sans), ui-monospace, monospace !important",
+	},
+	".cm-vim-message": {
+		color: "var(--muted-foreground) !important",
+	},
 });
 
 export function CodeEditor({
@@ -109,11 +133,19 @@ export function CodeEditor({
 	const parentRef = React.useRef<HTMLDivElement>(null);
 	const editorRef = React.useRef<ShikiEditor | null>(null);
 
+	const vimCompartment = React.useRef(new Compartment());
+
 	const onChangeRef = React.useRef(onChange);
 	onChangeRef.current = onChange;
 
 	const hotkeysRef = React.useRef(hotkeys);
 	hotkeysRef.current = hotkeys;
+
+	const vimEnabled = useEditorStore((s) => s.editorMode) === "vim";
+
+	const { saveFile } = useFileTreeActions();
+
+	Vim.defineEx("write", "w", () => saveFile());
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: editor is recreated only on lang change; value is synced separately
 	React.useEffect(() => {
@@ -133,7 +165,10 @@ export function CodeEditor({
 				if (update.docChanged)
 					onChangeRef.current?.(update.state.doc.toString());
 			},
-			extensions: baseExtensions(hotkeysRef),
+			extensions: [
+				...baseExtensions(hotkeysRef),
+				vimCompartment.current.of(vimEnabled ? vim() : []),
+			],
 		});
 
 		editorRef.current = editor;
@@ -143,6 +178,12 @@ export function CodeEditor({
 			editorRef.current = null;
 		};
 	}, []);
+
+	React.useEffect(() => {
+		const editor = editorRef.current;
+		if (!editor) return;
+		editor.reconfigure(vimCompartment.current, vimEnabled ? vim() : []);
+	}, [vimEnabled]);
 
 	return (
 		<div
