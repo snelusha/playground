@@ -145,7 +145,8 @@ export function CodeEditor({
 
 	const { saveFile } = useFileTreeActions();
 
-	Vim.defineEx("write", "w", () => saveFile());
+	const saveFileRef = React.useRef(saveFile);
+	saveFileRef.current = saveFile;
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: editor is recreated only on lang change; value is synced separately
 	React.useEffect(() => {
@@ -196,6 +197,10 @@ export function CodeEditor({
 		if (!editor) return;
 		editor.reconfigure(vimCompartment.current, vimEnabled ? vim() : []);
 	}, [vimEnabled]);
+
+	React.useEffect(() => {
+		Vim.defineEx("write", "w", () => saveFileRef.current?.());
+	}, []);
 
 	return (
 		<div
