@@ -415,8 +415,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 	const activeFilePath = useActiveFilePath();
 	const { setFileOperationDialog } = useFileTreeActions();
 
-	const noLocalFiles = localTree.length === 0;
-
 	return (
 		<Sidebar {...props}>
 			<SidebarContent>
@@ -475,17 +473,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 									defaultOpen={isActiveOrAncestor(path, activeFilePath)}
 								/>
 							))}
-							{localTree.map((node, index) => {
+							{localTree.map((node) => {
 								const path = `${LOCAL_ROOT}/${node.name}`;
 								return (
 									<FileTreeNode
 										key={`local:${node.name}`}
 										node={node}
 										path={path}
-										defaultOpen={
-											isActiveOrAncestor(path, activeFilePath) ||
-											(noLocalFiles && index === 0)
-										}
+										defaultOpen={isActiveOrAncestor(path, activeFilePath)}
 									/>
 								);
 							})}
