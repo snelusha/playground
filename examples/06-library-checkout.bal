@@ -3,14 +3,15 @@ import ballerina/io;
 type LibraryItem object {
     function title() returns string;
     function author() returns string;
-    function borrowMessage(boolean isBorrowed) returns string;
-    function returnMessage(boolean isBorrowed) returns string;
+    function borrowBook() returns string;
+    function returnBook() returns string;
 };
 
 class Book {
     *LibraryItem;
     string name;
     string writer;
+    boolean borrowed = false;
 
     function init(string name, string writer) {
         self.name = name;
@@ -25,17 +26,19 @@ class Book {
         return self.writer;
     }
 
-    function borrowMessage(boolean isBorrowed) returns string {
-        if isBorrowed {
+    function borrowBook() returns string {
+        if self.borrowed {
             return "Sorry, " + self.name + " is already borrowed.";
         }
+        self.borrowed = true;
         return "You borrowed " + self.name + ".";
     }
 
-    function returnMessage(boolean isBorrowed) returns string {
-        if !isBorrowed {
+    function returnBook() returns string {
+        if !self.borrowed {
             return "This book was not borrowed.";
         }
+        self.borrowed = false;
         return "You returned " + self.name + ".";
     }
 }
@@ -48,13 +51,10 @@ public function main() {
     io:println("Book 1 | ", book1.title(), " | ", book1.author());
     io:println("Book 2 | ", book2.title(), " | ", book2.author());
 
-    boolean book1Borrowed = false;
-    io:println("\nBorrow #1 | ", book1.borrowMessage(book1Borrowed));
-    book1Borrowed = true;
-    io:println("Borrow #2 | ", book1.borrowMessage(book1Borrowed));
+    io:println("\nBorrow #1 | ", book1.borrowBook());
+    io:println("Borrow #2 | ", book1.borrowBook());
 
-    io:println("\nReturn #1 | ", book1.returnMessage(book1Borrowed));
-    book1Borrowed = false;
-    io:println("Return #2 | ", book1.returnMessage(book1Borrowed));
+    io:println("\nReturn #1 | ", book1.returnBook());
+    io:println("Return #2 | ", book1.returnBook());
 }
 
