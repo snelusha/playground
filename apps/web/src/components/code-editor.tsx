@@ -2,14 +2,11 @@ import * as React from "react";
 
 import { basicSetup } from "codemirror";
 import { EditorSelection, Prec } from "@codemirror/state";
-import { indentUnit } from "@codemirror/language";
+import { StreamLanguage, indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
 import { EditorView, keymap } from "@codemirror/view";
-import {
-	indentWithTab,
-	insertNewlineAndIndent,
-	insertNewlineKeepIndent,
-} from "@codemirror/commands";
+import { indentWithTab } from "@codemirror/commands";
+import { clike } from "@codemirror/legacy-modes/mode/clike";
 
 import { ShikiEditor } from "@/components/shiki-editor";
 
@@ -30,6 +27,26 @@ interface CodeEditorProps {
 }
 
 const INDENT = "    ";
+
+// const ballerinaLanguage = StreamLanguage.define(
+// 	clike({
+// 		name: "ballerina",
+// 		languageData: {
+// 			// closeBrackets: { brackets: ["(", "[", "{", "'", '"', "`"] },
+// 			// commentTokens: { line: "//", block: { open: "/*", close: "*/" } },
+// 		},
+// 	} as Parameters<typeof clike>[0] & {
+// 		languageData: Record<string, unknown>;
+// 	}),
+// );
+
+const ballerinaLanguage = StreamLanguage.define(
+	clike({
+		name: "ballerina",
+	} as Parameters<typeof clike>[0] & {
+		languageData: Record<string, unknown>;
+	}),
+);
 
 function isWhitespace(char: string) {
 	return char === " " || char === "\t" || char === "\n" || char === "\r";
@@ -114,17 +131,23 @@ function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	return Prec.highest(keymap.of(bindings));
 }
 
-function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
+function baseExtensions(
+	hotkeysRef: React.RefObject<HotkeyMap>,
+	language: EditorLanguage,
+): Extension[] {
+	const languageExtensions: Extension[] =
+		language === "ballerina" ? [ballerinaLanguage] : [];
+
 	return [
 		buildHotkeyExtension(hotkeysRef),
-		Prec.highest(
-			keymap.of([
-				{
-					key: "Enter",
-					run: smartEnter,
-				},
-			]),
-		),
+		// Prec.highest(
+		// 	keymap.of([
+		// 		{
+		// 			key: "Enter",
+		// 			run: smartEnter,
+		// 		},
+		// 	]),
+		// ),
 		basicSetup,
 		indentUnit.of(INDENT),
 		keymap.of([indentWithTab]),
@@ -133,6 +156,7 @@ function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 			activateOnTyping: false,
 			override: [],
 		}),
+		...languageExtensions,
 	];
 }
 
@@ -213,7 +237,7 @@ export function CodeEditor({
 				if (update.docChanged)
 					onChangeRef.current?.(update.state.doc.toString());
 			},
-			extensions: baseExtensions(hotkeysRef),
+			extensions: baseExtensions(hotkeysRef, language),
 		});
 
 		editorRef.current = editor;
