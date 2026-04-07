@@ -1,11 +1,15 @@
 import * as React from "react";
 
 import { basicSetup } from "codemirror";
-import { Prec } from "@codemirror/state";
+import { EditorSelection, Prec } from "@codemirror/state";
 import { indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
 import { EditorView, keymap } from "@codemirror/view";
-import { indentWithTab } from "@codemirror/commands";
+import {
+	indentWithTab,
+	insertNewlineAndIndent,
+	insertNewlineKeepIndent,
+} from "@codemirror/commands";
 
 import { ShikiEditor } from "@/components/shiki-editor";
 
@@ -27,6 +31,75 @@ interface CodeEditorProps {
 
 const INDENT = "    ";
 
+function isWhitespace(char: string) {
+	return char === " " || char === "\t" || char === "\n" || char === "\r";
+}
+
+function isBetweenBraces(view: EditorView, pos: number) {
+	const { state } = view;
+	const doc = state.doc;
+
+	if (pos <= 0 || pos >= doc.length) return false;
+
+	let beforePos = pos - 1;
+	while (beforePos >= 0) {
+		const ch = doc.sliceString(beforePos, beforePos + 1);
+		if (!isWhitespace(ch)) {
+			if (ch !== "{") return false;
+			break;
+		}
+		beforePos--;
+	}
+	if (beforePos < 0) return false;
+
+	let afterPos = pos;
+	while (afterPos < doc.length) {
+		const ch = doc.sliceString(afterPos, afterPos + 1);
+		if (!isWhitespace(ch)) {
+			if (ch !== "}") return false;
+			break;
+		}
+		afterPos++;
+	}
+	if (afterPos >= doc.length) return false;
+
+	return true;
+}
+
+function smartEnter(view: EditorView): boolean {
+	const { state } = view;
+
+	// Only handle when all cursors are between braces; otherwise, fall back.
+	if (
+		!state.selection.ranges.every(
+			(range) => range.empty && isBetweenBraces(view, range.from),
+		)
+	) {
+		return false;
+	}
+
+	const transaction = state.changeByRange((range) => {
+		const pos = range.from;
+		const line = state.doc.lineAt(pos);
+		const lineIndentMatch = line.text.match(/^\s*/);
+		const baseIndent = lineIndentMatch ? lineIndentMatch[0] : "";
+
+		const insert = `\n${baseIndent}${INDENT}\n${baseIndent}`;
+		const insertFrom = pos;
+		const insertTo = pos;
+
+		const cursorPos = insertFrom + 1 + baseIndent.length + INDENT.length;
+
+		return {
+			changes: { from: insertFrom, to: insertTo, insert },
+			range: EditorSelection.cursor(cursorPos),
+		};
+	});
+
+	view.dispatch(transaction);
+	return true;
+}
+
 function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	const bindings: KeyBinding[] = Object.keys(hotkeysRef.current ?? {}).map(
 		(key) => ({
@@ -44,6 +117,14 @@ function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 	return [
 		buildHotkeyExtension(hotkeysRef),
+		Prec.highest(
+			keymap.of([
+				{
+					key: "Enter",
+					run: smartEnter,
+				},
+			]),
+		),
 		basicSetup,
 		indentUnit.of(INDENT),
 		keymap.of([indentWithTab]),
