@@ -30,14 +30,14 @@ export type EditorActions = {
 
 export type EditorStore = EditorState & EditorActions;
 
-const initial: EditorState = {
+const initial = {
 	output: "",
 	outputOpen: false,
-	editorMode: readStoredEditorMode(),
-};
+} satisfies Omit<EditorState, "editorMode">;
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
 	...initial,
+	editorMode: readStoredEditorMode(),
 
 	setOutput: (output) => set({ output }),
 	clearOutput: () => set({ output: initial.output }),
@@ -59,5 +59,5 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 			}
 			return { editorMode };
 		}),
-	reset: () => set(initial),
+	reset: () => set({ ...initial, editorMode: readStoredEditorMode() }),
 }));
