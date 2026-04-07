@@ -189,7 +189,7 @@ function EditorHeader() {
 					rel="noopener noreferrer"
 				>
 					<HugeiconsIcon icon={GithubFreeIcons} strokeWidth={1.5} size={16} />
-					<span>GitHub</span>
+					<span className="sm:block hidden">GitHub</span>
 				</a>
 			</div>
 		</header>
