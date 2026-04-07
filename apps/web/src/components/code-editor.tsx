@@ -66,7 +66,6 @@ function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 			activateOnTyping: false,
 			override: [],
 		}),
-		ballerinaMode,
 	];
 }
 
@@ -133,6 +132,7 @@ export function CodeEditor({
 	const parentRef = React.useRef<HTMLDivElement>(null);
 	const editorRef = React.useRef<ShikiEditor | null>(null);
 
+	const languageCompartment = React.useRef(new Compartment());
 	const vimCompartment = React.useRef(new Compartment());
 
 	const onChangeRef = React.useRef(onChange);
@@ -167,6 +167,9 @@ export function CodeEditor({
 			},
 			extensions: [
 				...baseExtensions(hotkeysRef),
+				languageCompartment.current.of(
+					language === "ballerina" ? ballerinaMode : [],
+				),
 				vimCompartment.current.of(vimEnabled ? vim() : []),
 			],
 		});
@@ -178,6 +181,15 @@ export function CodeEditor({
 			editorRef.current = null;
 		};
 	}, []);
+
+	React.useEffect(() => {
+		const editor = editorRef.current;
+		if (!editor) return;
+		editor.reconfigure(
+			languageCompartment.current,
+			language === "ballerina" ? ballerinaMode : [],
+		);
+	}, [language]);
 
 	React.useEffect(() => {
 		const editor = editorRef.current;
