@@ -56,7 +56,7 @@ func run(this js.Value, args []js.Value) any {
 	diags := result.Diagnostics()
 	if diags.HasErrors() {
 		printDiagnostics(fsys, path, os.Stderr, diags)
-		return nil
+		return jsDiagnostics(diags)
 	}
 
 	project := result.Project()
@@ -66,7 +66,7 @@ func run(this js.Value, args []js.Value) any {
 	diags = compilation.DiagnosticResult()
 	if diags.HasErrors() {
 		printDiagnostics(fsys, path, os.Stderr, diags)
-		return nil
+		return jsDiagnostics(diags)
 	}
 
 	backend := projects.NewBallerinaBackend(compilation)

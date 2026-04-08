@@ -4,6 +4,7 @@ import { basicSetup } from "codemirror";
 import { Compartment, Prec } from "@codemirror/state";
 import { StreamLanguage, indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
+import { type Diagnostic, linter } from "@codemirror/lint";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { clike } from "@codemirror/legacy-modes/mode/clike";
@@ -18,6 +19,8 @@ import { cn } from "@/lib/utils";
 
 import type { KeyBinding } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
+import type { Text } from "@codemirror/state";
+import type { EditorDiagnostic } from "@/stores/editor-store";
 
 export type EditorLanguage = "ballerina" | "toml" | "text";
 
@@ -28,6 +31,7 @@ interface CodeEditorProps {
 	onChange?: (value: string) => void;
 	hotkeys?: HotkeyMap;
 	language?: EditorLanguage;
+	diagnostics?: EditorDiagnostic[];
 	className?: string;
 }
 
@@ -127,6 +131,7 @@ export function CodeEditor({
 	onChange,
 	hotkeys = {},
 	language = "ballerina",
+	diagnostics = [],
 	className,
 }: CodeEditorProps) {
 	const parentRef = React.useRef<HTMLDivElement>(null);
@@ -134,12 +139,15 @@ export function CodeEditor({
 
 	const languageCompartment = React.useRef(new Compartment());
 	const vimCompartment = React.useRef(new Compartment());
+	const lintCompartment = React.useRef(new Compartment());
 
 	const onChangeRef = React.useRef(onChange);
 	onChangeRef.current = onChange;
 
 	const hotkeysRef = React.useRef(hotkeys);
 	hotkeysRef.current = hotkeys;
+	const diagnosticsRef = React.useRef<EditorDiagnostic[]>(diagnostics);
+	diagnosticsRef.current = diagnostics;
 
 	const vimEnabled = useEditorStore((s) => s.editorMode) === "vim";
 
@@ -172,6 +180,15 @@ export function CodeEditor({
 					language === "ballerina" ? ballerinaMode : [],
 				),
 				vimCompartment.current.of(vimEnabled ? vim() : []),
+				lintCompartment.current.of(
+					linter(
+						(view) =>
+							toCodeMirrorDiagnostics(view.state.doc, diagnosticsRef.current),
+						{
+							needsRefresh: () => true,
+						},
+					),
+				),
 			],
 		});
 
@@ -199,6 +216,17 @@ export function CodeEditor({
 	}, [vimEnabled]);
 
 	React.useEffect(() => {
+		const editor = editorRef.current;
+		if (!editor) return;
+		editor.reconfigure(
+			lintCompartment.current,
+			linter((view) => toCodeMirrorDiagnostics(view.state.doc, diagnostics), {
+				needsRefresh: () => true,
+			}),
+		);
+	}, [diagnostics]);
+
+	React.useEffect(() => {
 		Vim.defineEx("write", "w", () => saveFileRef.current?.());
 	}, []);
 
@@ -211,4 +239,39 @@ export function CodeEditor({
 			)}
 		/>
 	);
+}
+
+function toCodeMirrorDiagnostics(
+	doc: Text,
+	diagnostics: EditorDiagnostic[],
+): Diagnostic[] {
+	return diagnostics.map((diagnostic) => {
+		const from = lineColToOffset(
+			doc,
+			diagnostic.startLine,
+			diagnostic.startCol,
+		);
+		const rawTo = lineColToOffset(doc, diagnostic.endLine, diagnostic.endCol);
+		const to = rawTo > from ? rawTo : Math.min(from + 1, doc.length);
+		return {
+			from,
+			to,
+			severity: diagnostic.severity,
+			message: diagnostic.code
+				? `[${diagnostic.code}] ${diagnostic.message}`
+				: diagnostic.message,
+		};
+	});
+}
+
+function lineColToOffset(doc: Text, line: number, col: number): number {
+	if (doc.lines === 0) return 0;
+	const lineNumber = clamp(line + 1, 1, doc.lines);
+	const lineInfo = doc.line(lineNumber);
+	const safeCol = clamp(col, 0, lineInfo.length);
+	return lineInfo.from + safeCol;
+}
+
+function clamp(value: number, min: number, max: number): number {
+	return Math.max(min, Math.min(max, value));
 }

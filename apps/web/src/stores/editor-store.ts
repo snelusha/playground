@@ -3,6 +3,15 @@ import { create } from "zustand";
 const EDITOR_MODE_STORAGE_KEY = "playground.editor.mode";
 
 type EditorMode = "standard" | "vim";
+export type EditorDiagnostic = {
+	severity: "error" | "warning" | "info";
+	message: string;
+	code?: string;
+	startLine: number;
+	startCol: number;
+	endLine: number;
+	endCol: number;
+};
 
 function readStoredEditorMode(): EditorMode {
 	if (typeof localStorage === "undefined") return "standard";
@@ -15,6 +24,7 @@ export type EditorState = {
 	output: string;
 	outputOpen: boolean;
 	editorMode: EditorMode;
+	diagnosticsByPath: Record<string, EditorDiagnostic[]>;
 };
 
 export type EditorActions = {
@@ -25,6 +35,12 @@ export type EditorActions = {
 	toggleOutputOpen: () => void;
 	setEditorMode: (mode: EditorMode) => void;
 	toggleEditorMode: () => void;
+	setDiagnosticsForPath: (
+		path: string,
+		diagnostics: EditorDiagnostic[],
+	) => void;
+	clearDiagnosticsForPath: (path: string) => void;
+	clearAllDiagnostics: () => void;
 	reset: () => void;
 };
 
@@ -33,6 +49,7 @@ export type EditorStore = EditorState & EditorActions;
 const initial = {
 	output: "",
 	outputOpen: false,
+	diagnosticsByPath: {},
 } satisfies Omit<EditorState, "editorMode">;
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
@@ -59,5 +76,20 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 			}
 			return { editorMode };
 		}),
+	setDiagnosticsForPath: (path, diagnostics) =>
+		set((s) => ({
+			diagnosticsByPath: {
+				...s.diagnosticsByPath,
+				[path]: diagnostics,
+			},
+		})),
+	clearDiagnosticsForPath: (path) =>
+		set((s) => {
+			if (!(path in s.diagnosticsByPath)) return s;
+			const next = { ...s.diagnosticsByPath };
+			delete next[path];
+			return { diagnosticsByPath: next };
+		}),
+	clearAllDiagnostics: () => set({ diagnosticsByPath: {} }),
 	reset: () => set({ ...initial, editorMode: readStoredEditorMode() }),
 }));

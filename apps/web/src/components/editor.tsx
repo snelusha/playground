@@ -40,6 +40,8 @@ import { useFS } from "@/providers/fs-provider";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { EditorLanguage } from "@/components/code-editor";
+import type { EditorDiagnostic } from "@/stores/editor-store";
+import type { WasmDiagnostic } from "@/types/wasm-types";
 
 function getLanguage(path: string): EditorLanguage {
 	const ex = ext(path);
@@ -68,6 +70,46 @@ function getBallerinaExecutionTarget(fs: LayeredFS, path: string): string {
 	}
 
 	return path;
+}
+
+function toEditorDiagnostic(
+	diagnostic: WasmDiagnostic,
+): EditorDiagnostic | null {
+	if (
+		typeof diagnostic.startLine !== "number" ||
+		typeof diagnostic.startCol !== "number" ||
+		typeof diagnostic.endLine !== "number" ||
+		typeof diagnostic.endCol !== "number"
+	) {
+		return null;
+	}
+
+	const severity = mapSeverity(diagnostic.severity);
+	return {
+		severity,
+		code: diagnostic.code,
+		message: diagnostic.message,
+		startLine: diagnostic.startLine,
+		startCol: diagnostic.startCol,
+		endLine: diagnostic.endLine,
+		endCol: diagnostic.endCol,
+	};
+}
+
+function mapSeverity(value: string): EditorDiagnostic["severity"] {
+	if (value === "warning") return "warning";
+	if (value === "info") return "info";
+	return "error";
+}
+
+function resolveDiagnosticPath(
+	target: string,
+	filePath?: string,
+): string | null {
+	if (!filePath) return null;
+	if (filePath.startsWith("/")) return filePath;
+	if (ext(target) === "bal") return target;
+	return join(target, filePath);
 }
 
 function OutputPane() {
@@ -135,6 +177,12 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
+	const diagnosticsByPath = useEditorStore((s) => s.diagnosticsByPath);
+
+	const activeDiagnostics = React.useMemo(
+		() => (activeFile ? (diagnosticsByPath[activeFile.path] ?? []) : []),
+		[activeFile, diagnosticsByPath],
+	);
 
 	const handleChange = React.useCallback(
 		(next: string) => {
@@ -170,6 +218,11 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 					key={activeFile.path}
 					value={activeFile?.content}
 					onChange={handleChange}
+					diagnostics={
+						getLanguage(activeFile.path) === "ballerina"
+							? activeDiagnostics
+							: []
+					}
 					hotkeys={{
 						"Mod-Enter": onRun,
 						"Mod-Alt-v": toggleEditorMode,
@@ -215,6 +268,8 @@ function EditorContent() {
 	const { saveFile } = useFileTreeActions();
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
+	const setDiagnosticsForPath = useEditorStore((s) => s.setDiagnosticsForPath);
+	const clearAllDiagnostics = useEditorStore((s) => s.clearAllDiagnostics);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleRun = React.useCallback(() => {
@@ -234,15 +289,40 @@ function EditorContent() {
 
 			const target = getBallerinaExecutionTarget(fs, activeFile.path);
 			const runResult = run(target);
-			if (runResult?.error) {
+			clearAllDiagnostics();
+			if (runResult && "error" in runResult && runResult.error) {
 				captured += `${runResult.error}\n`;
+			}
+			if (runResult && "diagnostics" in runResult) {
+				const grouped = new Map<string, EditorDiagnostic[]>();
+				for (const diagnostic of runResult.diagnostics) {
+					const normalized = toEditorDiagnostic(diagnostic);
+					if (!normalized) continue;
+					const filePath =
+						resolveDiagnosticPath(target, diagnostic.filePath) ??
+						activeFile.path;
+					const current = grouped.get(filePath) ?? [];
+					current.push(normalized);
+					grouped.set(filePath, current);
+				}
+				for (const [filePath, diagnostics] of grouped) {
+					setDiagnosticsForPath(filePath, diagnostics);
+				}
 			}
 		} finally {
 			console.log = oldConsole;
 		}
 
 		openOutputWith(captured);
-	}, [activeFile, fs, saveFile, run, openOutputWith]);
+	}, [
+		activeFile,
+		fs,
+		saveFile,
+		run,
+		openOutputWith,
+		clearAllDiagnostics,
+		setDiagnosticsForPath,
+	]);
 
 	useHotkeys("mod+enter", () => handleRun(), {
 		preventDefault: true,
