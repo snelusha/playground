@@ -39,8 +39,9 @@ import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
+import type { EditorLanguage } from "@/components/code-editor";
 
-function getLanguage(path: string): string {
+function getLanguage(path: string): EditorLanguage {
 	const ex = ext(path);
 	switch (ex) {
 		case "bal":
@@ -133,6 +134,7 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 	const { updateFileContent } = useFileTreeActions();
 
 	const outputOpen = useEditorStore((s) => s.outputOpen);
+	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleChange = React.useCallback(
 		(next: string) => {
@@ -163,12 +165,19 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 					<span>Run</span>
 				</Button>
 			</div>
-			<CodeEditor
-				className="flex-1 min-h-0 w-full"
-				value={activeFile?.content ?? ""}
-				onChange={handleChange}
-				language={activeFile ? getLanguage(activeFile.path) : undefined}
-			/>
+			{activeFile && (
+				<CodeEditor
+					key={activeFile.path}
+					value={activeFile?.content}
+					onChange={handleChange}
+					hotkeys={{
+						"Mod-Enter": onRun,
+						"Mod-Alt-v": toggleEditorMode,
+						"Mod-r": () => window.location.reload(),
+					}}
+					language={activeFile ? getLanguage(activeFile.path) : "text"}
+				/>
+			)}
 		</div>
 	);
 }
@@ -206,6 +215,7 @@ function EditorContent() {
 	const { saveFile } = useFileTreeActions();
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
+	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleRun = React.useCallback(() => {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
@@ -234,17 +244,13 @@ function EditorContent() {
 		openOutputWith(captured);
 	}, [activeFile, fs, saveFile, run, openOutputWith]);
 
-	useHotkeys(
-		"mod+enter",
-		(e) => {
-			e.preventDefault();
-			handleRun();
-		},
-		{
-			enableOnFormTags: ["TEXTAREA"],
-			preventDefault: true,
-		},
-	);
+	useHotkeys("mod+enter", () => handleRun(), {
+		preventDefault: true,
+	});
+
+	useHotkeys("mod+alt+v", () => toggleEditorMode(), {
+		preventDefault: true,
+	});
 
 	if (!isReady) return <WasmLoadingScreen progress={progress} />;
 
