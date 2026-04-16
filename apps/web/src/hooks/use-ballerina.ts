@@ -45,16 +45,36 @@ export function useBallerina() {
 		};
 	}, []);
 
-	function run(path: string): { error?: string } | null {
+	async function run(path: string): Promise<{ error?: string } | null> {
 		if (typeof window.run !== "function")
 			return { error: "Ballerina runtime is not ready" };
 		if (!fs) return { error: "Virtual file system is not available" };
 
-		const result = window.run(fs, path);
-		if (result && typeof result === "object" && "error" in result) {
-			return result as { error?: string };
+		try {
+			const result = await window.run(fs, path);
+			if (result && typeof result === "object" && "error" in result) {
+				return result as { error?: string };
+			}
+			return null;
+		} catch (error) {
+			if (
+				error &&
+				typeof error === "object" &&
+				"error" in error &&
+				typeof error.error === "string"
+			) {
+				return { error: error.error };
+			}
+			if (error instanceof Error) {
+				return { error: error.message };
+			}
+			return {
+				error:
+					typeof error === "string"
+						? error
+						: "An unknown error occurred while running Ballerina code",
+			};
 		}
-		return null;
 	}
 
 	return { isReady, progress, run };

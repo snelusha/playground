@@ -128,7 +128,7 @@ function OutputPane() {
 	);
 }
 
-function EditorPane({ onRun }: { onRun: () => void }) {
+function EditorPane({ onRun }: { onRun: () => void | Promise<void> }) {
 	const activeFile = useActiveFile();
 
 	const { updateFileContent } = useFileTreeActions();
@@ -217,7 +217,7 @@ function EditorContent() {
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
-	const handleRun = React.useCallback(() => {
+	const handleRun = React.useCallback(async () => {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
 		const oldConsole = console.log;
@@ -233,7 +233,7 @@ function EditorContent() {
 			saveFile();
 
 			const target = getBallerinaExecutionTarget(fs, activeFile.path);
-			const runResult = run(target);
+			const runResult = await run(target);
 			if (runResult?.error) {
 				captured += `${runResult.error}\n`;
 			}
