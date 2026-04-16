@@ -60,7 +60,7 @@ function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 		buildHotkeyExtension(hotkeysRef),
 		basicSetup,
 		indentUnit.of(INDENT),
-		keymap.of([indentWithTab]),
+		// keymap.of([indentWithTab]),
 		theme,
 		autocompletion({
 			activateOnTyping: false,
@@ -122,6 +122,11 @@ const theme = EditorView.theme({
 	},
 });
 
+const disableCtrlBrackets = keymap.of([
+	{ key: "Ctrl-[", run: () => true },
+	{ key: "Ctrl-]", run: () => true },
+]);
+
 export function CodeEditor({
 	value,
 	onChange,
@@ -167,11 +172,12 @@ export function CodeEditor({
 					onChangeRef.current?.(update.state.doc.toString());
 			},
 			extensions: [
+				vimCompartment.current.of(vimEnabled ? vim() : []),
+				disableCtrlBrackets,
 				...baseExtensions(hotkeysRef),
 				languageCompartment.current.of(
 					language === "ballerina" ? ballerinaMode : [],
 				),
-				vimCompartment.current.of(vimEnabled ? vim() : []),
 			],
 		});
 
@@ -200,6 +206,7 @@ export function CodeEditor({
 
 	React.useEffect(() => {
 		Vim.defineEx("write", "w", () => saveFileRef.current?.());
+		Vim.map("<C-[>", "<Esc>", "insert");
 	}, []);
 
 	return (
