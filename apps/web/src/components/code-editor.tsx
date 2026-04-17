@@ -16,6 +16,34 @@ import { useFileTreeActions } from "@/stores/file-tree-store";
 
 import { cn } from "@/lib/utils";
 
+import {
+	type Transport,
+	LSPClient,
+	languageServerExtensions,
+} from "@codemirror/lsp-client";
+
+function websocketTransport(uri: string): Promise<Transport> {
+	let handlers: ((value: string) => void)[] = [];
+	const socket = new WebSocket(uri);
+	socket.onmessage = (e) => {
+		for (const handler of handlers) handler(e.data.toString());
+	};
+	return new Promise((resolve) => {
+		socket.onopen = () =>
+			resolve({
+				send(message: string) {
+					socket.send(message);
+				},
+				subscribe(handler: (value: string) => void) {
+					handlers.push(handler);
+				},
+				unsubscribe(handler: (value: string) => void) {
+					handlers = handlers.filter((h) => h !== handler);
+				},
+			});
+	});
+}
+
 import type { KeyBinding } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
 
@@ -55,17 +83,23 @@ function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	return Prec.highest(keymap.of(bindings));
 }
 
+const transport = await websocketTransport("ws://localhost:3000");
 function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
+	const client = new LSPClient({
+		extensions: languageServerExtensions(),
+	}).connect(transport);
+
 	return [
 		buildHotkeyExtension(hotkeysRef),
 		basicSetup,
 		indentUnit.of(INDENT),
 		keymap.of([indentWithTab]),
 		theme,
-		autocompletion({
-			activateOnTyping: false,
-			override: [],
-		}),
+		// autocompletion({
+		// 	activateOnTyping: false,
+		// 	override: [],
+		// }),
+		client.plugin("file:///some/file.bal"),
 	];
 }
 
