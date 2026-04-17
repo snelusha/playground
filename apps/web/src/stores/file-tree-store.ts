@@ -52,6 +52,7 @@ type FileTreeState = {
 
 type FileTreeActions = {
 	init(fs: LayeredFS): void;
+	fs(): LayeredFS;
 
 	openFile(path: string): void;
 	saveFile(): boolean;
@@ -112,6 +113,10 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 					s.localTree = fs.localTree();
 					s.ready = true;
 				});
+			},
+
+			fs() {
+				return _fs();
 			},
 
 			openFile(path) {

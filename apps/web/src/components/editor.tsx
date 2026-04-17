@@ -168,6 +168,7 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 			{activeFile && (
 				<CodeEditor
 					key={activeFile.path}
+					filePath={activeFile.path}
 					value={activeFile?.content}
 					onChange={handleChange}
 					hotkeys={{

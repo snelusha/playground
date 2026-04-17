@@ -21,6 +21,7 @@ import (
 	"ballerina-lang-go/projects"
 	"ballerina-lang-go/projects/directory"
 	"ballerina-lang-go/runtime"
+	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
 	"os"
 	"syscall/js"
@@ -28,8 +29,73 @@ import (
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
+	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
 
 	select {}
+}
+
+func mapDiagnostics(diags []diagnostics.Diagnostic) []any {
+	out := make([]any, 0, len(diags))
+
+	for _, d := range diags {
+		loc := d.Location()
+		lineRange := loc.LineRange()
+
+		out = append(out, map[string]any{
+			"message":  d.Message(),
+			"severity": 1,
+			"range": map[string]any{
+				"start": map[string]any{
+					"line":   lineRange.StartLine().Line(),
+					"column": lineRange.StartLine().Offset(),
+				},
+				"end": map[string]any{
+					"line":   lineRange.EndLine().Line(),
+					"column": lineRange.EndLine().Offset(),
+				},
+			},
+		})
+	}
+
+	return out
+}
+
+func getDiagnostics(this js.Value, args []js.Value) any {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", r)
+		}
+	}()
+
+	if len(args) < 2 {
+		return nil
+	}
+
+	proxy := args[0]
+	path := args[1].String()
+
+	fsys := NewLocalStorageFS(proxy)
+
+	result, err := directory.LoadProject(fsys, path)
+	if err != nil {
+		return nil
+	}
+
+	diags := result.Diagnostics()
+	if diags.HasErrors() {
+		return mapDiagnostics(diags.Diagnostics())
+	}
+
+	project := result.Project()
+	pkg := project.CurrentPackage()
+
+	compilation := pkg.Compilation()
+	diags = compilation.DiagnosticResult()
+	if diags.HasErrors() {
+		return mapDiagnostics(diags.Diagnostics())
+	}
+
+	return nil
 }
 
 func run(this js.Value, args []js.Value) any {

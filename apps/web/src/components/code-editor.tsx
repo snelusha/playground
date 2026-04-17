@@ -18,12 +18,14 @@ import { cn } from "@/lib/utils";
 
 import type { KeyBinding } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
+import { ballerinaLSPClient } from "./ballerina-ls";
 
 export type EditorLanguage = "ballerina" | "toml" | "text";
 
 type HotkeyMap = Record<string, () => void>;
 
 interface CodeEditorProps {
+	filePath?: string;
 	value?: string;
 	onChange?: (value: string) => void;
 	hotkeys?: HotkeyMap;
@@ -55,7 +57,10 @@ function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	return Prec.highest(keymap.of(bindings));
 }
 
-function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
+function baseExtensions(
+	filePath: string,
+	hotkeysRef: React.RefObject<HotkeyMap>,
+): Extension[] {
 	return [
 		buildHotkeyExtension(hotkeysRef),
 		basicSetup,
@@ -66,6 +71,7 @@ function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 			activateOnTyping: false,
 			override: [],
 		}),
+		ballerinaLSPClient.plugin(filePath),
 	];
 }
 
@@ -123,6 +129,7 @@ const theme = EditorView.theme({
 });
 
 export function CodeEditor({
+	filePath,
 	value,
 	onChange,
 	hotkeys = {},
@@ -167,7 +174,7 @@ export function CodeEditor({
 					onChangeRef.current?.(update.state.doc.toString());
 			},
 			extensions: [
-				...baseExtensions(hotkeysRef),
+				...baseExtensions(filePath, hotkeysRef),
 				languageCompartment.current.of(
 					language === "ballerina" ? ballerinaMode : [],
 				),
