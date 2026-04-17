@@ -21,6 +21,7 @@ import (
 	"ballerina-lang-go/projects"
 	"ballerina-lang-go/projects/directory"
 	"ballerina-lang-go/runtime"
+	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
 	"os"
 	"syscall/js"
@@ -28,6 +29,7 @@ import (
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
+	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
 
 	select {}
 }
@@ -86,6 +88,62 @@ func run(_ js.Value, args []js.Value) any {
 
 			resolve.Invoke(js.Null())
 		}()
+	})
+}
+
+func mapDiagnostics(diags []diagnostics.Diagnostic) []map[string]any {
+	mapped := make([]map[string]any, len(diags))
+	for i, d := range diags {
+		lineRange := d.Location().LineRange()
+		start := map[string]any{"line": lineRange.StartLine().Line(), "character": lineRange.StartLine().Offset()}
+		end := map[string]any{"line": lineRange.EndLine().Line(), "character": lineRange.EndLine().Offset()}
+		mapped[i] = map[string]any{
+			"range": map[string]any{
+				"start": start,
+				"end":   end,
+			},
+			"severity": d.DiagnosticInfo().Severity(),
+			"message":  d.Message(),
+		}
+	}
+	return mapped
+}
+
+func getDiagnostics(_ js.Value, args []js.Value) any {
+	return newPromise(func(resolve js.Value, reject js.Value) {
+		defer func() {
+			if r := recover(); r != nil {
+				reject.Invoke(jsError(fmt.Errorf("%v", r)))
+			}
+		}()
+
+		if len(args) < 2 {
+			reject.Invoke(jsError(fmt.Errorf("expected at least 2 arguments: (fsProxy, path)")))
+			return
+		}
+
+		proxy := args[0]
+		path := args[1].String()
+		fsys := NewBridgeFS(proxy)
+
+		result, err := directory.LoadProject(fsys, path)
+		if err != nil {
+			reject.Invoke(jsError(err))
+			return
+		}
+
+		if result.Diagnostics().HasErrors() {
+			resolve.Invoke(mapDiagnostics(result.Diagnostics().Diagnostics()))
+			return
+		}
+
+		compilation := result.Project().CurrentPackage().Compilation()
+		if compilation.DiagnosticResult().HasErrors() {
+			resolve.Invoke(mapDiagnostics(compilation.DiagnosticResult().Diagnostics()))
+			return
+		}
+
+		resolve.Invoke(js.Null())
 	})
 }
 
