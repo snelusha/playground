@@ -221,7 +221,7 @@ export function CodeEditor({
 		editor.reconfigure(
 			lintCompartment.current,
 			linter((view) => toCodeMirrorDiagnostics(view.state.doc, diagnostics), {
-				needsRefresh: () => true,
+				needsRefresh: () => false,
 			}),
 		);
 	}, [diagnostics]);
