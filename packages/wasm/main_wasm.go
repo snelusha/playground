@@ -60,19 +60,13 @@ func mapDiagnostics(diags []diagnostics.Diagnostic) []any {
 	return out
 }
 
-func getDiagnostics(this js.Value, args []js.Value) any {
+func computeDiagnostics(proxy js.Value, path string) (out any) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", r)
+			out = nil
 		}
 	}()
-
-	if len(args) < 2 {
-		return nil
-	}
-
-	proxy := args[0]
-	path := args[1].String()
 
 	fsys := NewLocalStorageFS(proxy)
 
@@ -96,6 +90,27 @@ func getDiagnostics(this js.Value, args []js.Value) any {
 	}
 
 	return nil
+}
+
+func getDiagnostics(this js.Value, args []js.Value) any {
+	if len(args) < 2 {
+		return js.Global().Get("Promise").Call("resolve", js.Null())
+	}
+
+	proxy := args[0]
+	path := args[1].String()
+
+	executor := js.FuncOf(func(this js.Value, pargs []js.Value) any {
+		resolve := pargs[0]
+		go func() {
+			result := computeDiagnostics(proxy, path)
+			resolve.Invoke(result)
+		}()
+		return nil
+	})
+	promise := js.Global().Get("Promise").New(executor)
+	executor.Release()
+	return promise
 }
 
 func run(this js.Value, args []js.Value) any {

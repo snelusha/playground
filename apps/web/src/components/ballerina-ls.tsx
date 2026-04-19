@@ -10,7 +10,7 @@ type TextDocumentParams = {
 export const ballerinaLS = {
 	name: "Ballerina Language Server",
 	onNotification: (_n: unknown) => {},
-	handleRequest: (method: string, params: unknown): unknown => {
+	handleRequest: async (method: string, params: unknown): Promise<unknown> => {
 		switch (method) {
 			case "initialize":
 				return { capabilities: { textDocumentSync: 1 } };
@@ -26,7 +26,7 @@ export const ballerinaLS = {
 					return null;
 				}
 				useFileTreeStore.getState().saveFile();
-				const result = window.getDiagnostics(
+				const result = await window.getDiagnostics(
 					useFileTreeStore.getState().fs(),
 					textDocument.uri,
 				);
@@ -104,14 +104,16 @@ export class BallerinaTransport implements Transport {
 	}
 
 	send(message: string): void {
-		const req = JSON.parse(message);
-		const result = ballerinaLS.handleRequest(req.method, req.params);
-		if (req.id !== undefined) {
-			const response = { jsonrpc: "2.0", id: req.id, result };
-			for (const h of this.handlers) {
-				h(JSON.stringify(response));
+		void (async () => {
+			const req = JSON.parse(message);
+			const result = await ballerinaLS.handleRequest(req.method, req.params);
+			if (req.id !== undefined) {
+				const response = { jsonrpc: "2.0", id: req.id, result };
+				for (const h of this.handlers) {
+					h(JSON.stringify(response));
+				}
 			}
-		}
+		})();
 	}
 	subscribe(handler: (value: string) => void): void {
 		this.handlers.push(handler);
