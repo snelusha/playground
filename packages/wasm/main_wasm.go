@@ -100,17 +100,17 @@ func getDiagnostics(this js.Value, args []js.Value) any {
 	proxy := args[0]
 	path := args[1].String()
 
-	executor := js.FuncOf(func(this js.Value, pargs []js.Value) any {
+	var executor js.Func
+	executor = js.FuncOf(func(_ js.Value, pargs []js.Value) any {
 		resolve := pargs[0]
 		go func() {
 			result := computeDiagnostics(proxy, path)
 			resolve.Invoke(result)
+			executor.Release()
 		}()
 		return nil
 	})
-	promise := js.Global().Get("Promise").New(executor)
-	executor.Release()
-	return promise
+	return js.Global().Get("Promise").New(executor)
 }
 
 func run(this js.Value, args []js.Value) any {

@@ -7,6 +7,37 @@ type TextDocumentParams = {
 	textDocument: { uri: string };
 };
 
+type DiagnosticRange = {
+	start: { line: number; column: number };
+	end: { line: number; column: number };
+};
+
+type WasmDiagnostic = {
+	range?: DiagnosticRange;
+	severity?: number;
+	message?: unknown;
+};
+
+const diagnosticSequenceByUri = new Map<string, number>();
+
+function toCodeMirrorDiagnostics(result: unknown) {
+	if (!Array.isArray(result)) return [];
+
+	return result.map((d: WasmDiagnostic) => {
+		const start = d.range?.start ?? { line: 0, column: 0 };
+		const end = d.range?.end ?? start;
+
+		return {
+			range: {
+				start: { line: start.line, character: start.column },
+				end: { line: end.line, character: end.column },
+			},
+			severity: d.severity ?? 1,
+			message: String(d.message ?? ""),
+		};
+	});
+}
+
 export const ballerinaLS = {
 	name: "Ballerina Language Server",
 	onNotification: (_n: unknown) => {},
@@ -26,62 +57,29 @@ export const ballerinaLS = {
 					return null;
 				}
 				useFileTreeStore.getState().saveFile();
+				const uri = textDocument.uri;
+				const sequence = (diagnosticSequenceByUri.get(uri) ?? 0) + 1;
+				diagnosticSequenceByUri.set(uri, sequence);
+
 				const result = await window.getDiagnostics(
 					useFileTreeStore.getState().fs(),
-					textDocument.uri,
+					uri,
 				);
 				console.log("Diagnostics result:", result);
-				if (result && Array.isArray(result)) {
-					const diagnostics = result.map((d: Record<string, unknown>) => {
-						const range = d.range as
-							| {
-									start: { line: number; column: number };
-									end: { line: number; column: number };
-							  }
-							| undefined;
-						const start = range?.start ?? { line: 0, column: 0 };
-						const end = range?.end ?? start;
-						return {
-							range: {
-								start: { line: start.line, character: start.column },
-								end: { line: end.line, character: end.column },
-							},
-							severity: (d.severity as number | undefined) ?? 1,
-							message: String(d.message ?? ""),
-						};
-					});
-					ballerinaLS.onNotification({
-						jsonrpc: "2.0",
-						method: "textDocument/publishDiagnostics",
-						params: {
-							uri: textDocument.uri,
-							diagnostics,
-						},
-					});
+				if (diagnosticSequenceByUri.get(uri) !== sequence) {
+					return null;
 				}
 
-				// console.log(
-				// 	useFileTreeStore.getState().fs().stat(params.textDocument.uri),
-				// );
-				// const diagnostics = [
-				// 	{
-				// 		range: {
-				// 			start: { line: 2, character: 0 },
-				// 			end: { line: 2, character: 6 },
-				// 		},
-				// 		severity: 2,
-				// 		message: "Custom Ballerina Error Example",
-				// 	},
-				// ];
-				//
-				// ballerinaLS.onNotification({
-				// 	jsonrpc: "2.0",
-				// 	method: "textDocument/publishDiagnostics",
-				// 	params: {
-				// 		uri: params.textDocument.uri,
-				// 		diagnostics: diagnostics,
-				// 	},
-				// });
+				const diagnostics = toCodeMirrorDiagnostics(result);
+				ballerinaLS.onNotification({
+					jsonrpc: "2.0",
+					method: "textDocument/publishDiagnostics",
+					params: {
+						uri,
+						diagnostics,
+					},
+				});
+
 				return null;
 			}
 
