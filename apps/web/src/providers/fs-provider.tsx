@@ -27,7 +27,7 @@ export function FSProvider({ children }: React.PropsWithChildren) {
 	if (!fs.current) fs.current = createFS();
 
 	React.useEffect(() => {
-		if (fs.current) init(fs.current);
+		if (fs.current) void init(fs.current);
 	}, [init]);
 
 	return <FSContext.Provider value={fs.current}>{children}</FSContext.Provider>;

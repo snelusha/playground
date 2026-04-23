@@ -79,7 +79,7 @@ function FileTreeFileNode({
 	path,
 	shareable = false,
 }: FileTreeNodeProps) {
-	const { copyShareLink } = useCopyShareLink();
+	const { copyShareLink, pendingPath } = useCopyShareLink();
 
 	const isMobile = useIsMobile();
 
@@ -99,10 +99,10 @@ function FileTreeFileNode({
 		expandDir,
 	} = useFileTreeActions();
 
-	function handleClick() {
+	async function handleClick() {
 		// TODO: This is a bit hacky, we should ideally have a separate "switchFile" action that doesn't mark the file as dirty
-		saveFile();
-		openFile(path);
+		await saveFile();
+		await openFile(path);
 		if (isMobile) toggleSidebar();
 	}
 
@@ -116,7 +116,7 @@ function FileTreeFileNode({
 			>
 				<SidebarMenuButton
 					isActive={activeFilePath === path}
-					onClick={handleClick}
+					onClick={() => void handleClick()}
 				>
 					<HugeiconsIcon
 						icon={isSharedFile ? AlertSquareIcon : File01Icon}
@@ -155,24 +155,26 @@ function FileTreeFileNode({
 						{shareable && (
 							<DropdownMenuItem onClick={() => void copyShareLink(path)}>
 								<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
-								<span>Share</span>
+								<span>{pendingPath === path ? "[...]" : "Share"}</span>
 							</DropdownMenuItem>
 						)}
 						{isSharedFile && (
 							<DropdownMenuItem
 								onClick={() => {
-									saveFile();
-									const dest = sharedToLocalDestination(path);
-									if (!dest) return;
-									if (exists(dest)) {
-										setFileOperationDialog({
-											type: "fork-file",
-											path,
-											defaultName: basename(path),
-										});
-									} else if (renameFile(path, dest)) {
-										expandDir(dirname(dest));
-									}
+									void (async () => {
+										await saveFile();
+										const dest = sharedToLocalDestination(path);
+										if (!dest) return;
+										if (await exists(dest)) {
+											setFileOperationDialog({
+												type: "fork-file",
+												path,
+												defaultName: basename(path),
+											});
+										} else if (await renameFile(path, dest)) {
+											expandDir(dirname(dest));
+										}
+									})();
 								}}
 							>
 								<HugeiconsIcon icon={GitForkIcon} strokeWidth={1.5} />
@@ -214,7 +216,7 @@ function FileTreeDirNode({
 	defaultOpen = false,
 	shareable = false,
 }: FileTreeDirNodeProps) {
-	const { copyShareLink } = useCopyShareLink();
+	const { copyShareLink, pendingPath } = useCopyShareLink();
 
 	const isMobile = useIsMobile();
 
@@ -310,24 +312,26 @@ function FileTreeDirNode({
 							{shareable && (
 								<DropdownMenuItem onClick={() => void copyShareLink(path)}>
 									<HugeiconsIcon icon={Share08Icon} strokeWidth={1.5} />
-									<span>Share</span>
+									<span>{pendingPath === path ? "[...]" : "Share"}</span>
 								</DropdownMenuItem>
 							)}
 							{isSharedDir && (
 								<DropdownMenuItem
 									onClick={() => {
-										saveFile();
-										const dest = sharedToLocalDestination(path);
-										if (!dest) return;
-										if (exists(dest)) {
-											setFileOperationDialog({
-												type: "fork-folder",
-												path,
-												defaultName: basename(path),
-											});
-										} else if (renameFile(path, dest)) {
-											expandDir(dirname(dest));
-										}
+										void (async () => {
+											await saveFile();
+											const dest = sharedToLocalDestination(path);
+											if (!dest) return;
+											if (await exists(dest)) {
+												setFileOperationDialog({
+													type: "fork-folder",
+													path,
+													defaultName: basename(path),
+												});
+											} else if (await renameFile(path, dest)) {
+												expandDir(dirname(dest));
+											}
+										})();
 									}}
 								>
 									<HugeiconsIcon icon={GitForkIcon} strokeWidth={1.5} />

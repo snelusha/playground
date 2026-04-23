@@ -124,7 +124,7 @@ export async function generateShareUrl(
 	nodePath: string,
 	activeFilePath: string | null,
 ): Promise<string | null> {
-	const root = toFileNode(fs, nodePath);
+	const root = await toFileNode(fs, nodePath);
 	if (!root) return null;
 
 	const openRelativePath =

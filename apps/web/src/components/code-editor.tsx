@@ -199,7 +199,9 @@ export function CodeEditor({
 	}, [vimEnabled]);
 
 	React.useEffect(() => {
-		Vim.defineEx("write", "w", () => saveFileRef.current?.());
+		Vim.defineEx("write", "w", () => {
+			void saveFileRef.current?.();
+		});
 	}, []);
 
 	return (

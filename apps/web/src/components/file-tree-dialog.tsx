@@ -152,6 +152,8 @@ function useFileTreeDialog() {
 	} = useFileTreeActions();
 
 	const [name, setName] = React.useState("");
+	const [alreadyExists, setAlreadyExists] = React.useState(false);
+	const [isSubmitting, setIsSubmitting] = React.useState(false);
 
 	const path = fileOperationDialog?.path;
 	const type = fileOperationDialog?.type as FileOperationType | undefined;
@@ -175,7 +177,21 @@ function useFileTreeDialog() {
 	const isRename = type?.startsWith("rename") ?? false;
 	const isDelete = type === "delete-file" || type === "delete-folder";
 	const isSamePath = isRename && targetPath === path;
-	const alreadyExists = !!targetPath && !isSamePath && exists(targetPath);
+	React.useEffect(() => {
+		let cancelled = false;
+		const checkExists = async () => {
+			if (!targetPath || isSamePath) {
+				if (!cancelled) setAlreadyExists(false);
+				return;
+			}
+			const result = await exists(targetPath);
+			if (!cancelled) setAlreadyExists(result);
+		};
+		void checkExists();
+		return () => {
+			cancelled = true;
+		};
+	}, [targetPath, isSamePath, exists]);
 	const isActionDisabled = isDelete
 		? false
 		: !name.trim() || hasPathSeparator || alreadyExists || isSamePath;
@@ -189,41 +205,46 @@ function useFileTreeDialog() {
 		if (!open) close();
 	};
 
-	const handleSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
+	const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
 		e.preventDefault();
 		if (!fileOperationDialog || !type || !path) return;
+		if (isSubmitting) return;
+		setIsSubmitting(true);
 
-		if (isDelete) {
-			if (type === "delete-file") deleteFile(path);
-			else if (type === "delete-folder") deleteDir(path);
+		try {
+			if (isDelete) {
+				if (type === "delete-file") await deleteFile(path);
+				else if (type === "delete-folder") await deleteDir(path);
+				close();
+				return;
+			}
+
+			if (isActionDisabled || !targetPath) return;
+
+			switch (type) {
+				case "new-file":
+					await createNewFile(targetPath);
+					break;
+				case "new-folder":
+					await createNewDir(targetPath);
+					break;
+				case "new-package":
+					await createNewPackage(path, name);
+					break;
+				case "rename-file":
+				case "rename-folder":
+					await renameFile(path, targetPath);
+					break;
+				case "fork-file":
+				case "fork-folder":
+					if (!(await renameFile(path, targetPath))) return;
+					expandDir(dirname(targetPath));
+					break;
+			}
 			close();
-			return;
+		} finally {
+			setIsSubmitting(false);
 		}
-
-		if (isActionDisabled || !targetPath) return;
-
-		switch (type) {
-			case "new-file":
-				createNewFile(targetPath);
-				break;
-			case "new-folder":
-				createNewDir(targetPath);
-				break;
-			case "new-package":
-				createNewPackage(path, name);
-				break;
-			case "rename-file":
-			case "rename-folder":
-				renameFile(path, targetPath);
-				break;
-			case "fork-file":
-			case "fork-folder":
-				if (!renameFile(path, targetPath)) return;
-				expandDir(dirname(targetPath));
-				break;
-		}
-
-		close();
 	};
 
 	return {
@@ -235,6 +256,7 @@ function useFileTreeDialog() {
 		isDelete,
 		alreadyExists,
 		isActionDisabled,
+		isSubmitting,
 		handleOpenChange,
 		handleSubmit,
 	};
@@ -250,6 +272,7 @@ export function FileTreeDialog() {
 		isDelete,
 		alreadyExists,
 		isActionDisabled,
+		isSubmitting,
 		handleOpenChange,
 		handleSubmit,
 	} = useFileTreeDialog();
@@ -310,16 +333,17 @@ export function FileTreeDialog() {
 							type="button"
 							variant="outline"
 							onClick={() => handleOpenChange(false)}
+							disabled={isSubmitting}
 						>
 							Cancel
 						</Button>
 						<Button
 							type="submit"
 							variant={isDelete ? "destructive" : "default"}
-							disabled={isActionDisabled}
+							disabled={isActionDisabled || isSubmitting}
 							autoFocus={isDelete}
 						>
-							{FILE_TREE_SUBMIT_LABEL[type]}
+							{isSubmitting ? "[...]" : FILE_TREE_SUBMIT_LABEL[type]}
 						</Button>
 					</DialogFooter>
 				</form>
