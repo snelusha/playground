@@ -21,11 +21,11 @@ export class LayeredFS implements FS {
 		private readonly local: LocalStorageFS,
 	) {}
 
-	open(path: string) {
+	async open(path: string) {
 		return this._withTargetOrNull(path, (fs) => fs.open(path));
 	}
 
-	stat(path: string) {
+	async stat(path: string) {
 		if (isRootPath(path))
 			return {
 				name: "/",
@@ -36,7 +36,7 @@ export class LayeredFS implements FS {
 		return this._withTargetOrNull(path, (fs) => fs.stat(path));
 	}
 
-	readDir(path: string) {
+	async readDir(path: string) {
 		if (isRootPath(path))
 			return [
 				{ name: TEMP_ROOT.slice(1), isDir: true },
@@ -45,15 +45,15 @@ export class LayeredFS implements FS {
 		return this._withTargetOrNull(path, (fs) => fs.readDir(path));
 	}
 
-	writeFile(path: string, content: string) {
+	async writeFile(path: string, content: string) {
 		return this._withTargetOrFalse(path, (fs) => fs.writeFile(path, content));
 	}
 
-	remove(path: string) {
+	async remove(path: string) {
 		return this._withTargetOrFalse(path, (fs) => fs.remove(path));
 	}
 
-	move(oldPath: string, newPath: string) {
+	async move(oldPath: string, newPath: string) {
 		const oldTarget = this._target(oldPath);
 		const newTarget = this._target(newPath);
 		if (!oldTarget || !newTarget) return false;
@@ -61,54 +61,56 @@ export class LayeredFS implements FS {
 		return this._moveToTarget(oldTarget, newTarget, oldPath, newPath);
 	}
 
-	mkdirAll(path: string) {
+	async mkdirAll(path: string) {
 		return this._withTargetOrFalse(path, (fs) => fs.mkdirAll(path));
 	}
 
-	tempTree() {
+	async tempTree() {
 		return this.temp.transformToTree(TEMP_ROOT);
 	}
 
-	localTree() {
+	async localTree() {
 		return this.local.transformToTree("/local");
 	}
 
-	graftSharedTree(
+	async graftSharedTree(
 		root: FileNode,
 		openRelativePath?: string | null,
-	): string | null {
+	): Promise<string | null> {
 		this.temp.insertSubtree(SHARED_ROOT, root);
 
 		const trimmed = openRelativePath?.trim();
 		if (trimmed && isSafeRelativePath(trimmed)) {
 			const candidate = join(SHARED_ROOT, trimmed);
-			const info = this.stat(candidate);
+			const info = await this.stat(candidate);
 			if (info && !info.isDir) return candidate;
 		}
 
 		return firstFilePathInSubtree(root, SHARED_ROOT);
 	}
 
-	private _moveToTarget(
+	private async _moveToTarget(
 		oldTarget: FS,
 		newTarget: FS,
 		oldPath: string,
 		newPath: string,
-	): boolean {
-		const info = oldTarget.stat(oldPath);
+	): Promise<boolean> {
+		const info = await oldTarget.stat(oldPath);
 		if (!info) return false;
 		if (info.isDir) {
-			if (!newTarget.mkdirAll(newPath)) return false;
-			const entries = oldTarget.readDir(oldPath);
+			if (!(await newTarget.mkdirAll(newPath))) return false;
+			const entries = await oldTarget.readDir(oldPath);
 			if (!entries) return false;
 			for (const entry of entries) {
 				const src = `${oldPath}/${entry.name}`;
 				const dst = `${newPath}/${entry.name}`;
-				if (!this._moveToTarget(oldTarget, newTarget, src, dst)) return false;
+				if (!(await this._moveToTarget(oldTarget, newTarget, src, dst)))
+					return false;
 			}
 		} else {
-			const file = oldTarget.open(oldPath);
-			if (!file || !newTarget.writeFile(newPath, file.content)) return false;
+			const file = await oldTarget.open(oldPath);
+			if (!file || !(await newTarget.writeFile(newPath, file.content)))
+				return false;
 		}
 		return oldTarget.remove(oldPath);
 	}
@@ -126,18 +128,21 @@ export class LayeredFS implements FS {
 		return null;
 	}
 
-	private _withTargetOrNull<T>(
+	private async _withTargetOrNull<T>(
 		path: string,
-		fn: (fs: FS) => T | null,
-	): T | null {
+		fn: (fs: FS) => Promise<T | null>,
+	): Promise<T | null> {
 		const target = this._target(path);
 		if (!target) return null;
 		return fn(target);
 	}
 
-	private _withTargetOrFalse(path: string, fn: (fs: FS) => boolean): boolean {
+	private async _withTargetOrFalse(
+		path: string,
+		fn: (fs: FS) => Promise<boolean>,
+	): Promise<boolean> {
 		const target = this._target(path);
 		if (!target) return false;
-		return fn(target);
+		return await fn(target);
 	}
 }

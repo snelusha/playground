@@ -11,8 +11,11 @@ export function useCopyShareLink() {
 	const fs = useFS();
 	const activeFilePath = useActiveFilePath();
 
+	const [pendingPath, setPendingPath] = React.useState<string | null>(null);
+
 	const copyShareLink = React.useCallback(
 		async (nodePath: string) => {
+			setPendingPath(nodePath);
 			try {
 				const url = await generateShareUrl(fs, nodePath, activeFilePath);
 				if (!url) {
@@ -24,10 +27,12 @@ export function useCopyShareLink() {
 				toast.success("Share link copied to clipboard");
 			} catch {
 				toast.error("Could not copy link to clipboard");
+			} finally {
+				setPendingPath((current) => (current === nodePath ? null : current));
 			}
 		},
 		[fs, activeFilePath],
 	);
 
-	return { copyShareLink };
+	return { copyShareLink, pendingPath };
 }
