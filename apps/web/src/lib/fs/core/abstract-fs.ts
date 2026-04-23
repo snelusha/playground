@@ -139,11 +139,12 @@ export class AbstractFS implements FS {
 					children: await this.transformToTree(fullPath),
 				});
 			} else {
-				const f = await this.open(fullPath);
+				const fileNode = this._getNode(fullPath);
+				const isFile = fileNode && !fileNode.isDir;
 				result.push({
 					kind: "file",
 					name: entry.name,
-					content: f?.content ?? "",
+					content: isFile ? (fileNode.content ?? "") : "",
 				});
 			}
 		}
