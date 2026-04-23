@@ -32,59 +32,61 @@ func main() {
 	select {}
 }
 
-func run(this js.Value, args []js.Value) any {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", r)
-		}
-	}()
+func run(_ js.Value, args []js.Value) any {
+	return newPromise(func(resolve js.Value, _ js.Value) {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Fprintf(os.Stderr, "%v\n", r)
+					resolve.Invoke(jsError(fmt.Errorf("%v", r)))
+				}
+			}()
 
-	if len(args) < 2 {
-		return jsError(fmt.Errorf("expected at least 2 arguments: (fsProxy, path)"))
-	}
+			if len(args) < 2 {
+				resolve.Invoke(jsError(fmt.Errorf("expected at least 2 arguments: (fsProxy, path)")))
+				return
+			}
 
-	proxy := args[0]
-	path := args[1].String()
+			proxy := args[0]
+			path := args[1].String()
+			fsys := NewBridgeFS(proxy)
 
-	fsys := NewBridgeFS(proxy)
+			result, err := directory.LoadProject(fsys, path)
+			if err != nil {
+				resolve.Invoke(jsError(err))
+				return
+			}
 
-	result, err := directory.LoadProject(fsys, path)
-	if err != nil {
-		return jsError(err)
-	}
+			if diags := result.Diagnostics(); diags.HasErrors() {
+				printDiagnostics(fsys, path, os.Stderr, diags)
+				resolve.Invoke(js.Null())
+				return
+			}
 
-	diags := result.Diagnostics()
-	if diags.HasErrors() {
-		printDiagnostics(fsys, path, os.Stderr, diags)
-		return nil
-	}
+			compilation := result.Project().CurrentPackage().Compilation()
+			if diags := compilation.DiagnosticResult(); diags.HasErrors() {
+				printDiagnostics(fsys, path, os.Stderr, diags)
+				resolve.Invoke(js.Null())
+				return
+			}
 
-	project := result.Project()
-	pkg := project.CurrentPackage()
+			birPkgs := projects.NewBallerinaBackend(compilation).BIRPackages()
+			if len(birPkgs) == 0 {
+				resolve.Invoke(jsError(fmt.Errorf("BIR generation failed: no BIR package produced")))
+				return
+			}
 
-	compilation := pkg.Compilation()
-	diags = compilation.DiagnosticResult()
-	if diags.HasErrors() {
-		printDiagnostics(fsys, path, os.Stderr, diags)
-		return nil
-	}
+			rt := runtime.NewRuntime()
+			for _, birPkg := range birPkgs {
+				if err := rt.Interpret(*birPkg); err != nil {
+					resolve.Invoke(jsError(err))
+					return
+				}
+			}
 
-	backend := projects.NewBallerinaBackend(compilation)
-	birPkgs := backend.BIRPackages()
-
-	if len(birPkgs) == 0 {
-		return jsError(fmt.Errorf("BIR generation failed: no BIR package produced"))
-	}
-
-	rt := runtime.NewRuntime()
-
-	for _, birPkg := range birPkgs {
-		if err := rt.Interpret(*birPkg); err != nil {
-			return jsError(err)
-		}
-	}
-
-	return nil
+			resolve.Invoke(js.Null())
+		}()
+	})
 }
 
 func jsError(err error) map[string]any {
