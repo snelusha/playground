@@ -1,6 +1,11 @@
 import { basename, pathSegments } from "@/lib/fs/core/path-utils";
 
-import type { FS } from "@/lib/fs/core/fs.interface";
+import type {
+	DirEntry,
+	FS,
+	OpenResult,
+	StatResult,
+} from "@/lib/fs/core/fs.interface";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 export type FSNode = {
@@ -13,12 +18,7 @@ export type FSNode = {
 export class AbstractFS implements FS {
 	protected data: FSNode = { isDir: true, children: {} };
 
-	open(path: string): {
-		content: string;
-		size: number;
-		modTime: number;
-		isDir: boolean;
-	} | null {
+	async open(path: string): Promise<OpenResult | null> {
 		const node = this._getNode(path, false);
 		if (!node || node.isDir) return null;
 		const content = node.content ?? "";
@@ -30,12 +30,7 @@ export class AbstractFS implements FS {
 		};
 	}
 
-	stat(path: string): {
-		name: string;
-		size: number;
-		modTime: number;
-		isDir: boolean;
-	} | null {
+	async stat(path: string): Promise<StatResult | null> {
 		const node = this._getNode(path, false);
 		if (!node) return null;
 		return {
@@ -46,7 +41,7 @@ export class AbstractFS implements FS {
 		};
 	}
 
-	readDir(path: string): { name: string; isDir: boolean }[] | null {
+	async readDir(path: string): Promise<DirEntry[] | null> {
 		const node = this._getNode(path, false);
 		if (!node?.isDir || !node.children) return null;
 		return Object.entries(node.children).map(([name, child]) => ({
@@ -55,7 +50,7 @@ export class AbstractFS implements FS {
 		}));
 	}
 
-	writeFile(path: string, content: string): boolean {
+	async writeFile(path: string, content: string): Promise<boolean> {
 		try {
 			const { parent, name } = this._getParentAndName(path);
 			if (!parent) return false;
@@ -73,7 +68,7 @@ export class AbstractFS implements FS {
 		}
 	}
 
-	remove(path: string): boolean {
+	async remove(path: string): Promise<boolean> {
 		const parts = pathSegments(path);
 		if (parts.length === 0) return false;
 		const name = parts[parts.length - 1];
@@ -87,7 +82,7 @@ export class AbstractFS implements FS {
 		return true;
 	}
 
-	move(oldPath: string, newPath: string): boolean {
+	async move(oldPath: string, newPath: string): Promise<boolean> {
 		try {
 			if (oldPath === newPath) return true;
 			if (newPath.startsWith(`${oldPath}/`)) return false;
@@ -110,7 +105,7 @@ export class AbstractFS implements FS {
 		}
 	}
 
-	mkdirAll(path: string): boolean {
+	async mkdirAll(path: string): Promise<boolean> {
 		if (!path || path === "." || path === "/") return true;
 		const parts = pathSegments(path);
 		let node: FSNode = this.data;
@@ -131,8 +126,8 @@ export class AbstractFS implements FS {
 		return true;
 	}
 
-	transformToTree(path: string = ""): FileNode[] {
-		const entries = this.readDir(path);
+	async transformToTree(path: string = ""): Promise<FileNode[]> {
+		const entries = await this.readDir(path);
 		if (!entries) return [];
 		const result: FileNode[] = [];
 		for (const entry of entries) {
@@ -141,10 +136,10 @@ export class AbstractFS implements FS {
 				result.push({
 					kind: "dir",
 					name: entry.name,
-					children: this.transformToTree(fullPath),
+					children: await this.transformToTree(fullPath),
 				});
 			} else {
-				const f = this.open(fullPath);
+				const f = await this.open(fullPath);
 				result.push({
 					kind: "file",
 					name: entry.name,
@@ -195,10 +190,10 @@ export class AbstractFS implements FS {
 		for (const node of tree) {
 			const p = prefix ? `${prefix}/${node.name}` : node.name;
 			if (node.kind === "dir") {
-				this.mkdirAll(p);
+				void this.mkdirAll(p);
 				this._seed(node.children, p);
 			} else {
-				this.writeFile(p, node.content);
+				void this.writeFile(p, node.content);
 			}
 		}
 	}
