@@ -254,12 +254,18 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				if (!dirResult) return false;
 				const tomlPath = `${dirPath}/Ballerina.toml`;
 				const balPath = `${dirPath}/main.bal`;
-				const tomlResult = await _fs().writeFile(
-					tomlPath,
-					DEFAULT_BALLERINA_TOML.replace("{name}", name),
-				);
-				const balResult = await _fs().writeFile(balPath, DEFAULT_MAIN_BAL);
-				if (!tomlResult || !balResult) return false;
+				const [tomlResult, balResult] = await Promise.all([
+					_fs().writeFile(
+						tomlPath,
+						DEFAULT_BALLERINA_TOML.replace("{name}", name),
+					),
+					_fs().writeFile(balPath, DEFAULT_MAIN_BAL),
+				]);
+				if (!tomlResult || !balResult) {
+					await _fs().remove(dirPath);
+					await get()._syncTrees();
+					return false;
+				}
 				await get()._syncTrees();
 				await get().openFile(balPath);
 				return true;

@@ -1,5 +1,7 @@
 import * as React from "react";
 
+import { toast } from "sonner";
+
 import { EphemeralFS } from "@/lib/fs/ephemeral-fs";
 import { LocalStorageFS } from "@/lib/fs/local-storage-fs";
 import { LayeredFS } from "@/lib/fs/layered-fs";
@@ -27,7 +29,11 @@ export function FSProvider({ children }: React.PropsWithChildren) {
 	if (!fs.current) fs.current = createFS();
 
 	React.useEffect(() => {
-		if (fs.current) void init(fs.current);
+		if (fs.current) {
+			void init(fs.current).catch(() =>
+				toast.error("Failed to initialize file system"),
+			);
+		}
 	}, [init]);
 
 	return <FSContext.Provider value={fs.current}>{children}</FSContext.Provider>;

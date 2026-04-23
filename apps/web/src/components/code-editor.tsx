@@ -9,6 +9,8 @@ import { indentWithTab } from "@codemirror/commands";
 import { clike } from "@codemirror/legacy-modes/mode/clike";
 import { Vim, vim } from "@replit/codemirror-vim";
 
+import { toast } from "sonner";
+
 import { ShikiEditor } from "@/components/shiki-editor";
 
 import { useEditorStore } from "@/stores/editor-store";
@@ -200,7 +202,8 @@ export function CodeEditor({
 
 	React.useEffect(() => {
 		Vim.defineEx("write", "w", () => {
-			void saveFileRef.current?.();
+			const saveFile = saveFileRef.current;
+			if (saveFile) saveFile().catch(() => toast.error("Failed to save file"));
 		});
 	}, []);
 

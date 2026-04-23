@@ -42,8 +42,12 @@ func NewBridgeFS(proxy js.Value) *bridgeFS {
 }
 
 func (l *bridgeFS) Create(name string) (fs.File, error) {
-	if _, err := l.bridgeCall("writeFile", name, name, ""); err != nil {
+	res, err := l.bridgeCall("writeFile", name, name, "")
+	if err != nil {
 		return nil, err
+	}
+	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
+		return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrNotExist}
 	}
 	return l.Open(name)
 }
@@ -54,7 +58,7 @@ func (l *bridgeFS) MkdirAll(path string, perm fs.FileMode) error {
 		return err
 	}
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
-		return &fs.PathError{Op: "mkdirAll", Path: path, Err: fs.ErrNotExist}
+		return &fs.PathError{Op: "mkdirAll", Path: path, Err: fs.ErrInvalid}
 	}
 	return nil
 }
@@ -65,7 +69,7 @@ func (l *bridgeFS) Move(oldpath string, newpath string) error {
 		return err
 	}
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
-		return &fs.PathError{Op: "move", Path: oldpath, Err: fs.ErrNotExist}
+		return &fs.PathError{Op: "move", Path: oldpath, Err: fs.ErrInvalid}
 	}
 	return nil
 }
@@ -110,7 +114,7 @@ func (l *bridgeFS) Open(name string) (fs.File, error) {
 			name:    path.Base(name),
 			size:    int64(result.Get("size").Int()),
 			isDir:   false,
-			modTime: time.Unix(int64(result.Get("modTime").Int()), 0),
+			modTime: time.UnixMilli(int64(result.Get("modTime").Float())),
 		},
 		reader: bytes.NewReader([]byte(result.Get("content").String())),
 	}, nil
@@ -137,7 +141,7 @@ func (l *bridgeFS) openDir(name string, stat js.Value) (fs.File, error) {
 		info: &bridgeFileInfo{
 			name:    path.Base(name),
 			isDir:   true,
-			modTime: time.Unix(int64(stat.Get("modTime").Int()), 0),
+			modTime: time.UnixMilli(int64(stat.Get("modTime").Float())),
 		},
 		entries: entries,
 	}, nil
@@ -149,7 +153,7 @@ func (l *bridgeFS) WriteFile(name string, data []byte, perm fs.FileMode) error {
 		return err
 	}
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
-		return &fs.PathError{Op: "writeFile", Path: name, Err: fs.ErrNotExist}
+		return &fs.PathError{Op: "writeFile", Path: name, Err: fs.ErrInvalid}
 	}
 	return nil
 }

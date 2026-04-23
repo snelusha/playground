@@ -94,25 +94,61 @@ export class LayeredFS implements FS {
 		newTarget: FS,
 		oldPath: string,
 		newPath: string,
+		createdPaths: string[] = [],
 	): Promise<boolean> {
 		const info = await oldTarget.stat(oldPath);
 		if (!info) return false;
+
 		if (info.isDir) {
 			if (!(await newTarget.mkdirAll(newPath))) return false;
+			createdPaths.push(newPath);
+
 			const entries = await oldTarget.readDir(oldPath);
-			if (!entries) return false;
+			if (!entries) {
+				await this._rollback(newTarget, createdPaths);
+				return false;
+			}
+
+			let success = true;
 			for (const entry of entries) {
-				const src = `${oldPath}/${entry.name}`;
-				const dst = `${newPath}/${entry.name}`;
-				if (!(await this._moveToTarget(oldTarget, newTarget, src, dst)))
-					return false;
+				const src = join(oldPath, entry.name);
+				const dst = join(newPath, entry.name);
+				if (
+					!(await this._moveToTarget(
+						oldTarget,
+						newTarget,
+						src,
+						dst,
+						createdPaths,
+					))
+				) {
+					success = false;
+					break;
+				}
+			}
+
+			if (!success) {
+				await this._rollback(newTarget, createdPaths);
+				return false;
 			}
 		} else {
 			const file = await oldTarget.open(oldPath);
-			if (!file || !(await newTarget.writeFile(newPath, file.content)))
+			if (!file) return false;
+
+			if (!(await newTarget.writeFile(newPath, file.content))) {
+				await this._rollback(newTarget, createdPaths);
 				return false;
+			}
+			createdPaths.push(newPath);
 		}
+
 		return oldTarget.remove(oldPath);
+	}
+
+	private async _rollback(target: FS, createdPaths: string[]): Promise<void> {
+		for (const p of [...createdPaths].reverse()) {
+			await target.remove(p).catch(() => {});
+		}
 	}
 
 	private _namespace(path: string): Namespace | null {
