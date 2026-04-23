@@ -10,7 +10,10 @@ import { LOCAL_ROOT, TEMP_ROOT } from "@/lib/fs/fs-roots";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 import type { FS } from "@/lib/fs/core/fs.interface";
 
-export function toFileNode(fs: FS, path: string): FileNode | null {
+export async function toFileNode(
+	fs: FS,
+	path: string,
+): Promise<FileNode | null> {
 	if (isRootPath(path) || path === TEMP_ROOT || path === LOCAL_ROOT)
 		return null;
 
@@ -18,21 +21,24 @@ export function toFileNode(fs: FS, path: string): FileNode | null {
 		if (seg === ".." || seg === ".") return null;
 	}
 
-	const info = fs.stat(path);
+	const info = await fs.stat(path);
 	if (!info) return null;
 
 	const name = basename(path);
 	if (!name) return null;
 
 	if (!info.isDir) {
-		const file = fs.open(path);
+		const file = await fs.open(path);
 		if (!file) return null;
 		return { kind: "file", name, content: file.content };
 	}
 
-	const children = (fs.readDir(path) ?? [])
-		.map((entry) => toFileNode(fs, `${path}/${entry.name}`))
-		.filter((n): n is FileNode => n !== null);
+	const entries = (await fs.readDir(path)) ?? [];
+	const children = (
+		await Promise.all(
+			entries.map((entry) => toFileNode(fs, `${path}/${entry.name}`)),
+		)
+	).filter((n): n is FileNode => n !== null);
 
 	return { kind: "dir", name, children };
 }
