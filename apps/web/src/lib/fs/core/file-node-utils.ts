@@ -5,7 +5,7 @@ import {
 	join,
 	pathSegments,
 } from "@/lib/fs/core/path-utils";
-import { LOCAL_ROOT, TEMP_ROOT } from "@/lib/fs/fs-roots";
+import { TEMP_ROOT } from "@/lib/fs/fs-roots";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 import type { FS } from "@/lib/fs/core/fs.interface";
@@ -14,8 +14,7 @@ export async function toFileNode(
 	fs: FS,
 	path: string,
 ): Promise<FileNode | null> {
-	if (isRootPath(path) || path === TEMP_ROOT || path === LOCAL_ROOT)
-		return null;
+	if (isRootPath(path) || path === TEMP_ROOT) return null;
 
 	for (const seg of pathSegments(path)) {
 		if (seg === ".." || seg === ".") return null;

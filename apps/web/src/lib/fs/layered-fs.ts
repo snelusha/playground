@@ -6,7 +6,7 @@ import {
 	join,
 } from "@/lib/fs/core/path-utils";
 
-import { LOCAL_ROOT, SHARED_ROOT, TEMP_ROOT } from "@/lib/fs/fs-roots";
+import { SHARED_ROOT, TEMP_ROOT } from "@/lib/fs/fs-roots";
 
 import type { FS } from "@/lib/fs/core/fs.interface";
 import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
@@ -36,11 +36,17 @@ export class LayeredFS implements FS {
 	}
 
 	async readDir(path: string) {
-		if (isRootPath(path))
+		if (isRootPath(path)) {
+			const remoteRootEntries = await this.local.readDir("/");
+			const filteredRemoteEntries =
+				remoteRootEntries?.filter(
+					(entry) => entry.name !== TEMP_ROOT.slice(1),
+				) ?? [];
 			return [
 				{ name: TEMP_ROOT.slice(1), isDir: true },
-				{ name: LOCAL_ROOT.slice(1), isDir: true },
+				...filteredRemoteEntries,
 			];
+		}
 		return this._withTargetOrNull(path, (fs) => fs.readDir(path));
 	}
 
@@ -69,7 +75,7 @@ export class LayeredFS implements FS {
 	}
 
 	async localTree() {
-		return this._transformToTree(this.local, LOCAL_ROOT);
+		return this._transformToTree(this.local, "/");
 	}
 
 	async graftSharedTree(
@@ -152,7 +158,7 @@ export class LayeredFS implements FS {
 
 	private _namespace(path: string): Namespace | null {
 		if (isUnder(path, TEMP_ROOT)) return "temp";
-		if (isUnder(path, LOCAL_ROOT)) return "local";
+		if (path.startsWith("/")) return "local";
 		return null;
 	}
 

@@ -63,8 +63,6 @@ import {
 } from "@/lib/fs/core/path-utils";
 import { cn } from "@/lib/utils";
 
-import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
-
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 type FileTreeNodeProps = {
@@ -457,7 +455,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 									onClick={() =>
 										setFileOperationDialog({
 											type: "new-package",
-											path: "/local",
+											path: "",
 										})
 									}
 								>
@@ -478,7 +476,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 								/>
 							))}
 							{localTree.map((node) => {
-								const path = `${LOCAL_ROOT}/${node.name}`;
+								const path = `/${node.name}`;
 								return (
 									<FileTreeNode
 										key={`local:${node.name}`}

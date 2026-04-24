@@ -8,12 +8,32 @@ import {
 	useFileTreeActions,
 	useFileTreeStore,
 	useActiveFilePath,
+	useLocalTree,
 } from "@/stores/file-tree-store";
 
 import { useShare } from "@/hooks/use-share";
 
 const DEFAULT_FILE = "/tmp/examples/01-response-aggregator/main.bal";
 const DEFAULT_SPLAT = DEFAULT_FILE.replace(/^\/+/, "");
+
+function firstLocalFilePath(
+	nodes: Array<{ kind: string; name: string; children?: unknown }>,
+): string | null {
+	for (const node of nodes) {
+		if (node.kind === "file") return `/${node.name}`;
+		if (node.kind === "dir" && Array.isArray(node.children)) {
+			const nested = firstLocalFilePath(
+				node.children as Array<{
+					kind: string;
+					name: string;
+					children?: unknown;
+				}>,
+			);
+			if (nested) return `/${node.name}${nested}`;
+		}
+	}
+	return null;
+}
 
 function normalizeSplat(splat: string | undefined): string | null {
 	const trimmed = splat?.trim();
@@ -37,6 +57,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const { isProcessingShare, shareNotice } = useShare();
 
 	const ready = useFileTreeStore((s) => s.ready);
+	const localTree = useLocalTree();
 	const activeFilePath = useActiveFilePath();
 	const { openFile, existsFile } = useFileTreeActions();
 
@@ -70,11 +91,13 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 				return;
 			}
 			if (!activePath && !cancelled) {
-				await openFile(DEFAULT_FILE);
+				const remoteDefault = firstLocalFilePath(localTree);
+				const fallback = remoteDefault ?? DEFAULT_FILE;
+				await openFile(fallback);
 				if (cancelled) return;
 				navigate({
 					to: "/$",
-					params: { _splat: DEFAULT_SPLAT },
+					params: { _splat: splatFromFilePath(fallback) },
 					replace: true,
 				});
 			}
@@ -90,6 +113,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		filePathFromUrl,
 		existsFile,
 		openFile,
+		localTree,
 		navigate,
 	]);
 

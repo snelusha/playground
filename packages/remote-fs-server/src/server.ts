@@ -9,13 +9,11 @@ import {
 
 const DEFAULT_PORT = 8787;
 const DEFAULT_HOST = "127.0.0.1";
-const DEFAULT_ROOT = ".remote-fs-data";
 const MAX_PAYLOAD = 8 * 1024 * 1024;
 
 const port = Number(process.env.REMOTE_FS_PORT ?? DEFAULT_PORT);
 const hostname = process.env.REMOTE_FS_HOST ?? DEFAULT_HOST;
-const rootDir = process.env.REMOTE_FS_ROOT ?? DEFAULT_ROOT;
-const resolvedRoot = path.resolve(process.cwd(), rootDir);
+const resolvedRoot = path.resolve(process.env.REMOTE_FS_ROOT ?? process.cwd());
 
 const adapter = new HostFsAdapter(resolvedRoot);
 
