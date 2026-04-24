@@ -1,0 +1,10 @@
+{
+	"name": "@playground/remote-fs-server",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun run src/server.ts",
+		"build": "bun build src/server.ts --target bun --outfile dist/server.js",
+		"clean": "git clean -xdf .turbo dist"
+	}
+}

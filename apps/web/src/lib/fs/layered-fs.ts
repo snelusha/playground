@@ -10,7 +10,6 @@ import { LOCAL_ROOT, SHARED_ROOT, TEMP_ROOT } from "@/lib/fs/fs-roots";
 
 import type { FS } from "@/lib/fs/core/fs.interface";
 import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
-import type { LocalStorageFS } from "@/lib/fs/local-storage-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 export type Namespace = "temp" | "local";
@@ -18,7 +17,7 @@ export type Namespace = "temp" | "local";
 export class LayeredFS implements FS {
 	constructor(
 		private readonly temp: EphemeralFS,
-		private readonly local: LocalStorageFS,
+		private readonly local: FS,
 	) {}
 
 	async open(path: string) {
@@ -70,7 +69,7 @@ export class LayeredFS implements FS {
 	}
 
 	async localTree() {
-		return this.local.transformToTree("/local");
+		return this._transformToTree(this.local, LOCAL_ROOT);
 	}
 
 	async graftSharedTree(
@@ -180,5 +179,34 @@ export class LayeredFS implements FS {
 		const target = this._target(path);
 		if (!target) return false;
 		return await fn(target);
+	}
+
+	private async _transformToTree(fs: FS, path: string): Promise<FileNode[]> {
+		const entries = await fs.readDir(path);
+		if (!entries) return [];
+
+		const nodes: FileNode[] = [];
+		for (const entry of entries) {
+			const fullPath = join(path, entry.name);
+			if (entry.isDir) {
+				nodes.push({
+					kind: "dir",
+					name: entry.name,
+					children: await this._transformToTree(fs, fullPath),
+				});
+			} else {
+				const file = await fs.open(fullPath);
+				nodes.push({
+					kind: "file",
+					name: entry.name,
+					content: file?.content ?? "",
+				});
+			}
+		}
+
+		return nodes.sort((a, b) => {
+			if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1;
+			return a.name.localeCompare(b.name);
+		});
 	}
 }
