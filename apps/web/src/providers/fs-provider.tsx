@@ -17,7 +17,7 @@ import type { FileNode } from "@/lib/fs/core/file-node.types";
 function createFS(): LayeredFS {
 	const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
 	const defaultRemoteHost = import.meta.env.DEV
-		? `${wsProtocol}://${window.location.hostname}:8787/fs`
+		? `${wsProtocol}://${window.location.hostname}:6969/fs`
 		: `${wsProtocol}://${window.location.host}/fs`;
 	const remoteFsUrl =
 		import.meta.env.VITE_REMOTE_FS_WS_URL ?? defaultRemoteHost;

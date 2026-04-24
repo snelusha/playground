@@ -166,7 +166,7 @@ function useFileTreeDialog() {
 	}, [fileOperationDialog]);
 
 	const targetPath = React.useMemo(() => {
-		if (!path || !type) return null;
+		if (path == null || !type) return null;
 		if (type === "fork-file" || type === "fork-folder")
 			return getForkTargetPath(path, name);
 		return getTargetPath(type, path, name);
@@ -207,7 +207,7 @@ function useFileTreeDialog() {
 
 	const handleSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
 		e.preventDefault();
-		if (!fileOperationDialog || !type || !path) return;
+		if (!fileOperationDialog || !type || path == null) return;
 		if (isSubmitting) return;
 		setIsSubmitting(true);
 
