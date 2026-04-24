@@ -12,15 +12,18 @@ import {
 } from "@/stores/file-tree-store";
 
 import { useShare } from "@/hooks/use-share";
+import { IS_REMOTE_FS } from "@/lib/fs/backend-mode";
+import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
 
 const DEFAULT_FILE = "/tmp/examples/01-response-aggregator/main.bal";
 const DEFAULT_SPLAT = DEFAULT_FILE.replace(/^\/+/, "");
 
 function firstLocalFilePath(
 	nodes: Array<{ kind: string; name: string; children?: unknown }>,
+	parentPath: string,
 ): string | null {
 	for (const node of nodes) {
-		if (node.kind === "file") return `/${node.name}`;
+		if (node.kind === "file") return `${parentPath}/${node.name}`;
 		if (node.kind === "dir" && Array.isArray(node.children)) {
 			const nested = firstLocalFilePath(
 				node.children as Array<{
@@ -28,8 +31,9 @@ function firstLocalFilePath(
 					name: string;
 					children?: unknown;
 				}>,
+				`${parentPath}/${node.name}`,
 			);
-			if (nested) return `/${node.name}${nested}`;
+			if (nested) return nested;
 		}
 	}
 	return null;
@@ -91,8 +95,11 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 				return;
 			}
 			if (!activePath && !cancelled) {
-				const remoteDefault = firstLocalFilePath(localTree);
-				const fallback = remoteDefault ?? DEFAULT_FILE;
+				const localRoot = IS_REMOTE_FS ? "" : LOCAL_ROOT;
+				const localDefault = firstLocalFilePath(localTree, localRoot);
+				const fallback = IS_REMOTE_FS
+					? (localDefault ?? DEFAULT_FILE)
+					: DEFAULT_FILE;
 				await openFile(fallback);
 				if (cancelled) return;
 				navigate({

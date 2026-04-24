@@ -7,15 +7,47 @@ import {
 	type RemoteFsResponse,
 } from "./protocol";
 
-const DEFAULT_PORT = 8787;
+const DEFAULT_PORT = 6969;
 const DEFAULT_HOST = "127.0.0.1";
 const MAX_PAYLOAD = 8 * 1024 * 1024;
 
 const port = Number(process.env.REMOTE_FS_PORT ?? DEFAULT_PORT);
 const hostname = process.env.REMOTE_FS_HOST ?? DEFAULT_HOST;
 const resolvedRoot = path.resolve(process.env.REMOTE_FS_ROOT ?? process.cwd());
+const webDistDir = path.resolve(
+	process.env.WEB_DIST_DIR ?? path.join(process.cwd(), "dist/web"),
+);
 
 const adapter = new HostFsAdapter(resolvedRoot);
+
+function safeAssetPath(pathname: string): string {
+	const normalized = path.posix.normalize(pathname);
+	const relative = normalized.replace(/^\/+/, "");
+	return path.resolve(webDistDir, relative);
+}
+
+async function serveWebAsset(pathname: string): Promise<Response> {
+	const targetPath = safeAssetPath(pathname);
+	if (
+		!targetPath.startsWith(`${webDistDir}${path.sep}`) &&
+		targetPath !== webDistDir
+	) {
+		return new Response("Not found", { status: 404 });
+	}
+
+	const file = Bun.file(targetPath);
+	if (await file.exists()) {
+		return new Response(file);
+	}
+
+	const indexFile = Bun.file(path.join(webDistDir, "index.html"));
+	if (await indexFile.exists()) {
+		return new Response(indexFile);
+	}
+	return new Response("Web build not found. Run `bun run build` first.", {
+		status: 503,
+	});
+}
 
 function parseRequest(
 	message: string | Buffer | Uint8Array,
@@ -40,9 +72,10 @@ function send(
 const server = Bun.serve({
 	hostname,
 	port,
-	fetch(req, bunServer) {
-		if (new URL(req.url).pathname !== "/fs") {
-			return new Response("Not found", { status: 404 });
+	async fetch(req, bunServer) {
+		const { pathname } = new URL(req.url);
+		if (pathname !== "/fs") {
+			return await serveWebAsset(pathname);
 		}
 		const upgraded = bunServer.upgrade(req);
 		return upgraded
@@ -79,5 +112,5 @@ const server = Bun.serve({
 });
 
 console.info(
-	`[remote-fs] listening ws://${server.hostname}:${server.port}/fs root=${resolvedRoot}`,
+	`[remote-fs] listening ws://${server.hostname}:${server.port}/fs root=${resolvedRoot} web=${webDistDir}`,
 );

@@ -4,7 +4,10 @@
 	"type": "module",
 	"scripts": {
 		"dev": "bun run src/server.ts",
-		"build": "bun build src/server.ts --target bun --outfile dist/server.js",
+		"start": "bun run dist/server.js",
+		"build:server": "bun build src/server.ts --target bun --outfile dist/server.js",
+		"build:web": "bun run --cwd ../../apps/web build && mkdir -p dist && rm -rf dist/web && cp -R ../../apps/web/dist dist/web",
+		"build": "bun run build:server && bun run build:web",
 		"clean": "git clean -xdf .turbo dist"
 	}
 }

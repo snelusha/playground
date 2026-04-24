@@ -4,7 +4,9 @@ import { toast } from "sonner";
 
 import { EphemeralFS } from "@/lib/fs/ephemeral-fs";
 import { LayeredFS } from "@/lib/fs/layered-fs";
+import { LocalStorageFS } from "@/lib/fs/local-storage-fs";
 import { RemoteFS } from "@/lib/fs/remote/remote-fs";
+import { IS_REMOTE_FS } from "@/lib/fs/backend-mode";
 
 import { useFileTreeStore } from "@/stores/file-tree-store";
 
@@ -14,13 +16,23 @@ import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 function createFS(): LayeredFS {
 	const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+	const defaultRemoteHost = import.meta.env.DEV
+		? `${wsProtocol}://${window.location.hostname}:8787/fs`
+		: `${wsProtocol}://${window.location.host}/fs`;
 	const remoteFsUrl =
-		import.meta.env.VITE_REMOTE_FS_WS_URL ??
-		`${wsProtocol}://${window.location.hostname}:8787/fs`;
+		import.meta.env.VITE_REMOTE_FS_WS_URL ?? defaultRemoteHost;
+
+	if (IS_REMOTE_FS) {
+		return new LayeredFS(
+			new EphemeralFS(EXAMPLES as FileNode[]),
+			new RemoteFS({ url: remoteFsUrl }),
+			{ localAtRoot: true },
+		);
+	}
 
 	return new LayeredFS(
 		new EphemeralFS(EXAMPLES as FileNode[]),
-		new RemoteFS({ url: remoteFsUrl }),
+		new LocalStorageFS(),
 	);
 }
 

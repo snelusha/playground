@@ -6,7 +6,7 @@ import {
 	join,
 } from "@/lib/fs/core/path-utils";
 
-import { SHARED_ROOT, TEMP_ROOT } from "@/lib/fs/fs-roots";
+import { LOCAL_ROOT, SHARED_ROOT, TEMP_ROOT } from "@/lib/fs/fs-roots";
 
 import type { FS } from "@/lib/fs/core/fs.interface";
 import type { EphemeralFS } from "@/lib/fs/ephemeral-fs";
@@ -14,11 +14,20 @@ import type { FileNode } from "@/lib/fs/core/file-node.types";
 
 export type Namespace = "temp" | "local";
 
+type LayeredFsOptions = {
+	localAtRoot?: boolean;
+};
+
 export class LayeredFS implements FS {
+	private readonly localAtRoot: boolean;
+
 	constructor(
 		private readonly temp: EphemeralFS,
 		private readonly local: FS,
-	) {}
+		options: LayeredFsOptions = {},
+	) {
+		this.localAtRoot = options.localAtRoot ?? false;
+	}
 
 	async open(path: string) {
 		return this._withTargetOrNull(path, (fs) => fs.open(path));
@@ -37,14 +46,20 @@ export class LayeredFS implements FS {
 
 	async readDir(path: string) {
 		if (isRootPath(path)) {
-			const remoteRootEntries = await this.local.readDir("/");
-			const filteredRemoteEntries =
-				remoteRootEntries?.filter(
+			if (!this.localAtRoot) {
+				return [
+					{ name: TEMP_ROOT.slice(1), isDir: true },
+					{ name: LOCAL_ROOT.slice(1), isDir: true },
+				];
+			}
+			const localRootEntries = await this.local.readDir("/");
+			const filteredRootEntries =
+				localRootEntries?.filter(
 					(entry) => entry.name !== TEMP_ROOT.slice(1),
 				) ?? [];
 			return [
 				{ name: TEMP_ROOT.slice(1), isDir: true },
-				...filteredRemoteEntries,
+				...filteredRootEntries,
 			];
 		}
 		return this._withTargetOrNull(path, (fs) => fs.readDir(path));
@@ -75,7 +90,10 @@ export class LayeredFS implements FS {
 	}
 
 	async localTree() {
-		return this._transformToTree(this.local, "/");
+		return this._transformToTree(
+			this.local,
+			this.localAtRoot ? "/" : LOCAL_ROOT,
+		);
 	}
 
 	async graftSharedTree(
@@ -158,7 +176,8 @@ export class LayeredFS implements FS {
 
 	private _namespace(path: string): Namespace | null {
 		if (isUnder(path, TEMP_ROOT)) return "temp";
-		if (path.startsWith("/")) return "local";
+		if (this.localAtRoot ? path.startsWith("/") : isUnder(path, LOCAL_ROOT))
+			return "local";
 		return null;
 	}
 

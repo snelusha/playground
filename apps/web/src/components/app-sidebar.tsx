@@ -61,6 +61,8 @@ import {
 	isSharedPath,
 	sharedToLocalDestination,
 } from "@/lib/fs/core/path-utils";
+import { IS_REMOTE_FS } from "@/lib/fs/backend-mode";
+import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
 import { cn } from "@/lib/utils";
 
 import type { FileNode } from "@/lib/fs/core/file-node.types";
@@ -455,7 +457,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 									onClick={() =>
 										setFileOperationDialog({
 											type: "new-package",
-											path: "",
+											path: IS_REMOTE_FS ? "" : LOCAL_ROOT,
 										})
 									}
 								>
@@ -476,7 +478,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 								/>
 							))}
 							{localTree.map((node) => {
-								const path = `/${node.name}`;
+								const path = IS_REMOTE_FS
+									? `/${node.name}`
+									: `${LOCAL_ROOT}/${node.name}`;
 								return (
 									<FileTreeNode
 										key={`local:${node.name}`}

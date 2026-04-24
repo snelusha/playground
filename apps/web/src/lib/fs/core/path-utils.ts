@@ -1,4 +1,5 @@
-import { EXAMPLES_ROOT, SHARED_ROOT } from "@/lib/fs/fs-roots";
+import { EXAMPLES_ROOT, LOCAL_ROOT, SHARED_ROOT } from "@/lib/fs/fs-roots";
+import { IS_REMOTE_FS } from "@/lib/fs/backend-mode";
 
 export function pathSegments(path: string): string[] {
 	return path.split("/").filter(Boolean);
@@ -74,7 +75,7 @@ export function isShareablePath(path: string): boolean {
 export function sharedToLocalDestination(sharedPath: string): string | null {
 	const rel = getRelativePath(SHARED_ROOT, sharedPath);
 	if (rel === null) return null;
-	return join("/", rel);
+	return join(IS_REMOTE_FS ? "/" : LOCAL_ROOT, rel);
 }
 
 export function getForkTargetPath(
@@ -90,7 +91,7 @@ export function getForkTargetPath(
 	const parts = pathSegments(rel);
 	if (parts.length === 0) return null;
 	parts[parts.length - 1] = trimmed;
-	return join("/", parts.join("/"));
+	return join(IS_REMOTE_FS ? "/" : LOCAL_ROOT, parts.join("/"));
 }
 
 export function ancestorDirPathsForFile(filePath: string): string[] {
