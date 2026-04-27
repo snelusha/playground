@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
+import { EditorSettingsDialog } from "@/components/editor-settings-dialog";
 import { VersionCard } from "@/components/version-card";
 import { ANSI } from "@/components/ansi";
 
@@ -191,6 +192,7 @@ function EditorHeader() {
 			</div>
 			<div className="flex items-center gap-4">
 				<VersionCard />
+				<EditorSettingsDialog />
 				<a
 					className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
 					href="https://github.com/ballerina-platform/playground"
