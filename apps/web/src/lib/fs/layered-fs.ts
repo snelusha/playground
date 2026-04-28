@@ -73,6 +73,10 @@ export class LayeredFS implements FS {
 		return this.local.transformToTree("/local");
 	}
 
+	clearLocal() {
+		this.local.clear();
+	}
+
 	graftSharedTree(
 		root: FileNode,
 		openRelativePath?: string | null,

@@ -15,10 +15,11 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import { useEditorStore } from "@/stores/editor-store";
-
-const LOCAL_FS_STORAGE_KEY = "bfs";
+import { useFileTreeStore } from "@/stores/file-tree-store";
+import { useFS } from "@/providers/fs-provider";
 
 export function EditorSettingsDialog() {
+	const fs = useFS();
 	const editorMode = useEditorStore((s) => s.editorMode);
 	const setEditorMode = useEditorStore((s) => s.setEditorMode);
 
@@ -32,8 +33,15 @@ export function EditorSettingsDialog() {
 	};
 
 	const handleConfirmClear = () => {
-		localStorage.removeItem(LOCAL_FS_STORAGE_KEY);
-		window.location.reload();
+		fs.clearLocal();
+		useFileTreeStore.setState((state) => ({
+			localTree: fs.localTree(),
+			activeFile: state.activeFile?.path.startsWith("/local/")
+				? null
+				: state.activeFile,
+		}));
+		setConfirmOpen(false);
+		setSettingsOpen(false);
 	};
 
 	return (
