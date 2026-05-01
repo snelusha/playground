@@ -23,6 +23,7 @@ import (
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
+	"io"
 	"os"
 	"syscall/js"
 )
@@ -46,6 +47,20 @@ func run(this js.Value, args []js.Value) any {
 
 	proxy := args[0]
 	path := args[1].String()
+	stdoutWriter := os.Stdout.Write
+	stderrWriter := os.Stderr.Write
+	diagnosticWriter := io.Writer(os.Stderr)
+
+	if len(args) >= 3 && args[2].Type() == js.TypeObject {
+		ioHandlers := args[2]
+		if stdoutFn := ioHandlers.Get("stdout"); stdoutFn.Type() == js.TypeFunction {
+			stdoutWriter = jsValueWriter(stdoutFn)
+		}
+		if stderrFn := ioHandlers.Get("stderr"); stderrFn.Type() == js.TypeFunction {
+			stderrWriter = jsValueWriter(stderrFn)
+			diagnosticWriter = writeFunc(stderrWriter)
+		}
+	}
 
 	fsys := NewLocalStorageFS(proxy)
 
@@ -56,7 +71,7 @@ func run(this js.Value, args []js.Value) any {
 
 	diags := result.Diagnostics()
 	if diags.HasErrors() {
-		printDiagnostics(fsys, path, os.Stderr, diags, diagnostics.NewDiagnosticEnv())
+		printDiagnostics(fsys, path, diagnosticWriter, diags, diagnostics.NewDiagnosticEnv())
 		return nil
 	}
 
@@ -66,7 +81,7 @@ func run(this js.Value, args []js.Value) any {
 	compilation := pkg.Compilation()
 	diags = compilation.DiagnosticResult()
 	if diags.HasErrors() {
-		printDiagnostics(fsys, path, os.Stderr, diags, compilation.DiagnosticEnv())
+		printDiagnostics(fsys, path, diagnosticWriter, diags, compilation.DiagnosticEnv())
 		return nil
 	}
 
@@ -81,10 +96,10 @@ func run(this js.Value, args []js.Value) any {
 	wasmPal := pal.Platform{
 		IO: pal.IO{
 			Stdout: func(p []byte) (n int, err error) {
-				return os.Stdout.Write(p)
+				return stdoutWriter(p)
 			},
 			Stderr: func(p []byte) (n int, err error) {
-				return os.Stderr.Write(p)
+				return stderrWriter(p)
 			},
 		},
 	}
@@ -103,5 +118,18 @@ func run(this js.Value, args []js.Value) any {
 func jsError(err error) map[string]any {
 	return map[string]any{
 		"error": err.Error(),
+	}
+}
+
+type writeFunc func([]byte) (int, error)
+
+func (w writeFunc) Write(p []byte) (int, error) {
+	return w(p)
+}
+
+func jsValueWriter(fn js.Value) func([]byte) (int, error) {
+	return func(p []byte) (int, error) {
+		fn.Invoke(string(p))
+		return len(p), nil
 	}
 }

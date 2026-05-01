@@ -3,6 +3,7 @@ import "@/wasm_exec";
 import * as React from "react";
 
 import { useFS } from "@/providers/fs-provider";
+import type { RunIOHandlers } from "@/types/wasm-types";
 
 export function useBallerina() {
 	const fs = useFS();
@@ -45,12 +46,15 @@ export function useBallerina() {
 		};
 	}, []);
 
-	function run(path: string): { error?: string } | null {
+	function run(
+		path: string,
+		ioHandlers?: RunIOHandlers,
+	): { error?: string } | null {
 		if (typeof window.run !== "function")
 			return { error: "Ballerina runtime is not ready" };
 		if (!fs) return { error: "Virtual file system is not available" };
 
-		const result = window.run(fs, path);
+		const result = window.run(fs, path, ioHandlers);
 		if (result && typeof result === "object" && "error" in result) {
 			return result as { error?: string };
 		}

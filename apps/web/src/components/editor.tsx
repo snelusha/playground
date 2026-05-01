@@ -220,25 +220,21 @@ function EditorContent() {
 	const handleRun = React.useCallback(() => {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
-		const oldConsole = console.log;
 		let captured = "";
-
-		console.log = (...args) => {
-			captured += `${args.join(" ")}\n`;
-			oldConsole.apply(console, args);
+		const appendChunk = (chunk: string) => {
+			captured += chunk;
 		};
 
-		try {
-			// FIXME: We should automatically save files on change.
-			saveFile();
+		// FIXME: We should automatically save files on change.
+		saveFile();
 
-			const target = getBallerinaExecutionTarget(fs, activeFile.path);
-			const runResult = run(target);
-			if (runResult?.error) {
-				captured += `${runResult.error}\n`;
-			}
-		} finally {
-			console.log = oldConsole;
+		const target = getBallerinaExecutionTarget(fs, activeFile.path);
+		const runResult = run(target, {
+			stdout: appendChunk,
+			stderr: appendChunk,
+		});
+		if (runResult?.error) {
+			captured += `${runResult.error}\n`;
 		}
 
 		openOutputWith(captured);
