@@ -7,7 +7,7 @@ export interface RunIOHandlers {
 
 declare global {
 	export interface Window {
-		Go: any; 
+		Go: any;
 		run(
 			proxy: FS,
 			path: string,

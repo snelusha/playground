@@ -47,20 +47,7 @@ func run(this js.Value, args []js.Value) any {
 
 	proxy := args[0]
 	path := args[1].String()
-	stdoutWriter := os.Stdout.Write
-	stderrWriter := os.Stderr.Write
-	diagnosticWriter := io.Writer(os.Stderr)
-
-	if len(args) >= 3 && args[2].Type() == js.TypeObject {
-		ioHandlers := args[2]
-		if stdoutFn := ioHandlers.Get("stdout"); stdoutFn.Type() == js.TypeFunction {
-			stdoutWriter = jsValueWriter(stdoutFn)
-		}
-		if stderrFn := ioHandlers.Get("stderr"); stderrFn.Type() == js.TypeFunction {
-			stderrWriter = jsValueWriter(stderrFn)
-			diagnosticWriter = writeFunc(stderrWriter)
-		}
-	}
+	stdoutWriter, stderrWriter, diagnosticWriter := resolveIOWriters(args)
 
 	fsys := NewLocalStorageFS(proxy)
 
@@ -93,16 +80,7 @@ func run(this js.Value, args []js.Value) any {
 	}
 
 	// FIXME: This is a copy of nativePal and should be replaced with a proper implementation.
-	wasmPal := pal.Platform{
-		IO: pal.IO{
-			Stdout: func(p []byte) (n int, err error) {
-				return stdoutWriter(p)
-			},
-			Stderr: func(p []byte) (n int, err error) {
-				return stderrWriter(p)
-			},
-		},
-	}
+	wasmPal := newWasmPal(stdoutWriter, stderrWriter)
 
 	rt := runtime.NewRuntime(wasmPal)
 
@@ -131,5 +109,34 @@ func jsValueWriter(fn js.Value) func([]byte) (int, error) {
 	return func(p []byte) (int, error) {
 		fn.Invoke(string(p))
 		return len(p), nil
+	}
+}
+
+func resolveIOWriters(args []js.Value) (stdout writeFunc, stderr writeFunc, diagnosticsWriter io.Writer) {
+	stdout = writeFunc(os.Stdout.Write)
+	stderr = writeFunc(os.Stderr.Write)
+	diagnosticsWriter = io.Writer(os.Stderr)
+
+	if len(args) < 3 || args[2].Type() != js.TypeObject {
+		return stdout, stderr, diagnosticsWriter
+	}
+
+	ioHandlers := args[2]
+	if stdoutFn := ioHandlers.Get("stdout"); stdoutFn.Type() == js.TypeFunction {
+		stdout = writeFunc(jsValueWriter(stdoutFn))
+	}
+	if stderrFn := ioHandlers.Get("stderr"); stderrFn.Type() == js.TypeFunction {
+		stderr = writeFunc(jsValueWriter(stderrFn))
+		diagnosticsWriter = stderr
+	}
+	return stdout, stderr, diagnosticsWriter
+}
+
+func newWasmPal(stdout writeFunc, stderr writeFunc) pal.Platform {
+	return pal.Platform{
+		IO: pal.IO{
+			Stdout: stdout,
+			Stderr: stderr,
+		},
 	}
 }
