@@ -18,9 +18,10 @@ package main
 
 import (
 	_ "ballerina-lang-go/lib/rt"
+	"ballerina-lang-go/pal"
 	"ballerina-lang-go/projects"
-	"ballerina-lang-go/projects/directory"
 	"ballerina-lang-go/runtime"
+	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
 	"os"
 	"syscall/js"
@@ -51,21 +52,21 @@ func run(_ js.Value, args []js.Value) any {
 			path := args[1].String()
 			fsys := NewBridgeFS(proxy)
 
-			result, err := directory.LoadProject(fsys, path)
+			result, err := projects.Load(fsys, path)
 			if err != nil {
 				resolve.Invoke(jsError(err))
 				return
 			}
 
 			if diags := result.Diagnostics(); diags.HasErrors() {
-				printDiagnostics(fsys, path, os.Stderr, diags)
+				printDiagnostics(fsys, path, os.Stderr, diags, diagnostics.NewDiagnosticEnv())
 				resolve.Invoke(js.Null())
 				return
 			}
 
 			compilation := result.Project().CurrentPackage().Compilation()
 			if diags := compilation.DiagnosticResult(); diags.HasErrors() {
-				printDiagnostics(fsys, path, os.Stderr, diags)
+				printDiagnostics(fsys, path, os.Stderr, diags, compilation.DiagnosticEnv())
 				resolve.Invoke(js.Null())
 				return
 			}
@@ -76,7 +77,19 @@ func run(_ js.Value, args []js.Value) any {
 				return
 			}
 
-			rt := runtime.NewRuntime()
+			// FIXME: This is a copy of nativePal and should be replaced with a proper implementation.
+			wasmPal := pal.Platform{
+				IO: pal.IO{
+					Stdout: func(p []byte) (n int, err error) {
+						return os.Stdout.Write(p)
+					},
+					Stderr: func(p []byte) (n int, err error) {
+						return os.Stderr.Write(p)
+					},
+				},
+			}
+
+			rt := runtime.NewRuntime(wasmPal)
 			for _, birPkg := range birPkgs {
 				if err := rt.Interpret(*birPkg); err != nil {
 					resolve.Invoke(jsError(err))
