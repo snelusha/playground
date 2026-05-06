@@ -4,6 +4,7 @@ import { basicSetup } from "codemirror";
 import { Compartment, Prec } from "@codemirror/state";
 import { StreamLanguage, indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
+import { languageServerExtensions, LSPClient } from "@codemirror/lsp-client";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { clike } from "@codemirror/legacy-modes/mode/clike";
@@ -16,11 +17,11 @@ import { ShikiEditor } from "@/components/shiki-editor";
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileTreeActions } from "@/stores/file-tree-store";
 
+import { BallerinaLS } from "@/lib/ballerina-ls";
 import { cn } from "@/lib/utils";
 
 import type { KeyBinding } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
-import { ballerinaLSPClient } from "../lib/ballerina-ls";
 
 export type EditorLanguage = "ballerina" | "toml" | "text";
 
@@ -45,6 +46,10 @@ const ballerinaMode = StreamLanguage.define(
 	}),
 );
 
+const ballerinaLSPClient = new LSPClient({
+	extensions: languageServerExtensions(),
+}).connect(new BallerinaLS());
+
 function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	const bindings: KeyBinding[] = Object.keys(hotkeysRef.current ?? {}).map(
 		(key) => ({
@@ -59,10 +64,7 @@ function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	return Prec.highest(keymap.of(bindings));
 }
 
-function baseExtensions(
-	filePath: string,
-	hotkeysRef: React.RefObject<HotkeyMap>,
-): Extension[] {
+function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 	return [
 		buildHotkeyExtension(hotkeysRef),
 		basicSetup,
@@ -73,7 +75,6 @@ function baseExtensions(
 			activateOnTyping: false,
 			override: [],
 		}),
-		ballerinaLSPClient.plugin(filePath),
 	];
 }
 
@@ -176,7 +177,8 @@ export function CodeEditor({
 					onChangeRef.current?.(update.state.doc.toString());
 			},
 			extensions: [
-				...baseExtensions(filePath, hotkeysRef),
+				...baseExtensions(hotkeysRef),
+				ballerinaLSPClient.plugin(filePath ?? ""),
 				languageCompartment.current.of(
 					language === "ballerina" ? ballerinaMode : [],
 				),

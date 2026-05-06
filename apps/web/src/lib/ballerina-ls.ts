@@ -1,5 +1,4 @@
 import { useFileTreeStore } from "@/stores/file-tree-store";
-import { languageServerExtensions, LSPClient } from "@codemirror/lsp-client";
 
 import type { Transport } from "@codemirror/lsp-client";
 
@@ -24,7 +23,6 @@ export class BallerinaLS implements Transport {
 
 	// biome-ignore lint/suspicious/noExplicitAny: this is a generic handler for all requests, so we can't type params
 	private async _handleRequest(method: string, params: any): Promise<any> {
-		console.log(method, params);
 		switch (method) {
 			case "initialize":
 				return {
@@ -91,7 +89,3 @@ export class BallerinaLS implements Transport {
 		this.handlers = this.handlers.filter((h) => h !== handler);
 	}
 }
-
-export const ballerinaLSPClient = new LSPClient({
-	extensions: languageServerExtensions(),
-}).connect(new BallerinaLS());

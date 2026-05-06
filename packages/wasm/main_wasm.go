@@ -102,7 +102,7 @@ func mapDiagnostics(diags []diagnostics.Diagnostic) []any {
 				"start": start,
 				"end":   end,
 			},
-			"severity": int(d.DiagnosticInfo().Severity()),
+			"severity": 1,
 			"message":  d.Message(),
 		}
 	}
