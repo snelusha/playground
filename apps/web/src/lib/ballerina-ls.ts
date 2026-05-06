@@ -7,9 +7,15 @@ type TextDocumentParams = {
 	textDocument: { uri: string };
 };
 
+type Position = {
+	line?: number;
+	character?: number;
+	column?: number;
+};
+
 type DiagnosticRange = {
-	start: { line: number; column: number };
-	end: { line: number; column: number };
+	start?: Position;
+	end?: Position;
 };
 
 type WasmDiagnostic = {
@@ -24,15 +30,17 @@ function toCodeMirrorDiagnostics(result: unknown) {
 	if (!Array.isArray(result)) return [];
 
 	return result.map((d: WasmDiagnostic) => {
-		const start = d.range?.start ?? { line: 0, column: 0 };
+		const start = d.range?.start ?? { line: 0, character: 0 };
 		const end = d.range?.end ?? start;
+		const startCharacter = start.character ?? start.column ?? 0;
+		const endCharacter = end.character ?? end.column ?? startCharacter;
 
 		return {
 			range: {
-				start: { line: start.line, character: start.column },
-				end: { line: end.line, character: end.column },
+				start: { line: start.line ?? 0, character: startCharacter },
+				end: { line: end.line ?? start.line ?? 0, character: endCharacter },
 			},
-			severity: d.severity ?? 1,
+			severity: 1,
 			message: String(d.message ?? ""),
 		};
 	});

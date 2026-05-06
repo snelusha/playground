@@ -91,8 +91,8 @@ func run(_ js.Value, args []js.Value) any {
 	})
 }
 
-func mapDiagnostics(diags []diagnostics.Diagnostic) []map[string]any {
-	mapped := make([]map[string]any, len(diags))
+func mapDiagnostics(diags []diagnostics.Diagnostic) []any {
+	mapped := make([]any, len(diags))
 	for i, d := range diags {
 		lineRange := d.Location().LineRange()
 		start := map[string]any{"line": lineRange.StartLine().Line(), "character": lineRange.StartLine().Offset()}
@@ -102,7 +102,7 @@ func mapDiagnostics(diags []diagnostics.Diagnostic) []map[string]any {
 				"start": start,
 				"end":   end,
 			},
-			"severity": d.DiagnosticInfo().Severity(),
+			"severity": int(d.DiagnosticInfo().Severity()),
 			"message":  d.Message(),
 		}
 	}

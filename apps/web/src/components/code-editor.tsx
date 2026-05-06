@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 import type { KeyBinding } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
-import { ballerinaLSPClient } from "./ballerina-ls";
+import { ballerinaLSPClient } from "../lib/ballerina-ls";
 
 export type EditorLanguage = "ballerina" | "toml" | "text";
 
