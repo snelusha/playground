@@ -3,47 +3,6 @@ import { languageServerExtensions, LSPClient } from "@codemirror/lsp-client";
 
 import type { Transport } from "@codemirror/lsp-client";
 
-type Position = {
-	line?: number;
-	character?: number;
-	column?: number;
-};
-
-type WasmDiagnostic = {
-	range?: {
-		start?: Position;
-		end?: Position;
-	};
-	severity?: number;
-	message?: unknown;
-};
-
-const diagnosticSequenceByUri = new Map<string, number>();
-
-function toLSPDiagnostics(diagnostics: WasmDiagnostic[]) {
-	return diagnostics.map((diagnostic) => {
-		const startLine = diagnostic.range?.start?.line ?? 0;
-		const startCharacter =
-			diagnostic.range?.start?.character ??
-			diagnostic.range?.start?.column ??
-			0;
-		const endLine = diagnostic.range?.end?.line ?? startLine;
-		const endCharacter =
-			diagnostic.range?.end?.character ??
-			diagnostic.range?.end?.column ??
-			startCharacter;
-
-		return {
-			range: {
-				start: { line: startLine, character: startCharacter },
-				end: { line: endLine, character: endCharacter },
-			},
-			severity: diagnostic.severity ?? 1,
-			message: String(diagnostic.message ?? ""),
-		};
-	});
-}
-
 export class BallerinaLS implements Transport {
 	private handlers: ((value: string) => void)[] = [];
 
@@ -83,16 +42,10 @@ export class BallerinaLS implements Transport {
 
 				try {
 					await useFileTreeStore.getState().saveFile();
-					const sequence = (diagnosticSequenceByUri.get(uri) ?? 0) + 1;
-					diagnosticSequenceByUri.set(uri, sequence);
-
 					const diagnostics = await window.getDiagnostics(
 						useFileTreeStore.getState().fs(),
 						uri,
 					);
-					if (diagnosticSequenceByUri.get(uri) !== sequence) {
-						return null;
-					}
 
 					this._publish(
 						JSON.stringify({
@@ -100,7 +53,7 @@ export class BallerinaLS implements Transport {
 							method: "textDocument/publishDiagnostics",
 							params: {
 								uri,
-								diagnostics: diagnostics ? toLSPDiagnostics(diagnostics) : [],
+								diagnostics: diagnostics ?? [],
 							},
 						}),
 					);
