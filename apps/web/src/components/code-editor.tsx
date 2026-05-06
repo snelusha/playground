@@ -13,6 +13,8 @@ import { toast } from "sonner";
 
 import { ShikiEditor } from "@/components/shiki-editor";
 
+import { BallerinaLS } from "@/lib/ballerina-ls";
+
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileTreeActions } from "@/stores/file-tree-store";
 
@@ -20,12 +22,14 @@ import { cn } from "@/lib/utils";
 
 import type { KeyBinding } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
+import { languageServerExtensions, LSPClient } from "@codemirror/lsp-client";
 
 export type EditorLanguage = "ballerina" | "toml" | "text";
 
 type HotkeyMap = Record<string, () => void>;
 
 interface CodeEditorProps {
+	filePath?: string;
 	value?: string;
 	onChange?: (value: string) => void;
 	hotkeys?: HotkeyMap;
@@ -125,6 +129,7 @@ const theme = EditorView.theme({
 });
 
 export function CodeEditor({
+	filePath,
 	value,
 	onChange,
 	hotkeys = {},
@@ -136,6 +141,7 @@ export function CodeEditor({
 
 	const languageCompartment = React.useRef(new Compartment());
 	const vimCompartment = React.useRef(new Compartment());
+	const lsCompartment = React.useRef(new Compartment());
 
 	const onChangeRef = React.useRef(onChange);
 	onChangeRef.current = onChange;
@@ -199,6 +205,15 @@ export function CodeEditor({
 		if (!editor) return;
 		editor.reconfigure(vimCompartment.current, vimEnabled ? vim() : []);
 	}, [vimEnabled]);
+
+	React.useEffect(() => {
+		const editor = editorRef.current;
+		if (!editor || !filePath) return;
+		const lsExtension = new LSPClient({
+			extensions: languageServerExtensions(),
+		}).connect(new BallerinaLS());
+		editor.reconfigure(lsCompartment.current, lsExtension.plugin(filePath));
+	}, [filePath]);
 
 	React.useEffect(() => {
 		Vim.defineEx("write", "w", () => {
