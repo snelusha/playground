@@ -1,4 +1,5 @@
 import { useFileTreeStore } from "@/stores/file-tree-store";
+import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
 
 import type { Transport } from "@codemirror/lsp-client";
 
@@ -37,10 +38,9 @@ export class BallerinaLS implements Transport {
 
 				try {
 					await useFileTreeStore.getState().saveFile();
-					const diagnostics = await window.getDiagnostics(
-						useFileTreeStore.getState().fs(),
-						uri,
-					);
+					const fs = useFileTreeStore.getState().fs();
+					const targetPath = await getBallerinaProjectTarget(fs, uri);
+					const diagnostics = await window.getDiagnostics(fs, targetPath);
 
 					this._publish(
 						JSON.stringify({

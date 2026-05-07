@@ -23,13 +23,8 @@ import { CodeEditor } from "@/components/code-editor";
 import { VersionCard } from "@/components/version-card";
 import { ANSI } from "@/components/ansi";
 
-import {
-	basename,
-	dirname,
-	ext,
-	isRootPath,
-	join,
-} from "@/lib/fs/core/path-utils";
+import { basename, ext } from "@/lib/fs/core/path-utils";
+import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
 import { cn } from "@/lib/utils";
 
 import { useEditorStore } from "@/stores/editor-store";
@@ -38,7 +33,6 @@ import { useActiveFile, useFileTreeActions } from "@/stores/file-tree-store";
 import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
-import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { EditorLanguage } from "@/components/code-editor";
 
 function getLanguage(path: string): EditorLanguage {
@@ -51,26 +45,6 @@ function getLanguage(path: string): EditorLanguage {
 		default:
 			return "text";
 	}
-}
-
-async function getBallerinaExecutionTarget(
-	fs: LayeredFS,
-	path: string,
-): Promise<string> {
-	let currentDir = dirname(path);
-	const hasRootPrefix = path.startsWith("/");
-
-	while (!isRootPath(currentDir)) {
-		const dirPath =
-			hasRootPrefix && !currentDir.startsWith("/")
-				? `/${currentDir}`
-				: currentDir;
-		const tomlPath = join(dirPath, "Ballerina.toml");
-		if (await fs.stat(tomlPath)) return dirPath;
-		currentDir = dirname(currentDir);
-	}
-
-	return path;
 }
 
 function OutputPane() {
@@ -255,7 +229,7 @@ function EditorContent() {
 			// FIXME: We should automatically save files on change.
 			await saveFile();
 
-			const target = await getBallerinaExecutionTarget(fs, activeFile.path);
+			const target = await getBallerinaProjectTarget(fs, activeFile.path);
 			const runResult = await run(target);
 			if (runResult?.error) {
 				captured += `${runResult.error}\n`;
