@@ -1,10 +1,26 @@
-import { useFileTreeStore } from "@/stores/file-tree-store";
+import { getBallerinaWorkerClient } from "@/lib/ballerina/worker-client";
+import { collectProjectSnapshot } from "@/lib/fs/project-snapshot";
 import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
+import { useFileTreeStore } from "@/stores/file-tree-store";
 
 import type { Transport } from "@codemirror/lsp-client";
 
+function lspUriToFsPath(uri: string): string {
+	if (uri.startsWith("file://")) {
+		const rest = uri.slice("file://".length);
+		const path = rest.startsWith("/") ? rest : `/${rest}`;
+		try {
+			return decodeURIComponent(path);
+		} catch {
+			return path;
+		}
+	}
+	return uri;
+}
+
 export class BallerinaLS implements Transport {
 	private handlers: ((value: string) => void)[] = [];
+	private _diagSeq = 0;
 
 	send(message: string): void {
 		void (async () => {
@@ -36,11 +52,18 @@ export class BallerinaLS implements Transport {
 				const uri: string = params.textDocument?.uri;
 				if (!uri) return null;
 
+				const mySeq = ++this._diagSeq;
+
 				try {
 					await useFileTreeStore.getState().saveFile();
 					const fs = useFileTreeStore.getState().fs();
-					const targetPath = await getBallerinaProjectTarget(fs, uri);
-					const diagnostics = await window.getDiagnostics(fs, targetPath);
+					const filePath = lspUriToFsPath(uri);
+					const targetPath = await getBallerinaProjectTarget(fs, filePath);
+					const snapshot = await collectProjectSnapshot(fs, targetPath);
+					const client = getBallerinaWorkerClient();
+					const diagnostics = await client.getDiagnostics(snapshot, targetPath);
+
+					if (mySeq !== this._diagSeq) return null;
 
 					this._publish(
 						JSON.stringify({
@@ -53,6 +76,7 @@ export class BallerinaLS implements Transport {
 						}),
 					);
 				} catch {
+					if (mySeq !== this._diagSeq) return null;
 					this._publish(
 						JSON.stringify({
 							jsonrpc: "2.0",
