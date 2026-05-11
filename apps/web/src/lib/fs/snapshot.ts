@@ -22,6 +22,22 @@ type SnapshotDirNode = {
 
 type SnapshotNode = SnapshotFileNode | SnapshotDirNode;
 
+export type SerializedSnapshot = Array<{
+	path: string;
+	node:
+		| {
+				isDir: false;
+				content: string;
+				modTime: number;
+				size: number;
+		  }
+		| {
+				isDir: true;
+				modTime: number;
+				entries: DirEntry[];
+		  };
+}>;
+
 export class SnapshotFS implements FS {
 	private constructor(
 		private readonly nodes: ReadonlyMap<string, SnapshotNode>,
@@ -31,6 +47,41 @@ export class SnapshotFS implements FS {
 		const nodes = new Map<string, SnapshotNode>();
 		await collectNodes(source, nodes, rootPath);
 		return new SnapshotFS(nodes);
+	}
+
+	static deserialize(data: SerializedSnapshot): SnapshotFS {
+		const nodes = new Map<string, SnapshotNode>();
+		for (const entry of data) {
+			nodes.set(entry.path, entry.node);
+		}
+		return new SnapshotFS(nodes);
+	}
+
+	serialize(): SerializedSnapshot {
+		const result: SerializedSnapshot = [];
+		for (const [path, node] of this.nodes.entries()) {
+			if (node.isDir) {
+				result.push({
+					path,
+					node: {
+						isDir: true,
+						modTime: node.modTime,
+						entries: [...node.entries],
+					},
+				});
+			} else {
+				result.push({
+					path,
+					node: {
+						isDir: false,
+						content: node.content,
+						modTime: node.modTime,
+						size: node.size,
+					},
+				});
+			}
+		}
+		return result;
 	}
 
 	async open(path: string): Promise<OpenResult | null> {
