@@ -1,65 +1,12 @@
 import "@/wasm_exec";
 
+import type {
+	BallerinaDiagnostic,
+	BallerinaRunResult,
+	BallerinaWorkerRequest,
+	BallerinaWorkerResponse,
+} from "@/lib/ballerina-worker-protocol";
 import { SnapshotFS } from "@/lib/fs/snapshot-fs";
-
-import type { SerializedFSNode } from "@/lib/fs/snapshot-fs";
-
-type Diagnostic = Record<string, unknown>;
-
-type RunResult = {
-	error?: string;
-	output: string;
-};
-
-type LoadRequest = {
-	type: "load";
-	id: number;
-};
-
-type DiagnosticsRequest = {
-	type: "diagnostics";
-	id: number;
-	fs: SerializedFSNode;
-	targetPath: string;
-};
-
-type RunRequest = {
-	type: "run";
-	id: number;
-	fs: SerializedFSNode;
-	targetPath: string;
-};
-
-type WorkerRequest = LoadRequest | DiagnosticsRequest | RunRequest;
-
-type LoadResponse = {
-	type: "load";
-	id: number;
-};
-
-type ProgressResponse = {
-	type: "progress";
-	id: number;
-	progress: number;
-};
-
-type DiagnosticsResponse = {
-	type: "diagnostics";
-	id: number;
-	diagnostics: Diagnostic[];
-};
-
-type RunResponse = {
-	type: "run";
-	id: number;
-	result: RunResult;
-};
-
-type ErrorResponse = {
-	type: "error";
-	id: number;
-	error: string;
-};
 
 type GoRuntime = {
 	importObject: WebAssembly.Imports;
@@ -69,28 +16,38 @@ type GoRuntime = {
 const workerGlobal = globalThis as typeof globalThis & {
 	Go: new () => GoRuntime;
 	run(proxy: SnapshotFS, path: string): Promise<{ error?: string } | null>;
-	getDiagnostics(proxy: SnapshotFS, path: string): Promise<Diagnostic[] | null>;
+	getDiagnostics(
+		proxy: SnapshotFS,
+		path: string,
+	): Promise<BallerinaDiagnostic[] | null>;
 };
 
 let wasmReady: Promise<void> | null = null;
 let wasmLoaded = false;
+let requestQueue = Promise.resolve();
 
-self.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
-	void handleRequest(event.data);
-});
+self.addEventListener(
+	"message",
+	(event: MessageEvent<BallerinaWorkerRequest>) => {
+		requestQueue = requestQueue.then(
+			() => handleRequest(event.data),
+			() => handleRequest(event.data),
+		);
+	},
+);
 
-async function handleRequest(request: WorkerRequest): Promise<void> {
+async function handleRequest(request: BallerinaWorkerRequest): Promise<void> {
 	try {
 		switch (request.type) {
 			case "load":
 				await loadWasm((progress) => {
-					postMessage({
+					post({
 						type: "progress",
 						id: request.id,
 						progress,
-					} satisfies ProgressResponse);
+					});
 				});
-				postMessage({ type: "load", id: request.id } satisfies LoadResponse);
+				post({ type: "load", id: request.id });
 				return;
 			case "diagnostics": {
 				await loadWasm();
@@ -98,11 +55,11 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 					new SnapshotFS(request.fs),
 					request.targetPath,
 				);
-				postMessage({
+				post({
 					type: "diagnostics",
 					id: request.id,
 					diagnostics: diagnostics ?? [],
-				} satisfies DiagnosticsResponse);
+				});
 				return;
 			}
 			case "run": {
@@ -111,27 +68,27 @@ async function handleRequest(request: WorkerRequest): Promise<void> {
 					new SnapshotFS(request.fs),
 					request.targetPath,
 				);
-				postMessage({
+				post({
 					type: "run",
 					id: request.id,
 					result,
-				} satisfies RunResponse);
+				});
 				return;
 			}
 		}
 	} catch (error) {
-		postMessage({
+		post({
 			type: "error",
 			id: request.id,
 			error: error instanceof Error ? error.message : String(error),
-		} satisfies ErrorResponse);
+		});
 	}
 }
 
 async function runWithCapturedOutput(
 	fs: SnapshotFS,
 	targetPath: string,
-): Promise<RunResult> {
+): Promise<BallerinaRunResult> {
 	const oldLog = console.log;
 	let output = "";
 
@@ -149,6 +106,10 @@ async function runWithCapturedOutput(
 	} finally {
 		console.log = oldLog;
 	}
+}
+
+function post(message: BallerinaWorkerResponse): void {
+	postMessage(message);
 }
 
 async function loadWasm(

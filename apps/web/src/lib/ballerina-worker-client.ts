@@ -1,68 +1,10 @@
 import type { SerializedFSNode } from "@/lib/fs/snapshot-fs";
-
-type Diagnostic = Record<string, unknown>;
-
-export type BallerinaRunResult = {
-	error?: string;
-	output: string;
-};
-
-type LoadRequest = {
-	type: "load";
-	id: number;
-};
-
-type DiagnosticsRequest = {
-	type: "diagnostics";
-	id: number;
-	fs: SerializedFSNode;
-	targetPath: string;
-};
-
-type RunRequest = {
-	type: "run";
-	id: number;
-	fs: SerializedFSNode;
-	targetPath: string;
-};
-
-type WorkerRequest = LoadRequest | DiagnosticsRequest | RunRequest;
-
-type LoadResponse = {
-	type: "load";
-	id: number;
-};
-
-type ProgressResponse = {
-	type: "progress";
-	id: number;
-	progress: number;
-};
-
-type DiagnosticsResponse = {
-	type: "diagnostics";
-	id: number;
-	diagnostics: Diagnostic[];
-};
-
-type RunResponse = {
-	type: "run";
-	id: number;
-	result: BallerinaRunResult;
-};
-
-type ErrorResponse = {
-	type: "error";
-	id: number;
-	error: string;
-};
-
-type WorkerMessage =
-	| LoadResponse
-	| ProgressResponse
-	| DiagnosticsResponse
-	| RunResponse
-	| ErrorResponse;
+import type {
+	BallerinaDiagnostic,
+	BallerinaRunResult,
+	BallerinaWorkerRequest,
+	BallerinaWorkerResponse,
+} from "@/lib/ballerina-worker-protocol";
 
 type PendingRequest =
 	| {
@@ -73,7 +15,7 @@ type PendingRequest =
 	  }
 	| {
 			type: "diagnostics";
-			resolve: (diagnostics: Diagnostic[]) => void;
+			resolve: (diagnostics: BallerinaDiagnostic[]) => void;
 			reject: (error: Error) => void;
 	  }
 	| {
@@ -99,7 +41,7 @@ class BallerinaWorkerClient {
 	getDiagnostics(
 		fs: SerializedFSNode,
 		targetPath: string,
-	): Promise<Diagnostic[]> {
+	): Promise<BallerinaDiagnostic[]> {
 		const id = this.nextId++;
 
 		return new Promise((resolve, reject) => {
@@ -127,7 +69,7 @@ class BallerinaWorkerClient {
 		});
 	}
 
-	private post(message: WorkerRequest): void {
+	private post(message: BallerinaWorkerRequest): void {
 		this.getWorker().postMessage(message);
 	}
 
@@ -146,7 +88,7 @@ class BallerinaWorkerClient {
 		return this.worker;
 	}
 
-	private handleMessage = (event: MessageEvent<WorkerMessage>) => {
+	private handleMessage = (event: MessageEvent<BallerinaWorkerResponse>) => {
 		const message = event.data;
 		const pending = this.pending.get(message.id);
 		if (!pending) return;
