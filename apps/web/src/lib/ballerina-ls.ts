@@ -1,7 +1,7 @@
 import { buildScopedFsSnapshot } from "@/lib/fs/snapshot";
 import { useFileTreeStore } from "@/stores/file-tree-store";
 import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
-import { ballerinaWorkerClient } from "@/workers/ballerina-worker-client";
+import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { Transport } from "@codemirror/lsp-client";
 
@@ -59,7 +59,7 @@ export class BallerinaLS implements Transport {
 					const filePath = lspUriToFsPath(uri);
 					const targetPath = await getBallerinaProjectTarget(fs, filePath);
 					const snapshot = await buildScopedFsSnapshot(fs, targetPath);
-					const diagnostics = await ballerinaWorkerClient.getDiagnostics({
+					const diagnostics = await getBallerinaWorkerClient().getDiagnostics({
 						targetPath,
 						snapshot,
 					});

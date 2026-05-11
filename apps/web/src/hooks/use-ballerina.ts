@@ -2,7 +2,8 @@ import * as React from "react";
 
 import { buildScopedFsSnapshot } from "@/lib/fs/snapshot";
 import { useFS } from "@/providers/fs-provider";
-import { ballerinaWorkerClient } from "@/workers/ballerina-worker-client";
+import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
+import type { BallerinaWorkerResults } from "@/workers/ballerina-worker-protocol";
 
 export function useBallerina() {
 	const fs = useFS();
@@ -11,10 +12,13 @@ export function useBallerina() {
 	const [progress, setProgress] = React.useState(0);
 
 	React.useEffect(() => {
+		const ballerinaWorkerClient = getBallerinaWorkerClient();
 		let cancelled = false;
-		const unsubscribeProgress = ballerinaWorkerClient.onProgress((pct) => {
-			if (!cancelled) setProgress(pct);
-		});
+		const unsubscribeProgress = ballerinaWorkerClient.onProgress(
+			(pct: number) => {
+				if (!cancelled) setProgress(pct);
+			},
+		);
 
 		ballerinaWorkerClient
 			.init()
@@ -34,28 +38,29 @@ export function useBallerina() {
 		};
 	}, []);
 
-	async function run(
-		path: string,
-	): Promise<{ error?: string; output?: string } | null> {
-		if (!ballerinaWorkerClient.isReady())
-			return { error: "Ballerina runtime is not ready" };
-		if (!fs) return { error: "Virtual file system is not available" };
+	const run = React.useCallback(
+		async (
+			path: string,
+		): Promise<
+			BallerinaWorkerResults["run"] | { error: string; output?: string }
+		> => {
+			if (!isReady) return { error: "Ballerina runtime is not ready" };
+			if (!fs) return { error: "Virtual file system is not available" };
 
-		try {
-			const snapshot = await buildScopedFsSnapshot(fs, path);
-			const result = await ballerinaWorkerClient.run({
-				targetPath: path,
-				snapshot,
-			});
-			if (result && typeof result === "object") {
-				return result as { error?: string; output?: string };
+			const ballerinaWorkerClient = getBallerinaWorkerClient();
+			try {
+				const snapshot = await buildScopedFsSnapshot(fs, path);
+				return await ballerinaWorkerClient.run({
+					targetPath: path,
+					snapshot,
+				});
+			} catch {
+				setIsReady(false);
+				return { error: "Failed to execute Ballerina program" };
 			}
-			return null;
-		} catch {
-			setIsReady(false);
-			return { error: "Failed to execute Ballerina program" };
-		}
-	}
+		},
+		[isReady, fs],
+	);
 
 	return { isReady, progress, run };
 }

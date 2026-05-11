@@ -17,13 +17,11 @@ export type FsSnapshot = {
 	entries: SnapshotEntry[];
 };
 
-/** Return types for methods exposed from the Ballerina worker (via Comlink). */
 export type BallerinaWorkerResults = {
 	run: { error?: string; output: string } | null;
 	getDiagnostics: Array<Record<string, unknown>> | null;
 };
 
-/** RPC surface exposed with `Comlink.expose` from `ballerina.worker.ts`. */
 export interface BallerinaWorkerApi {
 	init(wasmUrl: string, onProgress?: (percent: number) => void): Promise<void>;
 	run(input: {
