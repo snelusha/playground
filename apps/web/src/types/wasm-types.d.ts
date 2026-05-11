@@ -1,12 +1,13 @@
-import type { FS } from "@/lib/fs/core/fs.interface";
+import type { FsSnapshot } from "@/workers/ballerina-worker-protocol";
 
-declare global {
-	export interface Window {
-		Go: any;
-		run(proxy: FS, path: string): { error?: string } | null;
-		getDiagnostics: (
-			proxy: FS,
-			path: string,
-		) => Promise<Array<Record<string, any>> | null>;
-	}
-}
+export type BallerinaRunResult = {
+	error?: string;
+	output?: string;
+} | null;
+
+export type BallerinaDiagnosticsResult = Array<Record<string, unknown>> | null;
+
+export type BallerinaWorkerInput = {
+	targetPath: string;
+	snapshot: FsSnapshot;
+};
