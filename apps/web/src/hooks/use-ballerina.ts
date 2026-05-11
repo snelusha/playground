@@ -2,6 +2,8 @@ import "@/wasm_exec";
 
 import * as React from "react";
 
+import { SnapshotFS } from "@/lib/fs/snapshot";
+
 import { useFS } from "@/providers/fs-provider";
 
 export function useBallerina() {
@@ -50,7 +52,8 @@ export function useBallerina() {
 			return { error: "Ballerina runtime is not ready" };
 		if (!fs) return { error: "Virtual file system is not available" };
 
-		const result = await window.run(fs, path);
+		const snapshot = await SnapshotFS.from(fs, path);
+		const result = await window.run(snapshot, path);
 		if (result && typeof result === "object" && "error" in result) {
 			return result as { error?: string };
 		}
