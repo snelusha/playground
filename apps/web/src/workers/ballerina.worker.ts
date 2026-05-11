@@ -1,11 +1,11 @@
+import * as Comlink from "comlink";
+
 import "@/wasm_exec";
 
 import type { FS, OpenResult, StatResult } from "@/lib/fs/core/fs.interface";
 import type {
+	BallerinaWorkerApi,
 	FsSnapshot,
-	WorkerRequest,
-	WorkerResponse,
-	WorkerResultMap,
 } from "@/workers/ballerina-worker-protocol";
 
 type GoRuntime = {
@@ -121,30 +121,11 @@ class SnapshotFS implements FS {
 }
 
 let runtimeReady = false;
-let initRequestId = -1;
-
-function send(response: WorkerResponse): void {
-	self.postMessage(response);
-}
-
-function sendError(requestId: number, error: unknown): void {
-	const err =
-		error instanceof Error
-			? error
-			: new Error(typeof error === "string" ? error : "Unknown worker error");
-	send({
-		requestId,
-		type: "error",
-		payload: {
-			message: err.message,
-			stack: err.stack,
-		},
-	});
-}
+let initOnce: Promise<void> | null = null;
 
 async function fetchResponseWithProgress(
 	url: string,
-	requestId: number,
+	onProgress?: (percent: number) => void,
 ): Promise<Response> {
 	const res = await fetch(url);
 	const total = Number(res.headers.get("content-length") ?? 0);
@@ -162,11 +143,7 @@ async function fetchResponseWithProgress(
 				}
 				if (!value) continue;
 				loaded += value.byteLength;
-				send({
-					requestId,
-					type: "progress",
-					payload: { percent: Math.round((loaded / total) * 100) },
-				});
+				onProgress?.(Math.round((loaded / total) * 100));
 				controller.enqueue(value);
 			}
 		},
@@ -175,19 +152,27 @@ async function fetchResponseWithProgress(
 	return new Response(stream, { headers: res.headers });
 }
 
-async function initRuntime(wasmUrl: string, requestId: number): Promise<void> {
+async function initRuntime(
+	wasmUrl: string,
+	onProgress?: (percent: number) => void,
+): Promise<void> {
 	if (runtimeReady) return;
-	if (initRequestId >= 0 && initRequestId !== requestId) return;
-	initRequestId = requestId;
-
-	const globals = globalThis as RuntimeGlobals;
-	const go = new globals.Go();
-	const result = await WebAssembly.instantiateStreaming(
-		fetchResponseWithProgress(wasmUrl, requestId),
-		go.importObject,
-	);
-	go.run(result.instance);
-	runtimeReady = true;
+	if (!initOnce) {
+		initOnce = (async () => {
+			const globals = globalThis as RuntimeGlobals;
+			const go = new globals.Go();
+			const result = await WebAssembly.instantiateStreaming(
+				fetchResponseWithProgress(wasmUrl, onProgress),
+				go.importObject,
+			);
+			go.run(result.instance);
+			runtimeReady = true;
+		})().catch((err) => {
+			initOnce = null;
+			throw err;
+		});
+	}
+	await initOnce;
 }
 
 function withCapturedLogs<T>(
@@ -205,59 +190,28 @@ function withCapturedLogs<T>(
 		});
 }
 
-async function handleRun(
-	requestId: number,
-	payload: Extract<WorkerRequest, { type: "run" }>["payload"],
-): Promise<void> {
-	const globals = globalThis as RuntimeGlobals;
-	const fs = new SnapshotFS(payload.snapshot);
-	const { result, output } = await withCapturedLogs(async () =>
-		Promise.resolve(globals.run(fs, payload.targetPath)),
-	);
+const api: BallerinaWorkerApi = {
+	async init(
+		wasmUrl: string,
+		onProgress?: (percent: number) => void,
+	): Promise<void> {
+		await initRuntime(wasmUrl, onProgress);
+	},
 
-	send({
-		requestId,
-		type: "success",
-		payload: result ? { ...result, output } : { output },
-	});
-}
+	async run(payload) {
+		const globals = globalThis as RuntimeGlobals;
+		const fs = new SnapshotFS(payload.snapshot);
+		const { result, output } = await withCapturedLogs(async () =>
+			Promise.resolve(globals.run(fs, payload.targetPath)),
+		);
+		return result ? { ...result, output } : { output };
+	},
 
-async function handleDiagnostics(
-	requestId: number,
-	payload: Extract<WorkerRequest, { type: "getDiagnostics" }>["payload"],
-): Promise<void> {
-	const globals = globalThis as RuntimeGlobals;
-	const fs = new SnapshotFS(payload.snapshot);
-	const diagnostics = await globals.getDiagnostics(fs, payload.targetPath);
-	send({
-		requestId,
-		type: "success",
-		payload: diagnostics,
-	});
-}
-
-self.onmessage = (event: MessageEvent<WorkerRequest>) => {
-	void (async () => {
-		const message = event.data;
-		try {
-			switch (message.type) {
-				case "init":
-					await initRuntime(message.payload.wasmUrl, message.requestId);
-					send({
-						requestId: message.requestId,
-						type: "success",
-						payload: { ready: true } satisfies WorkerResultMap["init"],
-					});
-					break;
-				case "run":
-					await handleRun(message.requestId, message.payload);
-					break;
-				case "getDiagnostics":
-					await handleDiagnostics(message.requestId, message.payload);
-					break;
-			}
-		} catch (error) {
-			sendError(message.requestId, error);
-		}
-	})();
+	async getDiagnostics(payload) {
+		const globals = globalThis as RuntimeGlobals;
+		const fs = new SnapshotFS(payload.snapshot);
+		return globals.getDiagnostics(fs, payload.targetPath);
+	},
 };
+
+Comlink.expose(api);

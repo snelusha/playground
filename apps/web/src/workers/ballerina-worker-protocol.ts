@@ -17,53 +17,21 @@ export type FsSnapshot = {
 	entries: SnapshotEntry[];
 };
 
-export type WorkerRequest =
-	| {
-			requestId: number;
-			type: "init";
-			payload: {
-				wasmUrl: string;
-			};
-	  }
-	| {
-			requestId: number;
-			type: "run";
-			payload: {
-				targetPath: string;
-				snapshot: FsSnapshot;
-			};
-	  }
-	| {
-			requestId: number;
-			type: "getDiagnostics";
-			payload: {
-				targetPath: string;
-				snapshot: FsSnapshot;
-			};
-	  };
-
-export type WorkerResultMap = {
-	init: { ready: true };
+/** Return types for methods exposed from the Ballerina worker (via Comlink). */
+export type BallerinaWorkerResults = {
 	run: { error?: string; output: string } | null;
 	getDiagnostics: Array<Record<string, unknown>> | null;
 };
 
-export type WorkerResponse =
-	| {
-			requestId: number;
-			type: "progress";
-			payload: { percent: number };
-	  }
-	| {
-			requestId: number;
-			type: "success";
-			payload: unknown;
-	  }
-	| {
-			requestId: number;
-			type: "error";
-			payload: {
-				message: string;
-				stack?: string;
-			};
-	  };
+/** RPC surface exposed with `Comlink.expose` from `ballerina.worker.ts`. */
+export interface BallerinaWorkerApi {
+	init(wasmUrl: string, onProgress?: (percent: number) => void): Promise<void>;
+	run(input: {
+		targetPath: string;
+		snapshot: FsSnapshot;
+	}): Promise<BallerinaWorkerResults["run"]>;
+	getDiagnostics(input: {
+		targetPath: string;
+		snapshot: FsSnapshot;
+	}): Promise<BallerinaWorkerResults["getDiagnostics"]>;
+}
