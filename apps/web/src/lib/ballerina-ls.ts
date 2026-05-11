@@ -1,10 +1,13 @@
 import { useFileTreeStore } from "@/stores/file-tree-store";
+import { ballerinaWorker } from "@/lib/ballerina-worker-client";
 import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
+import { snapshotFS } from "@/lib/fs/snapshot-fs";
 
 import type { Transport } from "@codemirror/lsp-client";
 
 export class BallerinaLS implements Transport {
 	private handlers: ((value: string) => void)[] = [];
+	private diagnosticsRequestId = 0;
 
 	send(message: string): void {
 		void (async () => {
@@ -35,12 +38,19 @@ export class BallerinaLS implements Transport {
 				if (!useFileTreeStore.getState().ready) return null;
 				const uri: string = params.textDocument?.uri;
 				if (!uri) return null;
+				const requestId = ++this.diagnosticsRequestId;
 
 				try {
 					await useFileTreeStore.getState().saveFile();
 					const fs = useFileTreeStore.getState().fs();
 					const targetPath = await getBallerinaProjectTarget(fs, uri);
-					const diagnostics = await window.getDiagnostics(fs, targetPath);
+					const snapshot = await snapshotFS(fs);
+					const diagnostics = await ballerinaWorker.getDiagnostics(
+						snapshot,
+						targetPath,
+					);
+
+					if (requestId !== this.diagnosticsRequestId) return null;
 
 					this._publish(
 						JSON.stringify({
@@ -53,6 +63,7 @@ export class BallerinaLS implements Transport {
 						}),
 					);
 				} catch {
+					if (requestId !== this.diagnosticsRequestId) return null;
 					this._publish(
 						JSON.stringify({
 							jsonrpc: "2.0",
