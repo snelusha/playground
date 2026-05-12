@@ -1,17 +1,15 @@
 /// <reference lib="webworker" />
 
+import * as Comlink from "comlink";
+
 import "@/wasm_exec";
 
 import { SnapshotFS } from "@/lib/fs/snapshot";
 
 import type {
-	DiagnosticsRequest,
-	InitRequest,
-	RunRequest,
+	BallerinaWorkerApi,
 	WorkerDiagnostic,
 	WorkerRunResult,
-	WorkerRequest,
-	WorkerResponse,
 } from "@/workers/ballerina-worker-protocol";
 
 // ---------------------------------------------------------------------------
@@ -37,132 +35,68 @@ declare const self: DedicatedWorkerGlobalScope & {
 let initialized = false;
 
 // ---------------------------------------------------------------------------
-// Entry point
+// API implementation
 // ---------------------------------------------------------------------------
 
-self.onmessage = (event: MessageEvent<WorkerRequest>) => {
-	void handleRequest(event.data);
+const api: BallerinaWorkerApi = {
+	async init(wasmUrl, onProgress) {
+		try {
+			const go = new self.Go();
+
+			const wasmResponse = fetchWithProgress(wasmUrl, (value) =>
+				onProgress?.(value),
+			);
+
+			const { instance } = await WebAssembly.instantiateStreaming(
+				wasmResponse,
+				go.importObject,
+			);
+
+			go.run(instance);
+			initialized = true;
+		} catch (error) {
+			throw new Error(
+				toErrorMessage(error, "Failed to initialize WASM in worker"),
+			);
+		}
+	},
+
+	async run(path, snapshot) {
+		if (!initialized) {
+			throw new Error("WASM worker is not initialized");
+		}
+
+		if (typeof self.run !== "function") {
+			throw new Error("WASM run function is unavailable");
+		}
+
+		try {
+			const fs = SnapshotFS.deserialize(snapshot);
+			return await captureRun(fs, path);
+		} catch (error) {
+			throw new Error(toErrorMessage(error, "Failed to run Ballerina program"));
+		}
+	},
+
+	async diagnostics(path, snapshot) {
+		if (!initialized) {
+			throw new Error("WASM worker is not initialized");
+		}
+
+		if (typeof self.getDiagnostics !== "function") {
+			throw new Error("WASM diagnostics function is unavailable");
+		}
+
+		try {
+			const fs = SnapshotFS.deserialize(snapshot);
+			return await self.getDiagnostics(fs, path);
+		} catch (error) {
+			throw new Error(toErrorMessage(error, "Failed to get diagnostics"));
+		}
+	},
 };
 
-async function handleRequest(message: WorkerRequest): Promise<void> {
-	switch (message.type) {
-		case "init":
-			await handleInit(message);
-			break;
-		case "run":
-			await handleRun(message);
-			break;
-		case "diagnostics":
-			await handleDiagnostics(message);
-			break;
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
-
-async function handleInit(message: InitRequest): Promise<void> {
-	try {
-		const go = new self.Go();
-
-		const wasmResponse = fetchWithProgress(message.wasmUrl, (value) =>
-			post({ type: "progress", id: message.id, value }),
-		);
-
-		const { instance } = await WebAssembly.instantiateStreaming(
-			wasmResponse,
-			go.importObject,
-		);
-
-		go.run(instance);
-		initialized = true;
-
-		post({ id: message.id, type: "init-result", ok: true });
-	} catch (error) {
-		post({
-			id: message.id,
-			type: "init-result",
-			ok: false,
-			error: toErrorMessage(error, "Failed to initialize WASM in worker"),
-		});
-	}
-}
-
-async function handleRun(message: RunRequest): Promise<void> {
-	if (!initialized) {
-		post({
-			id: message.id,
-			type: "run-result",
-			ok: false,
-			error: "WASM worker is not initialized",
-		});
-		return;
-	}
-
-	if (typeof self.run !== "function") {
-		post({
-			id: message.id,
-			type: "run-result",
-			ok: false,
-			error: "WASM run function is unavailable",
-		});
-		return;
-	}
-
-	try {
-		const snapshot = SnapshotFS.deserialize(message.snapshot);
-		const result = await captureRun(snapshot, message.path);
-		post({ id: message.id, type: "run-result", ok: true, result });
-	} catch (error) {
-		post({
-			id: message.id,
-			type: "run-result",
-			ok: false,
-			error: toErrorMessage(error, "Failed to run Ballerina program"),
-		});
-	}
-}
-
-async function handleDiagnostics(message: DiagnosticsRequest): Promise<void> {
-	if (!initialized) {
-		post({
-			id: message.id,
-			type: "diagnostics-result",
-			ok: false,
-			error: "WASM worker is not initialized",
-		});
-		return;
-	}
-
-	if (typeof self.getDiagnostics !== "function") {
-		post({
-			id: message.id,
-			type: "diagnostics-result",
-			ok: false,
-			error: "WASM diagnostics function is unavailable",
-		});
-		return;
-	}
-
-	try {
-		const snapshot = SnapshotFS.deserialize(message.snapshot);
-		const diagnostics = await self.getDiagnostics(snapshot, message.path);
-		post({
-			id: message.id,
-			type: "diagnostics-result",
-			ok: true,
-			diagnostics,
-		});
-	} catch (error) {
-		post({
-			id: message.id,
-			type: "diagnostics-result",
-			ok: false,
-			error: toErrorMessage(error, "Failed to get diagnostics"),
-		});
-	}
-}
+Comlink.expose(api);
 
 // ---------------------------------------------------------------------------
 // Output capture
@@ -204,10 +138,6 @@ async function captureRun(
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
-
-function post(message: WorkerResponse): void {
-	self.postMessage(message);
-}
 
 function toErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message) return error.message;
