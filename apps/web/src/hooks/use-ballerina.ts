@@ -3,24 +3,14 @@ import * as React from "react";
 import { SnapshotFS } from "@/lib/fs/snapshot";
 import { useFS } from "@/providers/fs-provider";
 import { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
-import type { WorkerRunResult } from "@/workers/ballerina-worker-protocol";
+import type { WorkerRunResult } from "@/workers/ballerina-worker-contract";
+import { getBallerinaWasmUrl } from "@/workers/ballerina-wasm-url";
 
 export type UseBallerinaReturn = {
 	isReady: boolean;
 	progress: number;
 	run: (path: string) => Promise<WorkerRunResult | null>;
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function resolveWasmUrl(): string {
-	return new URL(
-		"ballerina.wasm",
-		new URL(import.meta.env.BASE_URL, window.location.origin),
-	).toString();
-}
 
 export function useBallerina(): UseBallerinaReturn {
 	const fs = useFS();
@@ -31,17 +21,17 @@ export function useBallerina(): UseBallerinaReturn {
 	React.useEffect(() => {
 		let cancelled = false;
 
-		const client = new BallerinaWorkerClient({
-			onProgress: (_id, value) => {
-				if (!cancelled) {
-					setProgress(value);
-				}
-			},
-		});
+		const client = new BallerinaWorkerClient();
 		clientRef.current = client;
 
 		client
-			.init(resolveWasmUrl())
+			.init(getBallerinaWasmUrl(), (value) => {
+				if (!cancelled) {
+					// Download hits 100% before compile + Go startup finish; cap at 99%
+					// until `init` resolves (then we set 100% and `isReady`).
+					setProgress(Math.min(value, 99));
+				}
+			})
 			.then(() => {
 				if (!cancelled) {
 					setProgress(100);
@@ -74,7 +64,7 @@ export function useBallerina(): UseBallerinaReturn {
 
 			try {
 				const snapshot = await SnapshotFS.from(fs, path);
-				return await clientRef.current.run(path, snapshot.serialize());
+				return await clientRef.current.run(path, snapshot);
 			} catch (error) {
 				const message =
 					error instanceof Error ? error.message : "Unexpected error";

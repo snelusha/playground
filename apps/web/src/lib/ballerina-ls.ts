@@ -3,6 +3,7 @@ import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
 
 import { SnapshotFS } from "@/lib/fs/snapshot";
 import { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
+import { getBallerinaWasmUrl } from "@/workers/ballerina-wasm-url";
 
 import type { Transport } from "@codemirror/lsp-client";
 
@@ -49,7 +50,7 @@ export class BallerinaLS implements Transport {
 					const snapshot = await SnapshotFS.from(fs, targetPath);
 					const diagnostics = await this.workerClient?.diagnostics(
 						targetPath,
-						snapshot.serialize(),
+						snapshot,
 					);
 
 					this._publish(
@@ -98,11 +99,7 @@ export class BallerinaLS implements Transport {
 			this.workerClient = new BallerinaWorkerClient();
 		}
 		if (!this.initPromise) {
-			const wasmUrl = new URL(
-				"ballerina.wasm",
-				new URL(import.meta.env.BASE_URL, window.location.origin),
-			).toString();
-			this.initPromise = this.workerClient.init(wasmUrl);
+			this.initPromise = this.workerClient.init(getBallerinaWasmUrl());
 		}
 
 		await this.initPromise;
