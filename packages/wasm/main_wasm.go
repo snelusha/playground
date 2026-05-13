@@ -46,7 +46,7 @@ func run(this js.Value, args []js.Value) any {
 	proxy := args[0]
 	path := args[1].String()
 
-	fsys := NewLocalStorageFS(proxy)
+	fsys := NewBridgeFS(proxy)
 
 	result, err := directory.LoadProject(fsys, path)
 	if err != nil {
