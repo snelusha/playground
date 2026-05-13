@@ -6,90 +6,49 @@ import { SnapshotFS } from "@/lib/fs/snapshot";
 
 import { useFS } from "@/providers/fs-provider";
 
+import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
+
+import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
+
 export function useBallerina() {
 	const fs = useFS();
+
+	const clientRef = React.useRef<BallerinaWorkerClient | null>(null);
 
 	const [isReady, setIsReady] = React.useState(false);
 	const [progress, setProgress] = React.useState(0);
 
 	React.useEffect(() => {
-		let cancelled = false;
+		const client = getBallerinaWorkerClient();
+		clientRef.current = client;
 
-		async function load() {
-			const go = new window.Go();
-
-			const wasmUrl = new URL(
-				"ballerina.wasm",
-				new URL(import.meta.env.BASE_URL, window.location.origin),
-			).toString();
-
-			const result = await WebAssembly.instantiateStreaming(
-				fetchResponseWithProgress(wasmUrl, (pct) => {
-					if (!cancelled) setProgress(pct);
-				}),
-				go.importObject,
-			);
-
-			go.run(result.instance);
-
-			if (!cancelled) {
-				setProgress(100);
-				setIsReady(true);
-			}
-		}
-
-		load().catch(() => {
-			if (!cancelled) setIsReady(false);
-		});
-
-		return () => {
-			cancelled = true;
-		};
+		client
+			.init((p) => setProgress(p))
+			.then(() => setIsReady(true))
+			.catch(() => setIsReady(false));
 	}, []);
 
-	async function run(path: string): Promise<{ error?: string } | null> {
-		if (typeof window.run !== "function")
-			return { error: "Ballerina runtime is not ready" };
-		if (!fs) return { error: "Virtual file system is not available" };
+	const run = React.useCallback(
+		async (path: string): Promise<{ error?: string } | null> => {
+			if (!clientRef.current)
+				return { error: "Ballerina runtime is not initialized" };
+			if (!fs) return { error: "Virtual file system is not available" };
 
-		const snapshot = await SnapshotFS.from(fs, path);
-		const result = await window.run(snapshot, path);
-		if (result && typeof result === "object" && "error" in result) {
-			return result as { error?: string };
-		}
-		return null;
-	}
+			const snapshot = await SnapshotFS.from(fs, path);
+			const result = await clientRef.current.run(snapshot, path);
+			if (result && typeof result === "object" && "error" in result) {
+				return result as { error?: string };
+			}
+			// FIXME: We could get rid of this once we have WASM PAL
+			if (result?.output) {
+				console.log(result.output);
+			} else if (result?.error) {
+				return { error: result.error };
+			}
+			return null;
+		},
+		[fs],
+	);
 
 	return { isReady, progress, run };
-}
-
-async function fetchResponseWithProgress(
-	url: string,
-	onProgress: (pct: number) => void,
-): Promise<Response> {
-	const res = await fetch(url);
-	const total = Number(res.headers.get("content-length") ?? 0);
-
-	if (!res.body || !total) return res;
-
-	const reader = res.body.getReader();
-	const stream = new ReadableStream({
-		async start(controller) {
-			let loaded = 0;
-			for (;;) {
-				const { done, value } = await reader.read();
-				if (done) {
-					controller.close();
-					break;
-				}
-				if (value) {
-					loaded += value.byteLength;
-					onProgress(Math.round((loaded / total) * 100));
-					controller.enqueue(value);
-				}
-			}
-		},
-	});
-
-	return new Response(stream, { headers: res.headers });
 }
