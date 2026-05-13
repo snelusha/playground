@@ -30,6 +30,7 @@ import {
 	isRootPath,
 	join,
 } from "@/lib/fs/core/path-utils";
+import { prettifyOutputIfJson } from "@/lib/output-prettify";
 import { cn } from "@/lib/utils";
 
 import { useEditorStore } from "@/stores/editor-store";
@@ -79,6 +80,11 @@ function OutputPane() {
 	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
 
+	const displayOutput = React.useMemo(
+		() => prettifyOutputIfJson(output),
+		[output],
+	);
+
 	return (
 		<div
 			className={cn(
@@ -124,7 +130,7 @@ function OutputPane() {
 				)}
 			>
 				<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
-					<ANSI value={output} />
+					<ANSI value={displayOutput} />
 				</pre>
 			</div>
 		</div>
