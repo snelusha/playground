@@ -55,7 +55,7 @@ async function fetchWithProgress(
 	return new Response(stream, { headers: res.headers });
 }
 
-// TODO: This should be removed
+// TODO: This can be removed when we have PAL support (v0.5.0)
 async function captureConsoleLogs<T>(
 	fn: () => Promise<T>,
 ): Promise<{ result: T; output: string }> {
@@ -95,10 +95,15 @@ const api: BallerinaWorkerAPI = {
 
 		return initPromise;
 	},
-	run: (snapshot: SnapshotFS, path: string): Promise<RunResult> => {
+	run: async (snapshot: SnapshotFS, path: string): Promise<RunResult> => {
 		if (typeof self.run !== "function")
 			return Promise.resolve({ error: "Ballerina runtime is not initialized" });
-		return captureConsoleLogs(() => Promise.resolve(self.run(snapshot, path)));
+		return captureConsoleLogs(() =>
+			Promise.resolve(self.run(snapshot, path)),
+		).then(({ result, output }) => ({
+			output: output || undefined,
+			error: result?.error || undefined,
+		}));
 	},
 	getDiagnostics: (
 		snapshot: SnapshotFS,
