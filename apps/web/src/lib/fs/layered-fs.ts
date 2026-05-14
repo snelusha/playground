@@ -100,8 +100,12 @@ export class LayeredFS implements FS {
 		if (!info) return false;
 
 		if (info.isDir) {
-			if (!(await newTarget.mkdirAll(newPath))) return false;
-			createdPaths.push(newPath);
+			const exists = await newTarget.stat(newPath);
+			if (exists && !exists.isDir) return false;
+			if (!exists) {
+				if (!(await newTarget.mkdirAll(newPath))) return false;
+				createdPaths.push(newPath);
+			}
 
 			const entries = await oldTarget.readDir(oldPath);
 			if (!entries) {
@@ -135,11 +139,13 @@ export class LayeredFS implements FS {
 			const file = await oldTarget.open(oldPath);
 			if (!file) return false;
 
+			const exists = await newTarget.stat(newPath);
+
 			if (!(await newTarget.writeFile(newPath, file.content))) {
 				await this._rollback(newTarget, createdPaths);
 				return false;
 			}
-			createdPaths.push(newPath);
+			if (!exists) createdPaths.push(newPath);
 		}
 
 		return oldTarget.remove(oldPath);
