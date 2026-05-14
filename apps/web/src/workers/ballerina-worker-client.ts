@@ -35,7 +35,7 @@ export class BallerinaWorkerClient {
 
 	async run(snapshot: SnapshotFS, path: string): Promise<RunResult> {
 		if (!this.api)
-			return Promise.resolve({ error: "Ballerina runtime is not ready" });
+			return Promise.resolve({ stderr: "Ballerina runtime is not ready" });
 		return this.api.run(Comlink.proxy(snapshot), path);
 	}
 
