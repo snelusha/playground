@@ -32,6 +32,13 @@ func main() {
 	select {}
 }
 
+func runOutcome(stdout, stderr string) map[string]any {
+	return map[string]any{
+		"stdout": stdout,
+		"stderr": stderr,
+	}
+}
+
 func run(_ js.Value, args []js.Value) any {
 	return newPromise(func(resolve js.Value, _ js.Value) {
 		go func() {
