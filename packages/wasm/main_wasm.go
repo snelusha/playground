@@ -18,7 +18,6 @@ package main
 
 import (
 	_ "ballerina-lang-go/lib/rt"
-	"ballerina-lang-go/pal"
 	"ballerina-lang-go/projects"
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
@@ -91,18 +90,8 @@ func run(_ js.Value, args []js.Value) any {
 				return
 			}
 
-			wasmPal := pal.Platform{
-				IO: pal.IO{
-					Stdout: func(p []byte) (n int, err error) {
-						return stdoutBuf.Write(p)
-					},
-					Stderr: func(p []byte) (n int, err error) {
-						return stderrBuf.Write(p)
-					},
-				},
-			}
-
-			rt := runtime.NewRuntime(wasmPal, project.Environment().TypeEnv())
+			pal := wasmPal(&stderrBuf, &stdoutBuf)
+			rt := runtime.NewRuntime(pal, project.Environment().TypeEnv())
 			for _, birPkg := range birPkgs {
 				if err := rt.Interpret(*birPkg); err != nil {
 					fmt.Fprintf(&stderrBuf, "%v\n", err)
