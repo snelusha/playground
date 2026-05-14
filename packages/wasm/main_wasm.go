@@ -22,8 +22,8 @@ import (
 	"ballerina-lang-go/projects"
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
+	"bytes"
 	"fmt"
-	"os"
 	"syscall/js"
 )
 
@@ -34,18 +34,27 @@ func main() {
 	select {}
 }
 
+func runOutcome(stdout, stderr string) map[string]any {
+	return map[string]any{
+		"stdout": stdout,
+		"stderr": stderr,
+	}
+}
+
 func run(_ js.Value, args []js.Value) any {
 	return newPromise(func(resolve js.Value, _ js.Value) {
 		go func() {
+			var stdoutBuf, stderrBuf bytes.Buffer
 			defer func() {
 				if r := recover(); r != nil {
-					fmt.Fprintf(os.Stderr, "%v\n", r)
-					resolve.Invoke(jsError(fmt.Errorf("%v", r)))
+					fmt.Fprintf(&stderrBuf, "%v\n", r)
+					resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 				}
 			}()
 
 			if len(args) < 2 {
-				resolve.Invoke(jsError(fmt.Errorf("expected at least 2 arguments: (fsProxy, path)")))
+				fmt.Fprintf(&stderrBuf, "expected at least 2 arguments: (fsProxy, path)\n")
+				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 				return
 			}
 
@@ -55,37 +64,38 @@ func run(_ js.Value, args []js.Value) any {
 
 			result, err := projects.Load(fsys, path)
 			if err != nil {
-				resolve.Invoke(jsError(err))
+				fmt.Fprintf(&stderrBuf, "%v\n", err)
+				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 				return
 			}
 
 			if diags := result.Diagnostics(); diags.HasErrors() {
-				printDiagnostics(fsys, path, os.Stderr, diags, diagnostics.NewDiagnosticEnv())
-				resolve.Invoke(js.Null())
+				printDiagnostics(fsys, path, &stderrBuf, diags, diagnostics.NewDiagnosticEnv())
+				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 				return
 			}
 
 			compilation := result.Project().CurrentPackage().Compilation()
 			if diags := compilation.DiagnosticResult(); diags.HasErrors() {
-				printDiagnostics(fsys, path, os.Stderr, diags, compilation.DiagnosticEnv())
-				resolve.Invoke(js.Null())
+				printDiagnostics(fsys, path, &stderrBuf, diags, compilation.DiagnosticEnv())
+				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 				return
 			}
 
 			birPkgs := projects.NewBallerinaBackend(compilation).BIRPackages()
 			if len(birPkgs) == 0 {
-				resolve.Invoke(jsError(fmt.Errorf("BIR generation failed: no BIR package produced")))
+				fmt.Fprintf(&stderrBuf, "BIR generation failed: no BIR package produced\n")
+				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 				return
 			}
 
-			// FIXME: This is a copy of nativePal and should be replaced with a proper implementation.
 			wasmPal := pal.Platform{
 				IO: pal.IO{
 					Stdout: func(p []byte) (n int, err error) {
-						return os.Stdout.Write(p)
+						return stdoutBuf.Write(p)
 					},
 					Stderr: func(p []byte) (n int, err error) {
-						return os.Stderr.Write(p)
+						return stderrBuf.Write(p)
 					},
 				},
 			}
@@ -93,22 +103,27 @@ func run(_ js.Value, args []js.Value) any {
 			rt := runtime.NewRuntime(wasmPal)
 			for _, birPkg := range birPkgs {
 				if err := rt.Interpret(*birPkg); err != nil {
-					resolve.Invoke(jsError(err))
+					fmt.Fprintf(&stderrBuf, "%v\n", err)
+					resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 					return
 				}
 			}
 
-			resolve.Invoke(js.Null())
+			resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 		}()
 	})
 }
 
-func mapDiagnostics(diags []diagnostics.Diagnostic) []any {
+func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEnv) []any {
 	mapped := make([]any, len(diags))
 	for i, d := range diags {
-		lineRange := d.Location().LineRange()
-		start := map[string]any{"line": lineRange.StartLine().Line(), "character": lineRange.StartLine().Offset()}
-		end := map[string]any{"line": lineRange.EndLine().Line(), "character": lineRange.EndLine().Offset()}
+		location := d.Location()
+		if diagnostics.IsLocationEmpty(location) {
+			continue
+		}
+
+		start := map[string]any{"line": de.StartLine(location), "character": de.StartColumn(location)}
+		end := map[string]any{"line": de.EndLine(location), "character": de.EndColumn(location)}
 		mapped[i] = map[string]any{
 			"range": map[string]any{
 				"start": start,
@@ -125,12 +140,12 @@ func getDiagnostics(_ js.Value, args []js.Value) any {
 	return newPromise(func(resolve js.Value, reject js.Value) {
 		defer func() {
 			if r := recover(); r != nil {
-				reject.Invoke(jsError(fmt.Errorf("%v", r)))
+				resolve.Invoke(js.ValueOf([]any{}))
 			}
 		}()
 
 		if len(args) < 2 {
-			reject.Invoke(jsError(fmt.Errorf("expected at least 2 arguments: (fsProxy, path)")))
+			resolve.Invoke(js.ValueOf([]any{}))
 			return
 		}
 
@@ -138,29 +153,23 @@ func getDiagnostics(_ js.Value, args []js.Value) any {
 		path := args[1].String()
 		fsys := NewBridgeFS(proxy)
 
-		result, err := directory.LoadProject(fsys, path)
+		result, err := projects.Load(fsys, path)
 		if err != nil {
-			reject.Invoke(jsError(err))
+			resolve.Invoke(js.ValueOf([]any{}))
 			return
 		}
 
 		if result.Diagnostics().HasErrors() {
-			resolve.Invoke(mapDiagnostics(result.Diagnostics().Diagnostics()))
+			resolve.Invoke(mapDiagnostics(result.Diagnostics().Diagnostics(), diagnostics.NewDiagnosticEnv()))
 			return
 		}
 
 		compilation := result.Project().CurrentPackage().Compilation()
 		if compilation.DiagnosticResult().HasErrors() {
-			resolve.Invoke(mapDiagnostics(compilation.DiagnosticResult().Diagnostics()))
+			resolve.Invoke(mapDiagnostics(compilation.DiagnosticResult().Diagnostics(), compilation.DiagnosticEnv()))
 			return
 		}
 
 		resolve.Invoke(js.ValueOf([]any{}))
 	})
-}
-
-func jsError(err error) map[string]any {
-	return map[string]any{
-		"error": err.Error(),
-	}
 }

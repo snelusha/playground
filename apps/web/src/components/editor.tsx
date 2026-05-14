@@ -217,29 +217,16 @@ function EditorContent() {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
 		setIsRunning(true);
-		const oldConsole = console.log;
-		let captured = "";
-
-		console.log = (...args) => {
-			captured += `${args.join(" ")}\n`;
-			oldConsole.apply(console, args);
-		};
-
 		try {
 			// FIXME: We should automatically save files on change.
 			await saveFile();
 
 			const target = await getBallerinaProjectTarget(fs, activeFile.path);
-			const runResult = await run(target);
-			if (runResult?.error) {
-				captured += `${runResult.error}\n`;
-			}
+			const { stdout, stderr } = await run(target);
+			openOutputWith([stdout, stderr].filter(Boolean).join("\n\n"));
 		} finally {
-			console.log = oldConsole;
 			setIsRunning(false);
 		}
-
-		openOutputWith(captured);
 	}, [activeFile, fs, saveFile, run, openOutputWith, isRunning]);
 
 	useHotkeys("mod+enter", () => void handleRun(), {

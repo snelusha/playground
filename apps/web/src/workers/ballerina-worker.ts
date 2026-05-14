@@ -12,7 +12,7 @@ export interface GoRuntime {
 
 declare const self: typeof globalThis & {
 	Go: new () => GoRuntime;
-	run: (fs: SnapshotFS, path: string) => Promise<{ error?: string } | null>;
+	run: (fs: SnapshotFS, path: string) => Promise<RunResult>;
 	getDiagnostics: (
 		fs: SnapshotFS,
 		path: string,
@@ -55,23 +55,6 @@ async function fetchWithProgress(
 	return new Response(stream, { headers: res.headers });
 }
 
-// TODO: This can be removed when we have PAL support (v0.5.0)
-async function captureConsoleLogs<T>(
-	fn: () => Promise<T>,
-): Promise<{ result: T; output: string }> {
-	const lines: string[] = [];
-	const originalLog = console.log;
-
-	console.log = (...args: unknown[]) => lines.push(args.join(" "));
-
-	try {
-		const result = await fn();
-		return { result, output: lines.join("\n") };
-	} finally {
-		console.log = originalLog;
-	}
-}
-
 let initPromise: Promise<void> | null = null;
 
 const api: BallerinaWorkerAPI = {
@@ -97,13 +80,10 @@ const api: BallerinaWorkerAPI = {
 	},
 	run: async (snapshot: SnapshotFS, path: string): Promise<RunResult> => {
 		if (typeof self.run !== "function")
-			return Promise.resolve({ error: "Ballerina runtime is not initialized" });
-		return captureConsoleLogs(() =>
-			Promise.resolve(self.run(snapshot, path)),
-		).then(({ result, output }) => ({
-			output: output || undefined,
-			error: result?.error || undefined,
-		}));
+			return Promise.resolve({
+				stderr: "Ballerina runtime is not initialized",
+			});
+		return self.run(snapshot, path);
 	},
 	getDiagnostics: (
 		snapshot: SnapshotFS,

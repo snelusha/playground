@@ -1,8 +1,8 @@
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
 export interface RunResult {
-	output?: string;
-	error?: string;
+	stdout?: string;
+	stderr?: string;
 }
 
 export interface BallerinaWorkerAPI {
