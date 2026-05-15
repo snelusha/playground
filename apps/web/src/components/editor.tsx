@@ -47,8 +47,24 @@ function getLanguage(path: string): EditorLanguage {
 	}
 }
 
+function formatJsonOutput(output: string): string {
+	const trimmed = output.trim();
+	if (!trimmed) return output;
+
+	try {
+		const parsed: unknown = JSON.parse(trimmed);
+		return JSON.stringify(parsed, null, 2);
+	} catch {
+		return output;
+	}
+}
+
 function OutputPane() {
 	const output = useEditorStore((s) => s.output);
+	const formattedOutput = React.useMemo(
+		() => formatJsonOutput(output),
+		[output],
+	);
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
@@ -98,7 +114,7 @@ function OutputPane() {
 				)}
 			>
 				<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
-					<ANSI value={output} />
+					<ANSI value={formattedOutput} />
 				</pre>
 			</div>
 		</div>
