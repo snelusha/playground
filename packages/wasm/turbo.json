@@ -1,12 +1,27 @@
 {
 	"extends": ["//"],
 	"tasks": {
+		"gen-libs": {
+			"env": ["LocalAppData"],
+			"inputs": [
+				"scripts/gen-libs.sh",
+				"ballerina-lang-go/go.mod",
+				"ballerina-lang-go/go.sum",
+				"ballerina-lang-go/langlib/**",
+				"ballerina-lang-go/stdlib/**",
+				"ballerina-lang-go/tools/gen-embedded-libs/**",
+				"../../.git/modules/packages/wasm/ballerina-lang-go/HEAD"
+			],
+			"outputs": ["ballerina-lang-go/lib/registry/gen/**"]
+		},
 		"build": {
+			"dependsOn": ["gen-libs"],
 			"env": ["LocalAppData"],
 			"inputs": [
 				"**/*.go",
 				"go.mod",
 				"go.sum",
+				"ballerina-lang-go/lib/registry/gen/**",
 				"../../.git/modules/packages/wasm/ballerina-lang-go/HEAD"
 			],
 			"outputs": ["dist/**"]

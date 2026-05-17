@@ -2,7 +2,8 @@
 	"name": "@playground/wasm",
 	"private": true,
 	"scripts": {
+		"gen-libs": "./scripts/gen-libs.sh",
 		"build": "GOOS=js GOARCH=wasm go build -o dist/ballerina.wasm . && ./scripts/gen-meta.sh",
-		"clean": "git clean -xdf .turbo dist"
+		"clean": "git clean -xdf .turbo dist ballerina-lang-go/lib/registry/gen"
 	}
 }
