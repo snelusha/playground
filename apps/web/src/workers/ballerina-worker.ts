@@ -78,6 +78,13 @@ const api: BallerinaWorkerAPI = {
 				go.importObject,
 			);
 			void go.run(instance);
+			const deadline = Date.now() + 10_000;
+			while (typeof self.run !== "function") {
+				if (Date.now() > deadline) {
+					throw new Error("Ballerina runtime init timed out");
+				}
+				await new Promise((r) => setTimeout(r, 10));
+			}
 		})().catch((error) => {
 			initPromise = null;
 			throw error;

@@ -52,7 +52,7 @@ func run(_ js.Value, args []js.Value) any {
 			}()
 
 			if len(args) < 2 {
-				fmt.Fprintf(stderr, "expected at least 3 arguments: (fsProxy, path, onOutput)\n")
+				fmt.Fprintf(stderr, "expected at least 2 arguments: (fsProxy, path[, onOutput])\n")
 				return
 			}
 
@@ -156,8 +156,8 @@ func emitOutput(onOutput js.Value, stream, text string) {
 }
 
 func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEnv) []any {
-	mapped := make([]any, len(diags))
-	for i, d := range diags {
+	mapped := make([]any, 0, len(diags))
+	for _, d := range diags {
 		location := d.Location()
 		if diagnostics.IsLocationEmpty(location) {
 			continue
@@ -165,14 +165,14 @@ func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEn
 
 		start := map[string]any{"line": de.StartLine(location), "character": de.StartColumn(location)}
 		end := map[string]any{"line": de.EndLine(location), "character": de.EndColumn(location)}
-		mapped[i] = map[string]any{
+		mapped = append(mapped, map[string]any{
 			"range": map[string]any{
 				"start": start,
 				"end":   end,
 			},
 			"severity": 1,
 			"message":  d.Message(),
-		}
+		})
 	}
 	return mapped
 }
