@@ -14,7 +14,4 @@ public function main() returns error? {
     res = check apiClient->post("/post", data);
     io:println("POST Response JSON Payload: ", check res.getJsonPayload());
     io:println("Post Response Content-Type Header: ", check res.getHeader("Content-Type"));
-
-    res = check apiClient->execute("GET", "/delay/5", {"X-Custom-Header": "BallerinaTimeout"});
-    io:println("Delayed Response Status: ", res.statusCode);
 }
