@@ -23,13 +23,8 @@ import { CodeEditor } from "@/components/code-editor";
 import { VersionCard } from "@/components/version-card";
 import { ANSI } from "@/components/ansi";
 
-import {
-	basename,
-	dirname,
-	ext,
-	isRootPath,
-	join,
-} from "@/lib/fs/core/path-utils";
+import { basename, ext } from "@/lib/fs/core/path-utils";
+import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
 import { cn } from "@/lib/utils";
 
 import { useEditorStore } from "@/stores/editor-store";
@@ -38,7 +33,6 @@ import { useActiveFile, useFileTreeActions } from "@/stores/file-tree-store";
 import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
-import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { EditorLanguage } from "@/components/code-editor";
 
 function getLanguage(path: string): EditorLanguage {
@@ -51,23 +45,6 @@ function getLanguage(path: string): EditorLanguage {
 		default:
 			return "text";
 	}
-}
-
-function getBallerinaExecutionTarget(fs: LayeredFS, path: string): string {
-	let currentDir = dirname(path);
-	const hasRootPrefix = path.startsWith("/");
-
-	while (!isRootPath(currentDir)) {
-		const dirPath =
-			hasRootPrefix && !currentDir.startsWith("/")
-				? `/${currentDir}`
-				: currentDir;
-		const tomlPath = join(dirPath, "Ballerina.toml");
-		if (fs.stat(tomlPath)) return dirPath;
-		currentDir = dirname(currentDir);
-	}
-
-	return path;
 }
 
 function OutputPane() {
@@ -128,7 +105,13 @@ function OutputPane() {
 	);
 }
 
-function EditorPane({ onRun }: { onRun: () => void }) {
+function EditorPane({
+	onRun,
+	isRunning,
+}: {
+	onRun: () => Promise<void>;
+	isRunning: boolean;
+}) {
 	const activeFile = useActiveFile();
 
 	const { updateFileContent } = useFileTreeActions();
@@ -158,20 +141,31 @@ function EditorPane({ onRun }: { onRun: () => void }) {
 				<Button
 					className="h-full rounded-none"
 					variant="ghost"
-					onClick={onRun}
-					disabled={!activeFile || getLanguage(activeFile.path) !== "ballerina"}
+					onClick={() => void onRun()}
+					disabled={
+						isRunning ||
+						!activeFile ||
+						getLanguage(activeFile.path) !== "ballerina"
+					}
 				>
-					<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-					<span>Run</span>
+					{isRunning ? (
+						<span>[...]</span>
+					) : (
+						<>
+							<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+							<span>Run</span>
+						</>
+					)}
 				</Button>
 			</div>
 			{activeFile && (
 				<CodeEditor
 					key={activeFile.path}
+					filePath={activeFile.path}
 					value={activeFile?.content}
 					onChange={handleChange}
 					hotkeys={{
-						"Mod-Enter": onRun,
+						"Mod-Enter": () => void onRun(),
 						"Mod-Alt-v": toggleEditorMode,
 						"Mod-r": () => window.location.reload(),
 					}}
@@ -213,13 +207,16 @@ function EditorContent() {
 	const activeFile = useActiveFile();
 
 	const { saveFile } = useFileTreeActions();
+	const [isRunning, setIsRunning] = React.useState(false);
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
-	const handleRun = React.useCallback(() => {
+	const handleRun = React.useCallback(async () => {
+		if (isRunning) return;
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
+		setIsRunning(true);
 		const oldConsole = console.log;
 		let captured = "";
 
@@ -230,21 +227,22 @@ function EditorContent() {
 
 		try {
 			// FIXME: We should automatically save files on change.
-			saveFile();
+			await saveFile();
 
-			const target = getBallerinaExecutionTarget(fs, activeFile.path);
-			const runResult = run(target);
+			const target = await getBallerinaProjectTarget(fs, activeFile.path);
+			const runResult = await run(target);
 			if (runResult?.error) {
 				captured += `${runResult.error}\n`;
 			}
 		} finally {
 			console.log = oldConsole;
+			setIsRunning(false);
 		}
 
 		openOutputWith(captured);
-	}, [activeFile, fs, saveFile, run, openOutputWith]);
+	}, [activeFile, fs, saveFile, run, openOutputWith, isRunning]);
 
-	useHotkeys("mod+enter", () => handleRun(), {
+	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,
 	});
 
@@ -260,7 +258,7 @@ function EditorContent() {
 			<SidebarInset className="flex flex-col h-dvh overflow-hidden">
 				<EditorHeader />
 				<main className="flex flex-col lg:flex-row flex-1 min-h-0">
-					<EditorPane onRun={handleRun} />
+					<EditorPane onRun={handleRun} isRunning={isRunning} />
 					<OutputPane />
 				</main>
 			</SidebarInset>

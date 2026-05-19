@@ -52,23 +52,38 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 
 	React.useEffect(() => {
 		if (!ready || isProcessingShare) return;
+		let cancelled = false;
 
-		const activePath = activeFilePathRef.current;
+		const syncFileRoute = async () => {
+			const fileExists = filePathFromUrl
+				? await existsFile(filePathFromUrl)
+				: false;
+			if (cancelled) return;
+			const activePath = activeFilePathRef.current;
+			if (filePathFromUrl && fileExists) {
+				if (!cancelled && filePathFromUrl !== activePath)
+					await openFile(filePathFromUrl);
+				return;
+			}
+			if (clearedByDeletionRef.current) {
+				clearedByDeletionRef.current = false;
+				return;
+			}
+			if (!activePath && !cancelled) {
+				await openFile(DEFAULT_FILE);
+				if (cancelled) return;
+				navigate({
+					to: "/$",
+					params: { _splat: DEFAULT_SPLAT },
+					replace: true,
+				});
+			}
+		};
+		void syncFileRoute();
 
-		if (filePathFromUrl && existsFile(filePathFromUrl)) {
-			if (filePathFromUrl !== activePath) openFile(filePathFromUrl);
-			return;
-		}
-
-		if (clearedByDeletionRef.current) {
-			clearedByDeletionRef.current = false;
-			return;
-		}
-
-		if (!activePath) {
-			openFile(DEFAULT_FILE);
-			navigate({ to: "/$", params: { _splat: DEFAULT_SPLAT }, replace: true });
-		}
+		return () => {
+			cancelled = true;
+		};
 	}, [
 		ready,
 		isProcessingShare,

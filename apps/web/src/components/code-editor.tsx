@@ -4,16 +4,20 @@ import { basicSetup } from "codemirror";
 import { Compartment, Prec } from "@codemirror/state";
 import { StreamLanguage, indentUnit } from "@codemirror/language";
 import { autocompletion } from "@codemirror/autocomplete";
+import { languageServerExtensions, LSPClient } from "@codemirror/lsp-client";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { clike } from "@codemirror/legacy-modes/mode/clike";
 import { Vim, vim } from "@replit/codemirror-vim";
+
+import { toast } from "sonner";
 
 import { ShikiEditor } from "@/components/shiki-editor";
 
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileTreeActions } from "@/stores/file-tree-store";
 
+import { BallerinaLS } from "@/lib/ballerina-ls";
 import { cn } from "@/lib/utils";
 
 import type { KeyBinding } from "@codemirror/view";
@@ -24,6 +28,7 @@ export type EditorLanguage = "ballerina" | "toml" | "text";
 type HotkeyMap = Record<string, () => void>;
 
 interface CodeEditorProps {
+	filePath?: string;
 	value?: string;
 	onChange?: (value: string) => void;
 	hotkeys?: HotkeyMap;
@@ -40,6 +45,10 @@ const ballerinaMode = StreamLanguage.define(
 		name: "ballerina",
 	}),
 );
+
+const ballerinaLSPClient = new LSPClient({
+	extensions: languageServerExtensions(),
+}).connect(new BallerinaLS());
 
 function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 	const bindings: KeyBinding[] = Object.keys(hotkeysRef.current ?? {}).map(
@@ -123,6 +132,7 @@ const theme = EditorView.theme({
 });
 
 export function CodeEditor({
+	filePath,
 	value,
 	onChange,
 	hotkeys = {},
@@ -168,6 +178,7 @@ export function CodeEditor({
 			},
 			extensions: [
 				...baseExtensions(hotkeysRef),
+				ballerinaLSPClient.plugin(filePath ?? ""),
 				languageCompartment.current.of(
 					language === "ballerina" ? ballerinaMode : [],
 				),
@@ -199,7 +210,10 @@ export function CodeEditor({
 	}, [vimEnabled]);
 
 	React.useEffect(() => {
-		Vim.defineEx("write", "w", () => saveFileRef.current?.());
+		Vim.defineEx("write", "w", () => {
+			const saveFile = saveFileRef.current;
+			if (saveFile) saveFile().catch(() => toast.error("Failed to save file"));
+		});
 	}, []);
 
 	return (
