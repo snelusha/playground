@@ -159,7 +159,7 @@ func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEn
 	mapped := make([]any, 0, len(diags))
 	for _, d := range diags {
 		location := d.Location()
-		if diagnostics.IsLocationEmpty(location) {
+		if diagnostics.IsLocationEmpty(location) || !diagnostics.LocationHasSource(location) {
 			continue
 		}
 
