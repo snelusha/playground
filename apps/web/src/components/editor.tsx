@@ -68,6 +68,34 @@ function OutputPane() {
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
+	const scrollRef = React.useRef<HTMLDivElement>(null);
+	const shouldAutoScrollRef = React.useRef(true);
+	const previousOutputLengthRef = React.useRef(output.length);
+
+	const updateAutoScrollState = React.useCallback(() => {
+		const element = scrollRef.current;
+		if (!element) return;
+
+		const distanceFromBottom =
+			element.scrollHeight - element.scrollTop - element.clientHeight;
+		shouldAutoScrollRef.current = distanceFromBottom < 24;
+	}, []);
+
+	React.useLayoutEffect(() => {
+		const element = scrollRef.current;
+		if (!element) return;
+
+		const outputWasReset = output.length < previousOutputLengthRef.current;
+		previousOutputLengthRef.current = output.length;
+
+		if (outputWasReset) {
+			shouldAutoScrollRef.current = true;
+		}
+
+		if (shouldAutoScrollRef.current || outputOpen) {
+			element.scrollTop = element.scrollHeight;
+		}
+	}, [output, outputOpen]);
 
 	return (
 		<div
@@ -108,6 +136,8 @@ function OutputPane() {
 				</div>
 			</div>
 			<div
+				ref={scrollRef}
+				onScroll={updateAutoScrollState}
 				className={cn(
 					"min-h-0 overflow-y-auto p-4",
 					outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
