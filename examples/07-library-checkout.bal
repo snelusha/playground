@@ -57,4 +57,3 @@ public function main() {
     io:println("\nReturn #1 | ", book1.returnBook());
     io:println("Return #2 | ", book1.returnBook());
 }
-

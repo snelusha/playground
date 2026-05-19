@@ -76,4 +76,3 @@ public function main() {
         io:println("Error  | ", row2);
     }
 }
-
