@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"strings"
@@ -202,7 +203,7 @@ func tlsMatchCN(pattern, host string) error {
 	return fmt.Errorf("x509: certificate CN %q does not match host %q", pattern, host)
 }
 
-func wasmPal(stderrBuf, stdoutBuf *bytes.Buffer) pal.Platform {
+func wasmPal(fsys fs.FS, stderrBuf, stdoutBuf *bytes.Buffer) pal.Platform {
 	return pal.Platform{
 		IO: pal.IO{
 			Stdout: func(p []byte) (n int, err error) {
@@ -210,6 +211,16 @@ func wasmPal(stderrBuf, stdoutBuf *bytes.Buffer) pal.Platform {
 			},
 			Stderr: func(p []byte) (n int, err error) {
 				return stderrBuf.Write(p)
+			},
+		},
+		FS: pal.FS{
+			ReadFile: func(path string) ([]byte, error) {
+				f, err := fsys.Open(path)
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = f.Close() }()
+				return io.ReadAll(f)
 			},
 		},
 		HTTP: pal.HTTP{

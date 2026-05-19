@@ -88,7 +88,7 @@ func run(_ js.Value, args []js.Value) any {
 				return
 			}
 
-			pal := wasmPal(&stderrBuf, &stdoutBuf)
+			pal := wasmPal(fsys, &stderrBuf, &stdoutBuf)
 			rt := runtime.NewRuntime(pal)
 			for _, birPkg := range birPkgs {
 				if err := rt.Interpret(*birPkg); err != nil {
