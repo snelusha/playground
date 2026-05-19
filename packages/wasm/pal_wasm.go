@@ -2,204 +2,150 @@ package main
 
 import (
 	"ballerina-lang-go/platform/pal"
-	"bytes"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
-	"net/http"
-	"os"
 	"strings"
+	"syscall/js"
+	"time"
 )
 
-type httpClient struct {
-	client *http.Client
+type fetchHTTPClient struct {
+	cfg pal.ClientConfig
 }
 
-func (c *httpClient) Execute(method, url string, body []byte, contentType string, reqHeaders map[string][]string) (int, map[string][]string, []byte, error) {
-	var bodyReader io.Reader
-	if body != nil {
-		bodyReader = bytes.NewReader(body)
+type requestContext struct {
+	controller js.Value
+	timeout    *time.Timer
+}
+
+func (ctx *requestContext) cleanup() {
+	if ctx.timeout != nil {
+		ctx.timeout.Stop()
 	}
-	req, err := http.NewRequest(method, url, bodyReader)
+}
+
+func (c *fetchHTTPClient) Execute(method, url string, body []byte, contentType string, reqHeaders map[string][]string) (int, map[string][]string, []byte, error) {
+	fetch := js.Global().Get("fetch")
+	if !fetch.Truthy() {
+		return 0, nil, nil, fmt.Errorf("browser fetch API is not available")
+	}
+
+	reqCtx := &requestContext{}
+	defer reqCtx.cleanup()
+
+	options := c.buildFetchOptions(method, body, contentType, reqHeaders, reqCtx)
+
+	resp, err := c.executeRequest(fetch, url, options)
 	if err != nil {
 		return 0, nil, nil, err
 	}
-	// Set default User-Agent before caller headers so caller can override it if needed
-	req.Header.Set("User-Agent", "ballerina")
+
+	respHeaders := c.extractHeaders(resp)
+	respBody, err := c.extractBody(resp)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+
+	return resp.Get("status").Int(), respHeaders, respBody, nil
+}
+
+func (c *fetchHTTPClient) buildFetchOptions(method string, body []byte, contentType string, reqHeaders map[string][]string, reqCtx *requestContext) map[string]any {
+	options := map[string]any{
+		"method":   method,
+		"headers":  c.buildHeaders(contentType, reqHeaders),
+		"redirect": redirectMode(c.cfg.FollowRedirects.Enabled),
+	}
+
+	if body != nil && methodAllowsBody(method) {
+		options["body"] = c.encodeBody(body)
+	}
+	if c.cfg.Timeout > 0 {
+		options["signal"] = c.setupTimeout(reqCtx)
+	}
+
+	return options
+}
+
+func methodAllowsBody(method string) bool {
+	switch strings.ToUpper(method) {
+	case "GET", "HEAD":
+		return false
+	default:
+		return true
+	}
+}
+
+func (c *fetchHTTPClient) buildHeaders(contentType string, reqHeaders map[string][]string) js.Value {
+	headers := js.Global().Get("Headers").New()
+
 	for k, vals := range reqHeaders {
 		if len(vals) == 0 {
 			continue
 		}
-		req.Header.Set(k, vals[0])
+		headers.Call("set", k, vals[0])
 		for _, v := range vals[1:] {
-			req.Header.Add(k, v)
+			headers.Call("append", k, v)
 		}
 	}
-	// Apply contentType (derived from mediaType) after caller headers so it
-	// always takes priority over any Content-Type supplied in reqHeaders.
+
 	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
+		headers.Call("set", "Content-Type", contentType)
 	}
-	resp, err := c.client.Do(req)
+
+	return headers
+}
+
+func (c *fetchHTTPClient) encodeBody(body []byte) js.Value {
+	bodyBytes := js.Global().Get("Uint8Array").New(len(body))
+	js.CopyBytesToJS(bodyBytes, body)
+	return bodyBytes
+}
+
+func (c *fetchHTTPClient) setupTimeout(reqCtx *requestContext) js.Value {
+	reqCtx.controller = js.Global().Get("AbortController").New()
+	reqCtx.timeout = time.AfterFunc(c.cfg.Timeout, func() {
+		reqCtx.controller.Call("abort")
+	})
+	return reqCtx.controller.Get("signal")
+}
+
+func (c *fetchHTTPClient) executeRequest(fetch js.Value, url string, options map[string]any) (js.Value, error) {
+	resp, err := awaitPromise(fetch.Invoke(url, js.ValueOf(options)))
+	return resp, err
+}
+
+func (c *fetchHTTPClient) extractHeaders(resp js.Value) map[string][]string {
+	respHeaders := map[string][]string{}
+	forEach := js.FuncOf(func(_ js.Value, args []js.Value) any {
+		value := args[0].String()
+		name := args[1].String()
+		respHeaders[name] = append(respHeaders[name], value)
+		return nil
+	})
+	defer forEach.Release()
+
+	resp.Get("headers").Call("forEach", forEach)
+	return respHeaders
+}
+
+func (c *fetchHTTPClient) extractBody(resp js.Value) ([]byte, error) {
+	arrayBuffer, err := awaitPromise(resp.Call("arrayBuffer"))
 	if err != nil {
-		return 0, nil, nil, err
+		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
-	respBody, err := io.ReadAll(resp.Body)
-	return resp.StatusCode, map[string][]string(resp.Header), respBody, err
+
+	uint8Array := js.Global().Get("Uint8Array").New(arrayBuffer)
+	respBody := make([]byte, uint8Array.Get("byteLength").Int())
+	js.CopyBytesToGo(respBody, uint8Array)
+
+	return respBody, nil
 }
 
-// newHTTPClient is the pal.HTTP.NewClient factory for the native-CLI
-// platform. It builds a *http.Client configured from cfg and wraps it so the
-// runtime sees only the pal.HTTPClient interface.
-func newHTTPClient(cfg pal.ClientConfig) pal.HTTPClient {
-	tlsConfig := &tls.Config{InsecureSkipVerify: cfg.TLS.InsecureSkipVerify} //nolint:gosec
-	if len(cfg.TLS.CACertPEM) > 0 {
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(cfg.TLS.CACertPEM) {
-			_, _ = fmt.Fprintf(os.Stderr, "ballerina: failed to parse CA certificate PEM (no valid certificates found); custom CA not loaded\n")
-		} else {
-			tlsConfig.RootCAs = pool
-			if !cfg.TLS.InsecureSkipVerify {
-				// Go 1.15+ requires SANs for hostname verification; many self-signed and
-				// Java-issued certs only set the CN field. When a custom CA is provided
-				// we do our own verification so CN-only certs are accepted as a fallback.
-				tlsConfig.InsecureSkipVerify = true //nolint:gosec
-				tlsConfig.VerifyConnection = tlsVerifyConnectionWithCNFallback(pool)
-			}
-		}
+func redirectMode(enabled bool) string {
+	if enabled {
+		return "follow"
 	}
-	if len(cfg.TLS.ClientCertPEM) > 0 && len(cfg.TLS.ClientKeyPEM) > 0 {
-		if cert, err := tls.X509KeyPair(cfg.TLS.ClientCertPEM, cfg.TLS.ClientKeyPEM); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "ballerina: tls.X509KeyPair failed (client certificate not loaded): %v\n", err)
-		} else {
-			tlsConfig.Certificates = []tls.Certificate{cert}
-		}
-	}
-	tlsConfig.ServerName = cfg.TLS.ServerName
-	tlsConfig.SessionTicketsDisabled = cfg.TLS.DisableSessionTickets
-	tlsConfig.MinVersion = tls.VersionTLS12 // secure default; overridden below if configured
-	if cfg.TLS.MinVersion != 0 {
-		tlsConfig.MinVersion = cfg.TLS.MinVersion
-	}
-	if cfg.TLS.MaxVersion != 0 {
-		tlsConfig.MaxVersion = cfg.TLS.MaxVersion
-	}
-	if len(cfg.TLS.CipherSuiteNames) > 0 {
-		if resolved := resolveCipherSuites(cfg.TLS.CipherSuiteNames); len(resolved) > 0 {
-			tlsConfig.CipherSuites = resolved
-		} else {
-			fmt.Fprintf(os.Stderr, "warning: no valid cipher suites resolved from cfg.TLS.CipherSuiteNames %v; keeping secure defaults\n", cfg.TLS.CipherSuiteNames)
-		}
-	}
-	transport := &http.Transport{
-		TLSClientConfig:     tlsConfig,
-		TLSHandshakeTimeout: cfg.TLS.HandshakeTimeout,
-	}
-	// Always enable HTTP/1 so default-config clients can talk to plain HTTP/1.1
-	// servers (and so ALPN can fall back to http/1.1 for HTTPS servers that
-	// don't speak h2). Add HTTP/2 + h2c on top when explicitly opted in.
-	protocols := new(http.Protocols)
-	protocols.SetHTTP1(true)
-	if cfg.HTTPVersion == "2.0" {
-		protocols.SetHTTP2(true)
-		protocols.SetUnencryptedHTTP2(true)
-	}
-	transport.Protocols = protocols
-	c := &http.Client{Timeout: cfg.Timeout, Transport: transport}
-	if !cfg.FollowRedirects.Enabled {
-		c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
-	} else {
-		maxCount := cfg.FollowRedirects.MaxCount
-		if maxCount <= 0 {
-			maxCount = 5 // Ballerina default
-		}
-		allowAuth := cfg.FollowRedirects.AllowAuthHeaders
-		c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			if len(via) > maxCount {
-				return http.ErrUseLastResponse
-			}
-			if allowAuth && len(via) > 0 {
-				if auth := via[0].Header.Get("Authorization"); auth != "" {
-					req.Header.Set("Authorization", auth)
-				}
-				if proxy := via[0].Header.Get("Proxy-Authorization"); proxy != "" {
-					req.Header.Set("Proxy-Authorization", proxy)
-				}
-			}
-			return nil
-		}
-	}
-	return &httpClient{client: c}
-}
-
-// resolveCipherSuites maps IANA TLS 1.2 cipher suite names to Go uint16 IDs.
-// Unknown names are silently skipped; TLS 1.3 ciphers are unaffected regardless.
-func resolveCipherSuites(names []string) []uint16 {
-	m := make(map[string]uint16, len(tls.CipherSuites())+len(tls.InsecureCipherSuites()))
-	for _, c := range tls.CipherSuites() {
-		m[c.Name] = c.ID
-	}
-	for _, c := range tls.InsecureCipherSuites() {
-		m[c.Name] = c.ID
-	}
-	ids := make([]uint16, 0, len(names))
-	for _, name := range names {
-		if id, ok := m[name]; ok {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
-// tlsVerifyConnectionWithCNFallback returns a VerifyConnection callback that verifies the
-// server's certificate chain against rootCAs and falls back to CN-based hostname matching
-// when no SANs are present. Go 1.15+ disabled CN-only hostname verification (RFC 6125 §2.3),
-// but many self-signed and Java-issued certificates still rely on it.
-func tlsVerifyConnectionWithCNFallback(rootCAs *x509.CertPool) func(tls.ConnectionState) error {
-	return func(cs tls.ConnectionState) error {
-		opts := x509.VerifyOptions{
-			Roots:         rootCAs,
-			Intermediates: x509.NewCertPool(),
-		}
-		for _, cert := range cs.PeerCertificates[1:] {
-			opts.Intermediates.AddCert(cert)
-		}
-		if _, err := cs.PeerCertificates[0].Verify(opts); err != nil {
-			return err
-		}
-		// cs.ServerName is the SNI hostname (no port). Try SAN-based verification first.
-		// Only fall back to CN matching for certs that genuinely have no SANs — when SANs
-		// are present but don't match, that is a real mismatch and must not be bypassed.
-		leaf := cs.PeerCertificates[0]
-		if err := leaf.VerifyHostname(cs.ServerName); err != nil {
-			if len(leaf.DNSNames) > 0 || len(leaf.IPAddresses) > 0 {
-				return err
-			}
-			return tlsMatchCN(leaf.Subject.CommonName, cs.ServerName)
-		}
-		return nil
-	}
-}
-
-// tlsMatchCN checks whether pattern (a certificate CN) matches host.
-// Supports simple wildcard patterns of the form "*.example.com".
-func tlsMatchCN(pattern, host string) error {
-	pattern = strings.ToLower(strings.TrimSuffix(pattern, "."))
-	host = strings.ToLower(strings.TrimSuffix(host, "."))
-	if pattern == host {
-		return nil
-	}
-	if strings.HasPrefix(pattern, "*.") {
-		suffix := pattern[1:] // ".example.com"
-		if strings.HasSuffix(host, suffix) && strings.Count(host, ".") == strings.Count(suffix, ".") {
-			return nil
-		}
-	}
-	return fmt.Errorf("x509: certificate CN %q does not match host %q", pattern, host)
+	return "manual"
 }
 
 func wasmPal(stderr, stdout io.Writer) pal.Platform {
@@ -209,7 +155,9 @@ func wasmPal(stderr, stdout io.Writer) pal.Platform {
 			Stderr: stderr.Write,
 		},
 		HTTP: pal.HTTP{
-			NewClient: newHTTPClient,
+			NewClient: (func(cfg pal.ClientConfig) pal.HTTPClient {
+				return &fetchHTTPClient{cfg: cfg}
+			}),
 		},
 	}
 }
