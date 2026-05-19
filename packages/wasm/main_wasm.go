@@ -143,7 +143,7 @@ func getDiagnostics(_ js.Value, args []js.Value) any {
 			return
 		}
 
-		resolve.Invoke(js.Null())
+		resolve.Invoke(js.ValueOf([]any{}))
 	})
 }
 
