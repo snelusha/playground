@@ -47,15 +47,115 @@ function getLanguage(path: string): EditorLanguage {
 	}
 }
 
+function findJsonFragmentEnd(text: string, start: number): number | null {
+	const stack: string[] = [];
+	let inString = false;
+	let escaped = false;
+
+	for (let index = start; index < text.length; index += 1) {
+		const char = text[index];
+
+		if (inString) {
+			if (escaped) {
+				escaped = false;
+			} else if (char === "\\") {
+				escaped = true;
+			} else if (char === '"') {
+				inString = false;
+			}
+			continue;
+		}
+
+		if (char === '"') {
+			inString = true;
+			continue;
+		}
+
+		if (char === "{" || char === "[") {
+			stack.push(char === "{" ? "}" : "]");
+			continue;
+		}
+
+		if (char === "}" || char === "]") {
+			if (stack.pop() !== char) return null;
+			if (stack.length === 0) return index + 1;
+		}
+	}
+
+	return null;
+}
+
+function normalizeJsonValue(value: unknown): unknown {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+			try {
+				return normalizeJsonValue(JSON.parse(trimmed));
+			} catch {
+				return value;
+			}
+		}
+
+		return value;
+	}
+
+	if (Array.isArray(value)) return value.map(normalizeJsonValue);
+
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, entry]) => [
+				key,
+				normalizeJsonValue(entry),
+			]),
+		);
+	}
+
+	return value;
+}
+
+function stringifyPrettyJson(value: unknown): string {
+	return JSON.stringify(normalizeJsonValue(value), null, 2);
+}
+
 function formatJsonOutput(output: string): string {
 	const trimmed = output.trim();
 	if (!trimmed) return output;
 
 	try {
 		const parsed: unknown = JSON.parse(trimmed);
-		return JSON.stringify(parsed, null, 2);
+		return stringifyPrettyJson(parsed);
 	} catch {
-		return output;
+		let formatted = "";
+		let cursor = 0;
+
+		while (cursor < output.length) {
+			const char = output[cursor];
+
+			if (char !== "{" && char !== "[") {
+				formatted += char;
+				cursor += 1;
+				continue;
+			}
+
+			const end = findJsonFragmentEnd(output, cursor);
+			if (end === null) {
+				formatted += char;
+				cursor += 1;
+				continue;
+			}
+
+			const fragment = output.slice(cursor, end);
+			try {
+				const parsed: unknown = JSON.parse(fragment);
+				formatted += stringifyPrettyJson(parsed);
+				cursor = end;
+			} catch {
+				formatted += char;
+				cursor += 1;
+			}
+		}
+
+		return formatted;
 	}
 }
 
