@@ -2,7 +2,10 @@ import "@/wasm_exec";
 
 import * as Comlink from "comlink";
 
-import type { BallerinaWorkerAPI, RunResult } from "./ballerina-worker-api";
+import type {
+	BallerinaWorkerAPI,
+	RunOutputCallback,
+} from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
 export interface GoRuntime {
@@ -12,7 +15,11 @@ export interface GoRuntime {
 
 declare const self: typeof globalThis & {
 	Go: new () => GoRuntime;
-	run: (fs: SnapshotFS, path: string) => Promise<RunResult>;
+	run: (
+		fs: SnapshotFS,
+		path: string,
+		onOutput: RunOutputCallback,
+	) => Promise<void>;
 	getDiagnostics: (
 		fs: SnapshotFS,
 		path: string,
@@ -78,12 +85,19 @@ const api: BallerinaWorkerAPI = {
 
 		return initPromise;
 	},
-	run: async (snapshot: SnapshotFS, path: string): Promise<RunResult> => {
-		if (typeof self.run !== "function")
-			return Promise.resolve({
-				stderr: "Ballerina runtime is not initialized",
+	run: async (
+		snapshot: SnapshotFS,
+		path: string,
+		onOutput: RunOutputCallback,
+	): Promise<void> => {
+		if (typeof self.run !== "function") {
+			onOutput({
+				stream: "stderr",
+				text: "Ballerina runtime is not initialized",
 			});
-		return self.run(snapshot, path);
+			return;
+		}
+		return self.run(snapshot, path, onOutput);
 	},
 	getDiagnostics: (
 		snapshot: SnapshotFS,

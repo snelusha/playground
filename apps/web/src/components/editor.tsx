@@ -226,6 +226,7 @@ function EditorContent() {
 	const [isRunning, setIsRunning] = React.useState(false);
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
+	const appendOutput = useEditorStore((s) => s.appendOutput);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleRun = React.useCallback(async () => {
@@ -238,12 +239,12 @@ function EditorContent() {
 			await saveFile();
 
 			const target = await getBallerinaProjectTarget(fs, activeFile.path);
-			const { stdout, stderr } = await run(target);
-			openOutputWith([stdout, stderr].filter(Boolean).join("\n\n"));
+			openOutputWith("");
+			await run(target, ({ text }) => appendOutput(text));
 		} finally {
 			setIsRunning(false);
 		}
-	}, [activeFile, fs, saveFile, run, openOutputWith, isRunning]);
+	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
 	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,

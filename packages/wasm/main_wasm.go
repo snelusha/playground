@@ -21,7 +21,6 @@ import (
 	"ballerina-lang-go/projects"
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
-	"bytes"
 	"fmt"
 	"syscall/js"
 )
@@ -33,27 +32,27 @@ func main() {
 	select {}
 }
 
-func runOutcome(stdout, stderr string) map[string]any {
-	return map[string]any{
-		"stdout": stdout,
-		"stderr": stderr,
-	}
-}
-
 func run(_ js.Value, args []js.Value) any {
 	return newPromise(func(resolve js.Value, _ js.Value) {
 		go func() {
-			var stdoutBuf, stderrBuf bytes.Buffer
+			onOutput := js.Null()
+			if len(args) >= 3 {
+				onOutput = args[2]
+			}
+
+			stderr := outputWriter{onOutput: onOutput, stream: "stderr"}
+			stdout := outputWriter{onOutput: onOutput, stream: "stdout"}
+			done := func() { resolve.Invoke(js.Undefined()) }
+
 			defer func() {
 				if r := recover(); r != nil {
-					fmt.Fprintf(&stderrBuf, "%v\n", r)
-					resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
+					fmt.Fprintf(stderr, "%v\n", r)
 				}
+				done()
 			}()
 
 			if len(args) < 2 {
-				fmt.Fprintf(&stderrBuf, "expected at least 2 arguments: (fsProxy, path)\n")
-				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
+				fmt.Fprintf(stderr, "expected at least 3 arguments: (fsProxy, path, onOutput)\n")
 				return
 			}
 
@@ -63,21 +62,18 @@ func run(_ js.Value, args []js.Value) any {
 
 			result, err := projects.Load(fsys, path)
 			if err != nil {
-				fmt.Fprintf(&stderrBuf, "%v\n", err)
-				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
+				fmt.Fprintf(stderr, "%v\n", err)
 				return
 			}
 
 			if diags := result.Diagnostics(); diags.HasErrors() {
-				printDiagnostics(fsys, path, &stderrBuf, diags, diagnostics.NewDiagnosticEnv())
-				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
+				printDiagnostics(fsys, path, stderr, diags, diagnostics.NewDiagnosticEnv())
 				return
 			}
 
 			compilation := result.Project().CurrentPackage().Compilation()
 			if diags := compilation.DiagnosticResult(); diags.HasErrors() {
-				printDiagnostics(fsys, path, &stderrBuf, diags, compilation.DiagnosticEnv())
-				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
+				printDiagnostics(fsys, path, stderr, diags, compilation.DiagnosticEnv())
 				return
 			}
 
@@ -85,46 +81,20 @@ func run(_ js.Value, args []js.Value) any {
 
 			birPkgs := projects.NewBallerinaBackend(compilation).BIRPackages()
 			if len(birPkgs) == 0 {
-				fmt.Fprintf(&stderrBuf, "BIR generation failed: no BIR package produced\n")
-				resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
+				fmt.Fprintf(stderr, "BIR generation failed: no BIR package produced\n")
 				return
 			}
 
-			pal := wasmPal(&stderrBuf, &stdoutBuf)
+			pal := wasmPal(stderr, stdout)
 			rt := runtime.NewRuntime(pal, project.Environment().TypeEnv())
 			for _, birPkg := range birPkgs {
 				if err := rt.Interpret(*birPkg); err != nil {
-					fmt.Fprintf(&stderrBuf, "%v\n", err)
-					resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
+					fmt.Fprintf(stderr, "%v\n", err)
 					return
 				}
 			}
-
-			resolve.Invoke(runOutcome(stdoutBuf.String(), stderrBuf.String()))
 		}()
 	})
-}
-
-func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEnv) []any {
-	mapped := make([]any, len(diags))
-	for i, d := range diags {
-		location := d.Location()
-		if diagnostics.IsLocationEmpty(location) {
-			continue
-		}
-
-		start := map[string]any{"line": de.StartLine(location), "character": de.StartColumn(location)}
-		end := map[string]any{"line": de.EndLine(location), "character": de.EndColumn(location)}
-		mapped[i] = map[string]any{
-			"range": map[string]any{
-				"start": start,
-				"end":   end,
-			},
-			"severity": 1,
-			"message":  d.Message(),
-		}
-	}
-	return mapped
 }
 
 func getDiagnostics(_ js.Value, args []js.Value) any {
@@ -163,4 +133,46 @@ func getDiagnostics(_ js.Value, args []js.Value) any {
 
 		resolve.Invoke(js.ValueOf([]any{}))
 	})
+}
+
+type outputWriter struct {
+	onOutput js.Value
+	stream   string
+}
+
+func (w outputWriter) Write(p []byte) (int, error) {
+	emitOutput(w.onOutput, w.stream, string(p))
+	return len(p), nil
+}
+
+func emitOutput(onOutput js.Value, stream, text string) {
+	if onOutput.Type() != js.TypeFunction {
+		return
+	}
+	onOutput.Invoke(map[string]any{
+		"stream": stream,
+		"text":   text,
+	})
+}
+
+func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEnv) []any {
+	mapped := make([]any, len(diags))
+	for i, d := range diags {
+		location := d.Location()
+		if diagnostics.IsLocationEmpty(location) {
+			continue
+		}
+
+		start := map[string]any{"line": de.StartLine(location), "character": de.StartColumn(location)}
+		end := map[string]any{"line": de.EndLine(location), "character": de.EndColumn(location)}
+		mapped[i] = map[string]any{
+			"range": map[string]any{
+				"start": start,
+				"end":   end,
+			},
+			"severity": 1,
+			"message":  d.Message(),
+		}
+	}
+	return mapped
 }

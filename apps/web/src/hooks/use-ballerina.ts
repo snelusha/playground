@@ -9,6 +9,7 @@ import { useFS } from "@/providers/fs-provider";
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
+import type { RunOutputCallback } from "@/workers/ballerina-worker-api";
 
 export function useBallerina() {
 	const fs = useFS();
@@ -29,18 +30,24 @@ export function useBallerina() {
 	}, []);
 
 	const run = React.useCallback(
-		async (path: string): Promise<{ stdout: string; stderr: string }> => {
-			if (!clientRef.current)
-				return { stdout: "", stderr: "Ballerina runtime is not initialized" };
-			if (!fs)
-				return { stdout: "", stderr: "Virtual file system is not available" };
+		async (path: string, onOutput: RunOutputCallback): Promise<void> => {
+			if (!clientRef.current) {
+				onOutput({
+					stream: "stderr",
+					text: "Ballerina runtime is not initialized",
+				});
+				return;
+			}
+			if (!fs) {
+				onOutput({
+					stream: "stderr",
+					text: "Virtual file system is not available",
+				});
+				return;
+			}
 
 			const snapshot = await SnapshotFS.from(fs, path);
-			const result = await clientRef.current.run(snapshot, path);
-			return {
-				stdout: result.stdout ?? "",
-				stderr: result.stderr ?? "",
-			};
+			await clientRef.current.run(snapshot, path, onOutput);
 		},
 		[fs],
 	);

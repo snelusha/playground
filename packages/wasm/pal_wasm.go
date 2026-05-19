@@ -202,15 +202,11 @@ func tlsMatchCN(pattern, host string) error {
 	return fmt.Errorf("x509: certificate CN %q does not match host %q", pattern, host)
 }
 
-func wasmPal(stderrBuf, stdoutBuf *bytes.Buffer) pal.Platform {
+func wasmPal(stderr, stdout io.Writer) pal.Platform {
 	return pal.Platform{
 		IO: pal.IO{
-			Stdout: func(p []byte) (n int, err error) {
-				return stdoutBuf.Write(p)
-			},
-			Stderr: func(p []byte) (n int, err error) {
-				return stderrBuf.Write(p)
-			},
+			Stdout: stdout.Write,
+			Stderr: stderr.Write,
 		},
 		HTTP: pal.HTTP{
 			NewClient: newHTTPClient,
