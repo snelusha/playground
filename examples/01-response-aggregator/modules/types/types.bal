@@ -5,4 +5,3 @@ public type ApiResponse record {|
     int flags;
     any result;
 |};
-

@@ -24,4 +24,3 @@ public function main() {
                 " | ", ord.zone, " (fee: $", deliveryFee[ord.zone], ")");
     }
 }
-

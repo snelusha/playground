@@ -27,4 +27,3 @@ public function processResponse(types:ApiResponse res) {
         io:println("  Info: ", result);
     }
 }
-

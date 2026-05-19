@@ -9,6 +9,7 @@ import { useFS } from "@/providers/fs-provider";
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
+import type { RunOutputCallback } from "@/workers/ballerina-worker-api";
 
 export function useBallerina() {
 	const fs = useFS();
@@ -29,23 +30,24 @@ export function useBallerina() {
 	}, []);
 
 	const run = React.useCallback(
-		async (path: string): Promise<{ error?: string } | null> => {
-			if (!clientRef.current)
-				return { error: "Ballerina runtime is not initialized" };
-			if (!fs) return { error: "Virtual file system is not available" };
+		async (path: string, onOutput: RunOutputCallback): Promise<void> => {
+			if (!clientRef.current) {
+				onOutput({
+					stream: "stderr",
+					text: "Ballerina runtime is not initialized",
+				});
+				return;
+			}
+			if (!fs) {
+				onOutput({
+					stream: "stderr",
+					text: "Virtual file system is not available",
+				});
+				return;
+			}
 
 			const snapshot = await SnapshotFS.from(fs, path);
-			const result = await clientRef.current.run(snapshot, path);
-			if (result && typeof result === "object" && "error" in result) {
-				return result as { error?: string };
-			}
-			// FIXME: We could get rid of this once we have WASM PAL
-			if (result?.output) {
-				console.log(result.output);
-			} else if (result?.error) {
-				return { error: result.error };
-			}
-			return null;
+			await clientRef.current.run(snapshot, path, onOutput);
 		},
 		[fs],
 	);

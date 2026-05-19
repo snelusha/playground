@@ -59,4 +59,3 @@ public function main() {
 
     top(-500, 32);
 }
-

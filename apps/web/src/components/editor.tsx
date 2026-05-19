@@ -47,11 +47,155 @@ function getLanguage(path: string): EditorLanguage {
 	}
 }
 
+function findJsonFragmentEnd(text: string, start: number): number | null {
+	const stack: string[] = [];
+	let inString = false;
+	let escaped = false;
+
+	for (let index = start; index < text.length; index += 1) {
+		const char = text[index];
+
+		if (inString) {
+			if (escaped) {
+				escaped = false;
+			} else if (char === "\\") {
+				escaped = true;
+			} else if (char === '"') {
+				inString = false;
+			}
+			continue;
+		}
+
+		if (char === '"') {
+			inString = true;
+			continue;
+		}
+
+		if (char === "{" || char === "[") {
+			stack.push(char === "{" ? "}" : "]");
+			continue;
+		}
+
+		if (char === "}" || char === "]") {
+			if (stack.pop() !== char) return null;
+			if (stack.length === 0) return index + 1;
+		}
+	}
+
+	return null;
+}
+
+function normalizeJsonValue(value: unknown): unknown {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+			try {
+				return normalizeJsonValue(JSON.parse(trimmed));
+			} catch {
+				return value;
+			}
+		}
+
+		return value;
+	}
+
+	if (Array.isArray(value)) return value.map(normalizeJsonValue);
+
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, entry]) => [
+				key,
+				normalizeJsonValue(entry),
+			]),
+		);
+	}
+
+	return value;
+}
+
+function stringifyPrettyJson(value: unknown): string {
+	return JSON.stringify(normalizeJsonValue(value), null, 2);
+}
+
+function formatJsonOutput(output: string): string {
+	const trimmed = output.trim();
+	if (!trimmed) return output;
+
+	try {
+		const parsed: unknown = JSON.parse(trimmed);
+		return stringifyPrettyJson(parsed);
+	} catch {
+		let formatted = "";
+		let cursor = 0;
+
+		while (cursor < output.length) {
+			const char = output[cursor];
+
+			if (char !== "{" && char !== "[") {
+				formatted += char;
+				cursor += 1;
+				continue;
+			}
+
+			const end = findJsonFragmentEnd(output, cursor);
+			if (end === null) {
+				formatted += char;
+				cursor += 1;
+				continue;
+			}
+
+			const fragment = output.slice(cursor, end);
+			try {
+				const parsed: unknown = JSON.parse(fragment);
+				formatted += stringifyPrettyJson(parsed);
+				cursor = end;
+			} catch {
+				formatted += char;
+				cursor += 1;
+			}
+		}
+
+		return formatted;
+	}
+}
+
 function OutputPane() {
 	const output = useEditorStore((s) => s.output);
+	const formattedOutput = React.useMemo(
+		() => formatJsonOutput(output),
+		[output],
+	);
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
+	const scrollRef = React.useRef<HTMLDivElement>(null);
+	const shouldAutoScrollRef = React.useRef(true);
+	const previousOutputLengthRef = React.useRef(output.length);
+
+	const updateAutoScrollState = React.useCallback(() => {
+		const element = scrollRef.current;
+		if (!element) return;
+
+		const distanceFromBottom =
+			element.scrollHeight - element.scrollTop - element.clientHeight;
+		shouldAutoScrollRef.current = distanceFromBottom < 24;
+	}, []);
+
+	React.useLayoutEffect(() => {
+		const element = scrollRef.current;
+		if (!element) return;
+
+		const outputWasReset = output.length < previousOutputLengthRef.current;
+		previousOutputLengthRef.current = output.length;
+
+		if (outputWasReset) {
+			shouldAutoScrollRef.current = true;
+		}
+
+		if (shouldAutoScrollRef.current || outputOpen) {
+			element.scrollTop = element.scrollHeight;
+		}
+	}, [output, outputOpen]);
 
 	return (
 		<div
@@ -92,13 +236,15 @@ function OutputPane() {
 				</div>
 			</div>
 			<div
+				ref={scrollRef}
+				onScroll={updateAutoScrollState}
 				className={cn(
 					"min-h-0 overflow-y-auto p-4",
 					outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
 				)}
 			>
 				<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
-					<ANSI value={output} />
+					<ANSI value={formattedOutput} />
 				</pre>
 			</div>
 		</div>
@@ -210,6 +356,7 @@ function EditorContent() {
 	const [isRunning, setIsRunning] = React.useState(false);
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
+	const appendOutput = useEditorStore((s) => s.appendOutput);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleRun = React.useCallback(async () => {
@@ -217,30 +364,17 @@ function EditorContent() {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
 		setIsRunning(true);
-		const oldConsole = console.log;
-		let captured = "";
-
-		console.log = (...args) => {
-			captured += `${args.join(" ")}\n`;
-			oldConsole.apply(console, args);
-		};
-
 		try {
 			// FIXME: We should automatically save files on change.
 			await saveFile();
 
 			const target = await getBallerinaProjectTarget(fs, activeFile.path);
-			const runResult = await run(target);
-			if (runResult?.error) {
-				captured += `${runResult.error}\n`;
-			}
+			openOutputWith("");
+			await run(target, ({ text }) => appendOutput(text));
 		} finally {
-			console.log = oldConsole;
 			setIsRunning(false);
 		}
-
-		openOutputWith(captured);
-	}, [activeFile, fs, saveFile, run, openOutputWith, isRunning]);
+	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
 	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,

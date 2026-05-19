@@ -19,6 +19,7 @@ export type EditorState = {
 
 export type EditorActions = {
 	setOutput: (output: string) => void;
+	appendOutput: (output: string) => void;
 	clearOutput: () => void;
 	openOutputWith: (output: string) => void;
 	setOutputOpen: (outputOpen: boolean) => void;
@@ -40,6 +41,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 	editorMode: readStoredEditorMode(),
 
 	setOutput: (output) => set({ output }),
+	appendOutput: (output) => set((s) => ({ output: s.output + output })),
 	clearOutput: () => set({ output: initial.output }),
 	openOutputWith: (output) => set({ output, outputOpen: true }),
 	setOutputOpen: (outputOpen) => set({ outputOpen }),

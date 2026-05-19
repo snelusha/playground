@@ -1,6 +1,9 @@
 import * as Comlink from "comlink";
 
-import type { BallerinaWorkerAPI, RunResult } from "./ballerina-worker-api";
+import type {
+	BallerinaWorkerAPI,
+	RunOutputCallback,
+} from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
 export class BallerinaWorkerClient {
@@ -33,10 +36,16 @@ export class BallerinaWorkerClient {
 		return this.initPromise;
 	}
 
-	async run(snapshot: SnapshotFS, path: string): Promise<RunResult> {
-		if (!this.api)
-			return Promise.resolve({ error: "Ballerina runtime is not ready" });
-		return this.api.run(Comlink.proxy(snapshot), path);
+	async run(
+		snapshot: SnapshotFS,
+		path: string,
+		onOutput: RunOutputCallback,
+	): Promise<void> {
+		if (!this.api) {
+			onOutput({ stream: "stderr", text: "Ballerina runtime is not ready" });
+			return;
+		}
+		return this.api.run(Comlink.proxy(snapshot), path, Comlink.proxy(onOutput));
 	}
 
 	async getDiagnostics(
