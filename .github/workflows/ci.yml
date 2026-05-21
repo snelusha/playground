@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: bun install
 
+      - name: Generate examples asset
+        run: go run ./scripts/example_gen/main.go ./examples ./apps/web/src/assets/examples.json
+
       - name: Run lint
         run: bun run lint
 
