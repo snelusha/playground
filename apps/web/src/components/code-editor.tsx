@@ -101,7 +101,7 @@ const theme = EditorView.theme({
 	},
 	".cm-gutters": {
 		paddingLeft: "0.5rem",
-		backgroundColor: "transparent",
+		backgroundColor: "var(--background)",
 		border: "none",
 		color: "var(--muted-foreground)",
 		userSelect: "none",
