@@ -31,5 +31,5 @@ test("creates a package and runs hello world", async ({ page }) => {
 	await expect(runButton).toContainText("Run", { timeout: 10_000 });
 
 	const output = page.getByTestId("output-pane");
-	await expect(output).toContainText("Hello, World!", { timeout: 10_000 });
+	await expect(output).toHaveText("Hello, World!", { timeout: 10_000 });
 });
