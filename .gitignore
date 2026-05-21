@@ -6,4 +6,7 @@ node_modules
 apps/*/dist
 packages/*/dist
 
+test-results/
+playwright-report/
+
 .DS_Store

@@ -445,7 +445,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 						</SidebarGroupLabel>
 						<DropdownMenu>
 							<DropdownMenuTrigger
-								render={<Button variant="ghost" size="icon-xs" />}
+								render={
+									<Button
+										variant="ghost"
+										size="icon-xs"
+										aria-label="Add to localspace"
+										data-testid="localspace-add"
+									/>
+								}
 							>
 								<HugeiconsIcon icon={PlusSignIcon} strokeWidth={1.5} />
 							</DropdownMenuTrigger>

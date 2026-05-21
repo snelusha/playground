@@ -292,7 +292,7 @@ export function FileTreeDialog() {
 
 	return (
 		<Dialog open={isOpen} onOpenChange={handleOpenChange}>
-			<DialogContent>
+			<DialogContent data-testid="file-tree-dialog">
 				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
 					<DialogHeader>
 						<DialogTitle>{title}</DialogTitle>
