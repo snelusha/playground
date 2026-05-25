@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 const EDITOR_MODE_STORAGE_KEY = "playground.editor.mode";
 
-type EditorMode = "standard" | "vim";
+export type EditorMode = "standard" | "vim";
 
 function readStoredEditorMode(): EditorMode {
 	if (typeof localStorage === "undefined") return "standard";

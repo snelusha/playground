@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { immer } from "zustand/middleware/immer";
 
-import { ancestorDirPathsForFile } from "@/lib/fs/core/path-utils";
+import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
+import { ancestorDirPathsForFile, isUnder } from "@/lib/fs/core/path-utils";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
@@ -62,6 +63,7 @@ type FileTreeActions = {
 
 	createDir(path: string): Promise<boolean>;
 	deleteDir(path: string): Promise<boolean>;
+	clearLocalspace(): Promise<void>;
 
 	updateFileContent(content: string): void;
 
@@ -212,6 +214,19 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				return true;
 			},
 
+			async clearLocalspace() {
+				await _fs().clearLocalspace();
+				set((s) => {
+					s.localTree = [];
+					s.expandedPaths = new Set(
+						[...s.expandedPaths].filter((path) => !isUnder(path, LOCAL_ROOT)),
+					);
+					if (s.activeFile && isUnder(s.activeFile.path, LOCAL_ROOT)) {
+						s.activeFile = null;
+					}
+				});
+			},
+
 			updateFileContent(content) {
 				set((s) => {
 					if (s.activeFile) {
@@ -357,6 +372,7 @@ export const useFileTreeActions = () =>
 			renameFile: s.renameFile,
 			createDir: s.createDir,
 			deleteDir: s.deleteDir,
+			clearLocalspace: s.clearLocalspace,
 			updateFileContent: s.updateFileContent,
 			exists: s.exists,
 			existsFile: s.existsFile,
