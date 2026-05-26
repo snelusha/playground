@@ -237,6 +237,7 @@ function OutputPane() {
 			</div>
 			<div
 				ref={scrollRef}
+				data-testid="output-pane"
 				onScroll={updateAutoScrollState}
 				className={cn(
 					"min-h-0 overflow-y-auto p-4",
@@ -287,6 +288,7 @@ function EditorPane({
 				<Button
 					className="h-full rounded-none"
 					variant="ghost"
+					data-testid="run-button"
 					onClick={() => void onRun()}
 					disabled={
 						isRunning ||
@@ -403,7 +405,10 @@ function EditorContent() {
 function WasmLoadingScreen({ progress }: { progress: number }) {
 	const pct = Math.max(0, Math.min(100, progress));
 	return (
-		<div className="w-full flex items-center justify-center min-h-dvh">
+		<div
+			className="w-full flex items-center justify-center min-h-dvh"
+			data-testid="wasm-loading"
+		>
 			<div className="flex flex-col items-center gap-4">
 				<div className="text-sm text-muted-foreground">
 					Loading WASM binaries...&nbsp;
