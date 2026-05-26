@@ -171,6 +171,7 @@ function OutputPane() {
 	const scrollRef = React.useRef<HTMLDivElement>(null);
 	const shouldAutoScrollRef = React.useRef(true);
 	const previousOutputLengthRef = React.useRef(output.length);
+	const previousOutputOpenRef = React.useRef(outputOpen);
 
 	const updateAutoScrollState = React.useCallback(() => {
 		const element = scrollRef.current;
@@ -186,13 +187,16 @@ function OutputPane() {
 		if (!element) return;
 
 		const outputWasReset = output.length < previousOutputLengthRef.current;
-		previousOutputLengthRef.current = output.length;
+		const outputWasOpened = outputOpen && !previousOutputOpenRef.current;
 
-		if (outputWasReset) {
+		previousOutputLengthRef.current = output.length;
+		previousOutputOpenRef.current = outputOpen;
+
+		if (outputWasReset || outputWasOpened) {
 			shouldAutoScrollRef.current = true;
 		}
 
-		if (shouldAutoScrollRef.current || outputOpen) {
+		if (shouldAutoScrollRef.current) {
 			element.scrollTop = element.scrollHeight;
 		}
 	}, [output, outputOpen]);
