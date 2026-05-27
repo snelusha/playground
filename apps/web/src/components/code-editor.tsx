@@ -1,12 +1,37 @@
 import * as React from "react";
 
-import { basicSetup } from "codemirror";
-import { Compartment, Prec } from "@codemirror/state";
-import { StreamLanguage, indentUnit } from "@codemirror/language";
-import { autocompletion } from "@codemirror/autocomplete";
+import {
+	autocompletion,
+	closeBrackets,
+	closeBracketsKeymap,
+	completionKeymap,
+} from "@codemirror/autocomplete";
+import {
+	defaultKeymap,
+	history,
+	historyKeymap,
+	indentWithTab,
+} from "@codemirror/commands";
+import {
+	bracketMatching,
+	defaultHighlightStyle,
+	indentOnInput,
+	indentUnit,
+	StreamLanguage,
+	syntaxHighlighting,
+} from "@codemirror/language";
 import { languageServerExtensions, LSPClient } from "@codemirror/lsp-client";
-import { EditorView, keymap } from "@codemirror/view";
-import { indentWithTab } from "@codemirror/commands";
+import { highlightSelectionMatches } from "@codemirror/search";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
+import {
+	drawSelection,
+	dropCursor,
+	EditorView,
+	highlightActiveLineGutter,
+	highlightSpecialChars,
+	keymap,
+	lineNumbers,
+} from "@codemirror/view";
 import { clike } from "@codemirror/legacy-modes/mode/clike";
 import { Vim, vim } from "@replit/codemirror-vim";
 
@@ -38,6 +63,33 @@ interface CodeEditorProps {
 
 const INDENT = "    ";
 
+const defaultKeymapWithoutBracketIndent = defaultKeymap.filter(
+	(binding) => binding.key !== "Mod-[" && binding.key !== "Mod-]",
+);
+
+// Keep our setup explicit instead of using CodeMirror basicSetup so that
+// editor behavior and shortcuts remain under our control.
+const playgroundSetup: Extension[] = [
+	lineNumbers(),
+	highlightActiveLineGutter(),
+	highlightSpecialChars(),
+	history(),
+	drawSelection(),
+	dropCursor(),
+	EditorState.allowMultipleSelections.of(true),
+	indentOnInput(),
+	syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+	bracketMatching(),
+	closeBrackets(),
+	highlightSelectionMatches(),
+	keymap.of([
+		...closeBracketsKeymap,
+		...defaultKeymapWithoutBracketIndent,
+		...historyKeymap,
+		...completionKeymap,
+	]),
+];
+
 // This is a hack to bring smart indentation for Ballerina
 // since there's no official CodeMirror support
 const ballerinaMode = StreamLanguage.define(
@@ -67,7 +119,7 @@ function buildHotkeyExtension(hotkeysRef: React.RefObject<HotkeyMap>) {
 function baseExtensions(hotkeysRef: React.RefObject<HotkeyMap>): Extension[] {
 	return [
 		buildHotkeyExtension(hotkeysRef),
-		basicSetup,
+		playgroundSetup,
 		indentUnit.of(INDENT),
 		keymap.of([indentWithTab]),
 		theme,
