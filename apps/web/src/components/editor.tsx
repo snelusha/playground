@@ -21,6 +21,7 @@ import { Progress } from "@/components/ui/progress";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
 import { VersionCard } from "@/components/version-card";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { ANSI } from "@/components/ansi";
 
 import { basename, ext } from "@/lib/fs/core/path-utils";
@@ -349,6 +350,7 @@ function EditorHeader() {
 					<HugeiconsIcon icon={GithubFreeIcons} strokeWidth={1.5} size={16} />
 					<span className="sm:block hidden">GitHub</span>
 				</a>
+				<SettingsDialog />
 			</div>
 		</header>
 	);
