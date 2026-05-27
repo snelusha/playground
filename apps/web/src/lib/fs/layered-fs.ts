@@ -73,7 +73,7 @@ export class LayeredFS implements FS {
 		return this.local.transformToTree("/local");
 	}
 
-	async clearLocalspace() {
+	clearLocalspace() {
 		this.local.clear();
 	}
 

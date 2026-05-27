@@ -63,7 +63,7 @@ type FileTreeActions = {
 
 	createDir(path: string): Promise<boolean>;
 	deleteDir(path: string): Promise<boolean>;
-	clearLocalspace(): Promise<void>;
+	clearLocalspace(): void;
 
 	updateFileContent(content: string): void;
 
@@ -214,8 +214,8 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				return true;
 			},
 
-			async clearLocalspace() {
-				await _fs().clearLocalspace();
+			clearLocalspace() {
+				_fs().clearLocalspace();
 				set((s) => {
 					s.localTree = [];
 					s.expandedPaths = new Set(

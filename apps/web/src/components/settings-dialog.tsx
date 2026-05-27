@@ -48,8 +48,8 @@ export function SettingsDialog() {
 
 	const hasLocalFiles = localTree.length > 0;
 
-	async function handleClearLocalspace() {
-		await clearLocalspace();
+	function handleClearLocalspace() {
+		clearLocalspace();
 		setConfirmingClear(false);
 		setOpen(false);
 		toast.success("Local space cleared");
@@ -86,7 +86,7 @@ export function SettingsDialog() {
 				<AlertDialogContent>
 					<ClearLocalspaceConfirmation
 						onCancel={() => setConfirmingClear(false)}
-						onConfirm={() => void handleClearLocalspace()}
+						onConfirm={() => handleClearLocalspace()}
 					/>
 				</AlertDialogContent>
 			</AlertDialog>
@@ -139,7 +139,7 @@ function SettingsContent({
 
 				<Field orientation="responsive">
 					<FieldContent>
-						<FieldLabel>Local Storage</FieldLabel>
+						<FieldLabel>Local Space</FieldLabel>
 					</FieldContent>
 					<Button
 						variant="destructive"
