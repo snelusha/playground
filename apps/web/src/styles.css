@@ -152,7 +152,7 @@
 
 @layer base {
 	* {
-		@apply border-border outline-ring/50 font-sans [scrollbar-color:gray_transparent] [scrollbar-width:thin] scroll-smooth;
+		@apply border-border outline-ring/50 font-sans [scrollbar-color:gray_transparent] [scrollbar-width:thin];
 	}
 	body {
 		@apply font-sans bg-background text-foreground;

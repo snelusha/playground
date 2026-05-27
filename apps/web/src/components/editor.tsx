@@ -196,8 +196,11 @@ function OutputPane() {
 			shouldAutoScrollRef.current = true;
 		}
 
-		if (shouldAutoScrollRef.current) {
-			element.scrollTop = element.scrollHeight;
+		if (shouldAutoScrollRef.current || outputOpen) {
+			element.scrollTo({
+				top: element.scrollHeight,
+				behavior: outputWasReset ? "auto" : "smooth",
+			});
 		}
 	}, [output, outputOpen]);
 
