@@ -172,7 +172,7 @@ function ClearLocalspaceConfirmation({
 			<AlertDialogFooter>
 				<AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
 				<AlertDialogAction variant="destructive" onClick={onConfirm}>
-					Clear local space
+					Clear
 				</AlertDialogAction>
 			</AlertDialogFooter>
 		</>
