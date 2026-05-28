@@ -1,0 +1,13 @@
+.github
+node_modules
+**/node_modules
+.turbo
+**/.turbo
+apps/web/dist
+packages/wasm/dist
+coverage
+playwright-report
+test-results
+.DS_Store
+.env
+.env.*
