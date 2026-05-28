@@ -5,7 +5,6 @@ import {
 	ChevronDown,
 	ChevronUp,
 	CleanIcon,
-	GithubFreeIcons,
 	PlayIcon,
 } from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -20,7 +19,6 @@ import { Progress } from "@/components/ui/progress";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
-import { VersionCard } from "@/components/version-card";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { ANSI } from "@/components/ansi";
 
@@ -340,16 +338,9 @@ function EditorHeader() {
 				<h1 className="text-sm font-medium">Ballerina Playground</h1>
 			</div>
 			<div className="flex items-center gap-4">
-				<VersionCard />
-				<a
-					className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
-					href="https://github.com/ballerina-platform/playground"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-					<HugeiconsIcon icon={GithubFreeIcons} strokeWidth={1.5} size={16} />
-					<span className="sm:block hidden">GitHub</span>
-				</a>
+				<span className="text-xs text-muted-foreground select-none">
+					{__BALLERINA_VERSION__}
+				</span>
 				<SettingsDialog />
 			</div>
 		</header>

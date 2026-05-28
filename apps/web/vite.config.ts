@@ -27,13 +27,10 @@ function githubPagesSpa(): Plugin {
 	};
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(() => {
 	return {
 		define: {
 			__BALLERINA_VERSION__: JSON.stringify(meta.version),
-			__COMMIT_SHA__: JSON.stringify(
-				(mode === "production" && process.env.COMMIT_SHA) || "dev",
-			),
 		},
 		plugins: [
 			tanstackRouter({
