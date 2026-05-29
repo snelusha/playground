@@ -2,7 +2,6 @@ import * as React from "react";
 
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-	AlertSquareIcon,
 	FolderIcon,
 	File01Icon,
 	ChevronDown,
@@ -118,10 +117,7 @@ function FileTreeFileNode({
 					isActive={activeFilePath === path}
 					onClick={() => void handleClick()}
 				>
-					<HugeiconsIcon
-						icon={isSharedFile ? AlertSquareIcon : File01Icon}
-						strokeWidth={1.5}
-					/>
+					<HugeiconsIcon icon={File01Icon} strokeWidth={1.5} />
 					{node.name}
 				</SidebarMenuButton>
 				<DropdownMenu>
@@ -259,10 +255,7 @@ function FileTreeDirNode({
 				>
 					<SidebarMenuButton className="w-full" onClick={handleToggle}>
 						<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
-						<HugeiconsIcon
-							icon={isSharedDir ? AlertSquareIcon : FolderIcon}
-							strokeWidth={1.5}
-						/>
+						<HugeiconsIcon icon={FolderIcon} strokeWidth={1.5} />
 						<span className="truncate">{node.name}</span>
 					</SidebarMenuButton>
 					<DropdownMenu modal={false}>
