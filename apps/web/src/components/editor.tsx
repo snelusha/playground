@@ -338,9 +338,16 @@ function EditorHeader() {
 				<h1 className="text-sm font-medium">Ballerina Playground</h1>
 			</div>
 			<div className="flex items-center gap-4">
-				<span className="text-xs text-muted-foreground select-none">
-					{__BALLERINA_VERSION__}
-				</span>
+				<a
+					className="flex items-center gap-2 text-xs text-muted-foreground hover:text-secondary-foreground"
+					href="https://github.com/orgs/ballerina-platform/projects/383"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<span className="text-xs text-muted-foreground select-none">
+						{__BALLERINA_VERSION__}
+					</span>
+				</a>
 				<SettingsDialog />
 			</div>
 		</header>
