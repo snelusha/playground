@@ -1,7 +1,5 @@
 import * as React from "react";
 
-import { ShareNoticeDialog } from "@/components/share-notice-dialog";
-
 import { useParams, useNavigate } from "@tanstack/react-router";
 
 import {
@@ -34,7 +32,7 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 	const { _splat: splat } = useParams({ strict: false }) as { _splat?: string };
 	const navigate = useNavigate({ from: "/$" });
 
-	const { isProcessingShare, shareNotice } = useShare();
+	const { isProcessingShare } = useShare();
 
 	const ready = useFileTreeStore((s) => s.ready);
 	const activeFilePath = useActiveFilePath();
@@ -106,14 +104,5 @@ export function FileRouteSync({ children }: React.PropsWithChildren) {
 		}
 	}, [ready, isProcessingShare, activeFilePath, currentSplat, navigate]);
 
-	return (
-		<>
-			{children}
-			<ShareNoticeDialog
-				open={shareNotice.open}
-				onDismiss={shareNotice.dismiss}
-				onDismissPermanently={shareNotice.dismissPermanently}
-			/>
-		</>
-	);
+	return children;
 }
