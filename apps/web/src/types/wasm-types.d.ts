@@ -9,5 +9,6 @@ declare global {
 			proxy: FS,
 			path: string,
 		) => Promise<Array<Record<string, any>> | null>;
+		getAST: (proxy: FS, path: string) => Promise<string | null>;
 	}
 }

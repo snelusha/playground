@@ -4,6 +4,8 @@ import * as React from "react";
 
 import { SnapshotFS } from "@/lib/fs/snapshot";
 
+import type { SnapshotFileOverride } from "@/lib/fs/snapshot";
+
 import { useFS } from "@/providers/fs-provider";
 
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
@@ -52,5 +54,20 @@ export function useBallerina() {
 		[fs],
 	);
 
-	return { isReady, progress, run };
+	const getAST = React.useCallback(
+		async (
+			path: string,
+			overrides: SnapshotFileOverride[] = [],
+		): Promise<string> => {
+			if (!clientRef.current) return "Ballerina runtime is not initialized\n";
+			if (!fs) return "Virtual file system is not available\n";
+
+			const snapshot = await SnapshotFS.from(fs, path, overrides);
+			const ast = await clientRef.current.getAST(snapshot, path);
+			return ast || "No AST output produced\n";
+		},
+		[fs],
+	);
+
+	return { isReady, progress, run, getAST };
 }

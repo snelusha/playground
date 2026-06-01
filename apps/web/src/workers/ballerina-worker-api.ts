@@ -20,4 +20,5 @@ export interface BallerinaWorkerAPI {
 		snapshot: SnapshotFS,
 		path: string,
 	): Promise<Array<Record<string, unknown>>>;
+	getAST(snapshot: SnapshotFS, path: string): Promise<string>;
 }

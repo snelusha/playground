@@ -24,6 +24,7 @@ declare const self: typeof globalThis & {
 		fs: SnapshotFS,
 		path: string,
 	) => Promise<Array<Record<string, unknown>>>;
+	getAST: (fs: SnapshotFS, path: string) => Promise<string>;
 };
 
 async function fetchWithProgress(
@@ -79,7 +80,11 @@ const api: BallerinaWorkerAPI = {
 			);
 			void go.run(instance);
 			const deadline = Date.now() + 10_000;
-			while (typeof self.run !== "function") {
+			while (
+				typeof self.run !== "function" ||
+				typeof self.getDiagnostics !== "function" ||
+				typeof self.getAST !== "function"
+			) {
 				if (Date.now() > deadline) {
 					throw new Error("Ballerina runtime init timed out");
 				}
@@ -112,6 +117,14 @@ const api: BallerinaWorkerAPI = {
 	): Promise<Array<Record<string, unknown>>> => {
 		if (typeof self.getDiagnostics !== "function") return Promise.resolve([]);
 		return Promise.resolve(self.getDiagnostics(snapshot, path) ?? []);
+	},
+	getAST: (snapshot: SnapshotFS, path: string): Promise<string> => {
+		if (typeof self.getAST !== "function") {
+			return Promise.resolve("Ballerina runtime does not expose getAST\n");
+		}
+		return Promise.resolve(
+			self.getAST(snapshot, path) ?? "No AST output produced\n",
+		);
 	},
 };
 

@@ -262,10 +262,14 @@ function OutputPane() {
 
 function EditorPane({
 	onRun,
+	onGetAST,
 	isRunning,
+	isGettingAST,
 }: {
 	onRun: () => Promise<void>;
+	onGetAST: () => Promise<void>;
 	isRunning: boolean;
+	isGettingAST: boolean;
 }) {
 	const activeFile = useActiveFile();
 
@@ -293,26 +297,43 @@ function EditorPane({
 				<span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
-				<Button
-					className="h-full rounded-none"
-					variant="ghost"
-					data-testid="run-button"
-					onClick={() => void onRun()}
-					disabled={
-						isRunning ||
-						!activeFile ||
-						getLanguage(activeFile.path) !== "ballerina"
-					}
-				>
-					{isRunning ? (
-						<span>[...]</span>
-					) : (
-						<>
-							<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-							<span>Run</span>
-						</>
-					)}
-				</Button>
+				<div className="flex h-full">
+					<Button
+						className="h-full rounded-none border-l"
+						variant="ghost"
+						data-testid="ast-button"
+						onClick={() => void onGetAST()}
+						disabled={
+							isRunning ||
+							isGettingAST ||
+							!activeFile ||
+							getLanguage(activeFile.path) !== "ballerina"
+						}
+					>
+						{isGettingAST ? <span>[...]</span> : <span>AST</span>}
+					</Button>
+					<Button
+						className="h-full rounded-none border-l"
+						variant="ghost"
+						data-testid="run-button"
+						onClick={() => void onRun()}
+						disabled={
+							isRunning ||
+							isGettingAST ||
+							!activeFile ||
+							getLanguage(activeFile.path) !== "ballerina"
+						}
+					>
+						{isRunning ? (
+							<span>[...]</span>
+						) : (
+							<>
+								<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+								<span>Run</span>
+							</>
+						)}
+					</Button>
+				</div>
 			</div>
 			{activeFile && (
 				<CodeEditor
@@ -359,19 +380,20 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run } = useBallerina();
+	const { isReady, progress, run, getAST } = useBallerina();
 
 	const activeFile = useActiveFile();
 
 	const { saveFile } = useFileTreeActions();
 	const [isRunning, setIsRunning] = React.useState(false);
+	const [isGettingAST, setIsGettingAST] = React.useState(false);
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
 	const appendOutput = useEditorStore((s) => s.appendOutput);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
 
 	const handleRun = React.useCallback(async () => {
-		if (isRunning) return;
+		if (isRunning || isGettingAST) return;
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
 		setIsRunning(true);
@@ -385,7 +407,70 @@ function EditorContent() {
 		} finally {
 			setIsRunning(false);
 		}
-	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
+	}, [
+		activeFile,
+		fs,
+		saveFile,
+		run,
+		openOutputWith,
+		appendOutput,
+		isRunning,
+		isGettingAST,
+	]);
+
+	const handleGetAST = React.useCallback(async () => {
+		if (isRunning || isGettingAST) return;
+		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
+
+		setIsGettingAST(true);
+		try {
+			// FIXME: We should automatically save files on change.
+			await saveFile();
+
+			const target = await getBallerinaProjectTarget(fs, activeFile.path);
+			openOutputWith(await getAST(target));
+		} finally {
+			setIsGettingAST(false);
+		}
+	}, [
+		activeFile,
+		fs,
+		saveFile,
+		getAST,
+		openOutputWith,
+		isRunning,
+		isGettingAST,
+	]);
+
+	const astRequestIdRef = React.useRef(0);
+	React.useEffect(() => {
+		const requestId = ++astRequestIdRef.current;
+		if (!isReady || isRunning || isGettingAST) return;
+		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
+		const timeoutId = window.setTimeout(() => {
+			void (async () => {
+				const target = await getBallerinaProjectTarget(fs, activeFile.path);
+				const ast = await getAST(target, [
+					{ path: activeFile.path, content: activeFile.content },
+				]);
+				if (requestId === astRequestIdRef.current) {
+					openOutputWith(ast);
+				}
+			})();
+		}, 500);
+
+		return () => {
+			window.clearTimeout(timeoutId);
+		};
+	}, [
+		activeFile,
+		fs,
+		getAST,
+		isGettingAST,
+		isReady,
+		isRunning,
+		openOutputWith,
+	]);
 
 	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,
@@ -403,7 +488,12 @@ function EditorContent() {
 			<SidebarInset className="flex flex-col h-dvh overflow-hidden">
 				<EditorHeader />
 				<main className="flex flex-col lg:flex-row flex-1 min-h-0">
-					<EditorPane onRun={handleRun} isRunning={isRunning} />
+					<EditorPane
+						onRun={handleRun}
+						onGetAST={handleGetAST}
+						isRunning={isRunning}
+						isGettingAST={isGettingAST}
+					/>
 					<OutputPane />
 				</main>
 			</SidebarInset>

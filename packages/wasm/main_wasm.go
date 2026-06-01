@@ -17,17 +17,22 @@
 package main
 
 import (
+	"ballerina-lang-go/ast"
+	"ballerina-lang-go/context"
 	_ "ballerina-lang-go/lib/rt"
 	"ballerina-lang-go/projects"
 	"ballerina-lang-go/runtime"
+	"ballerina-lang-go/semtypes"
 	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
+	"strings"
 	"syscall/js"
 )
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
 	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
+	js.Global().Set("getAST", js.FuncOf(getAST))
 
 	select {}
 }
@@ -105,7 +110,7 @@ func run(_ js.Value, args []js.Value) any {
 }
 
 func getDiagnostics(_ js.Value, args []js.Value) any {
-	return newPromise(func(resolve js.Value, reject js.Value) {
+	return newPromise(func(resolve js.Value, _ js.Value) {
 		defer func() {
 			if r := recover(); r != nil {
 				resolve.Invoke(js.ValueOf([]any{}))
@@ -139,6 +144,63 @@ func getDiagnostics(_ js.Value, args []js.Value) any {
 		}
 
 		resolve.Invoke(js.ValueOf([]any{}))
+	})
+}
+
+func getAST(_ js.Value, args []js.Value) any {
+	return newPromise(func(resolve js.Value, _ js.Value) {
+		defer func() {
+			if r := recover(); r != nil {
+				resolve.Invoke(fmt.Sprintf("AST generation failed: %v\n", r))
+			}
+		}()
+
+		if len(args) < 2 {
+			resolve.Invoke("expected at least 2 arguments: (fsProxy, path)\n")
+			return
+		}
+
+		proxy := args[0]
+		path := args[1].String()
+		fsys := NewBridgeFS(proxy)
+
+		result, err := projects.Load(fsys, path)
+		if err != nil {
+			resolve.Invoke(fmt.Sprintf("AST generation failed: %v\n", err))
+			return
+		}
+
+		pkg := result.Project().CurrentPackage()
+		if pkg == nil {
+			resolve.Invoke("AST generation failed: no current package found\n")
+			return
+		}
+
+		env := context.NewCompilerEnvironment(semtypes.CreateTypeEnv(), false)
+		cx := context.NewCompilerContext(env)
+		prettyPrinter := ast.PrettyPrinter{}
+		var builder strings.Builder
+
+		for _, module := range pkg.Modules() {
+			for _, docID := range module.DocumentIDs() {
+				doc := module.Document(docID)
+				if doc == nil {
+					continue
+				}
+				syntaxTree := doc.SyntaxTree()
+				cx.DiagnosticEnv().RegisterFile(syntaxTree.FilePath(), syntaxTree.TextDocument())
+				cu := ast.GetCompilationUnit(cx, syntaxTree)
+				builder.WriteString(prettyPrinter.Print(cu))
+				builder.WriteByte('\n')
+			}
+		}
+
+		if builder.Len() == 0 {
+			resolve.Invoke("No AST output produced\n")
+			return
+		}
+
+		resolve.Invoke(builder.String())
 	})
 }
 

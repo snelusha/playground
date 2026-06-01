@@ -56,6 +56,11 @@ export class BallerinaWorkerClient {
 		return this.api.getDiagnostics(Comlink.proxy(snapshot), path);
 	}
 
+	async getAST(snapshot: SnapshotFS, path: string): Promise<string> {
+		if (!this.api) return Promise.resolve("");
+		return this.api.getAST(Comlink.proxy(snapshot), path);
+	}
+
 	dispose() {
 		this.worker?.terminate();
 		this.worker = null;

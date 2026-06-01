@@ -22,14 +22,33 @@ type SnapshotDirNode = {
 
 type SnapshotNode = SnapshotFileNode | SnapshotDirNode;
 
+export type SnapshotFileOverride = {
+	path: string;
+	content: string;
+};
+
 export class SnapshotFS implements FS {
 	private constructor(
 		private readonly nodes: ReadonlyMap<string, SnapshotNode>,
 	) {}
 
-	static async from(source: FS, rootPath: string): Promise<SnapshotFS> {
+	static async from(
+		source: FS,
+		rootPath: string,
+		overrides: SnapshotFileOverride[] = [],
+	): Promise<SnapshotFS> {
 		const nodes = new Map<string, SnapshotNode>();
 		await collectNodes(source, nodes, rootPath);
+		for (const override of overrides) {
+			const existing = nodes.get(override.path);
+			const modTime = existing?.modTime ?? Date.now();
+			nodes.set(override.path, {
+				isDir: false,
+				content: override.content,
+				modTime,
+				size: override.content.length,
+			});
+		}
 		return new SnapshotFS(nodes);
 	}
 
