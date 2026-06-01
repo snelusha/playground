@@ -262,9 +262,13 @@ function OutputPane() {
 
 function EditorPane({
 	onRun,
+	onGracefulStop,
+	onImmediateStop,
 	isRunning,
 }: {
 	onRun: () => Promise<void>;
+	onGracefulStop: () => Promise<void>;
+	onImmediateStop: () => Promise<void>;
 	isRunning: boolean;
 }) {
 	const activeFile = useActiveFile();
@@ -293,26 +297,47 @@ function EditorPane({
 				<span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
-				<Button
-					className="h-full rounded-none"
-					variant="ghost"
-					data-testid="run-button"
-					onClick={() => void onRun()}
-					disabled={
-						isRunning ||
-						!activeFile ||
-						getLanguage(activeFile.path) !== "ballerina"
-					}
-				>
-					{isRunning ? (
-						<span>[...]</span>
-					) : (
-						<>
-							<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-							<span>Run</span>
-						</>
-					)}
-				</Button>
+				<div className="flex h-full items-center">
+					<Button
+						className="h-full rounded-none"
+						variant="ghost"
+						data-testid="run-button"
+						onClick={() => void onRun()}
+						disabled={
+							isRunning ||
+							!activeFile ||
+							getLanguage(activeFile.path) !== "ballerina"
+						}
+					>
+						{isRunning ? (
+							<span>[...]</span>
+						) : (
+							<>
+								<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+								<span>Run</span>
+							</>
+						)}
+					</Button>
+					{ /* TODO: Should something with these two stop buttons. */ }	
+					<Button
+						className="h-full rounded-none"
+						variant="ghost"
+						data-testid="graceful-stop-button"
+						onClick={() => void onGracefulStop()}
+						disabled={!isRunning}
+					>
+						Graceful Stop
+					</Button>
+					<Button
+						className="h-full rounded-none"
+						variant="ghost"
+						data-testid="immediate-stop-button"
+						onClick={() => void onImmediateStop()}
+						disabled={!isRunning}
+					>
+						Immediate Stop
+					</Button>
+				</div>
 			</div>
 			{activeFile && (
 				<CodeEditor
@@ -359,7 +384,7 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run } = useBallerina();
+	const { isReady, progress, run, sendSignal } = useBallerina();
 
 	const activeFile = useActiveFile();
 
@@ -387,6 +412,14 @@ function EditorContent() {
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
+	const handleGracefulStop = React.useCallback(async () => {
+		await sendSignal("graceful");
+	}, [sendSignal]);
+
+	const handleImmediateStop = React.useCallback(async () => {
+		await sendSignal("immediate");
+	}, [sendSignal]);
+
 	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,
 	});
@@ -403,7 +436,12 @@ function EditorContent() {
 			<SidebarInset className="flex flex-col h-dvh overflow-hidden">
 				<EditorHeader />
 				<main className="flex flex-col lg:flex-row flex-1 min-h-0">
-					<EditorPane onRun={handleRun} isRunning={isRunning} />
+					<EditorPane
+						onRun={handleRun}
+						onGracefulStop={handleGracefulStop}
+						onImmediateStop={handleImmediateStop}
+						isRunning={isRunning}
+					/>
 					<OutputPane />
 				</main>
 			</SidebarInset>

@@ -9,6 +9,8 @@ export interface RunOutput {
 
 export type RunOutputCallback = (output: RunOutput) => void;
 
+export type RuntimeSignal = "graceful" | "immediate";
+
 export interface BallerinaWorkerAPI {
 	init(wasmUrl: string, onProgress: (progress: number) => void): Promise<void>;
 	run(
@@ -20,4 +22,5 @@ export interface BallerinaWorkerAPI {
 		snapshot: SnapshotFS,
 		path: string,
 	): Promise<Array<Record<string, unknown>>>;
+	sendSignal(signal: RuntimeSignal): Promise<boolean>;
 }

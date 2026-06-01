@@ -5,6 +5,7 @@ import * as Comlink from "comlink";
 import type {
 	BallerinaWorkerAPI,
 	RunOutputCallback,
+	RuntimeSignal,
 } from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
@@ -24,6 +25,7 @@ declare const self: typeof globalThis & {
 		fs: SnapshotFS,
 		path: string,
 	) => Promise<Array<Record<string, unknown>>>;
+	sendSignal: (signal: RuntimeSignal) => boolean;
 };
 
 async function fetchWithProgress(
@@ -112,6 +114,10 @@ const api: BallerinaWorkerAPI = {
 	): Promise<Array<Record<string, unknown>>> => {
 		if (typeof self.getDiagnostics !== "function") return Promise.resolve([]);
 		return Promise.resolve(self.getDiagnostics(snapshot, path) ?? []);
+	},
+	sendSignal: (signal: RuntimeSignal): Promise<boolean> => {
+		if (typeof self.sendSignal !== "function") return Promise.resolve(false);
+		return Promise.resolve(self.sendSignal(signal));
 	},
 };
 

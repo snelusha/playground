@@ -3,6 +3,7 @@ import * as Comlink from "comlink";
 import type {
 	BallerinaWorkerAPI,
 	RunOutputCallback,
+	RuntimeSignal,
 } from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
@@ -54,6 +55,11 @@ export class BallerinaWorkerClient {
 	): Promise<Array<Record<string, unknown>>> {
 		if (!this.api) return Promise.resolve([]);
 		return this.api.getDiagnostics(Comlink.proxy(snapshot), path);
+	}
+
+	async sendSignal(signal: RuntimeSignal): Promise<boolean> {
+		if (!this.api) return false;
+		return this.api.sendSignal(signal);
 	}
 
 	dispose() {

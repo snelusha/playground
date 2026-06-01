@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"syscall/js"
 	"time"
 )
@@ -148,7 +149,59 @@ func redirectMode(enabled bool) string {
 	return "manual"
 }
 
-func wasmPal(stderr, stdout io.Writer) pal.Platform {
+type wasmSignalSource struct {
+	ch chan pal.Signal
+}
+
+var (
+	activeSignalsMu sync.Mutex
+	activeSignals   *wasmSignalSource
+)
+
+func newWasmSignalSource() (*wasmSignalSource, pal.SignalSource) {
+	ch := make(chan pal.Signal, 4)
+	source := &wasmSignalSource{ch: ch}
+	return source, pal.SignalSource{Signals: ch}
+}
+
+func (s *wasmSignalSource) send(signal pal.Signal) bool {
+	select {
+	case s.ch <- signal:
+		return true
+	default:
+		return false
+	}
+}
+
+func activateSignalSource(source *wasmSignalSource) bool {
+	activeSignalsMu.Lock()
+	defer activeSignalsMu.Unlock()
+	if activeSignals != nil {
+		return false
+	}
+	activeSignals = source
+	return true
+}
+
+func deactivateSignalSource(source *wasmSignalSource) {
+	activeSignalsMu.Lock()
+	defer activeSignalsMu.Unlock()
+	if activeSignals == source {
+		activeSignals = nil
+	}
+}
+
+func sendActiveSignal(signal pal.Signal) bool {
+	activeSignalsMu.Lock()
+	source := activeSignals
+	activeSignalsMu.Unlock()
+	if source == nil {
+		return false
+	}
+	return source.send(signal)
+}
+
+func wasmPal(stderr, stdout io.Writer, signals pal.SignalSource) pal.Platform {
 	return pal.Platform{
 		IO: pal.IO{
 			Stdout: stdout.Write,
@@ -159,5 +212,6 @@ func wasmPal(stderr, stdout io.Writer) pal.Platform {
 				return &fetchHTTPClient{cfg: cfg}
 			}),
 		},
+		Signals: signals,
 	}
 }
