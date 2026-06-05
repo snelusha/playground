@@ -7,6 +7,7 @@ import { ancestorDirPathsForFile, isUnder } from "@/lib/fs/core/path-utils";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
+import type { SnapshotFSMutation } from "@/lib/fs/snapshot";
 
 const DEFAULT_MAIN_BAL = `import ballerina/io;
 
@@ -82,6 +83,8 @@ type FileTreeActions = {
 	collapseDir(path: string): void;
 
 	_syncTrees(): Promise<void>;
+
+	applyRuntimeMutations(mutations: SnapshotFSMutation[]): Promise<void>;
 
 	loadSharedFiles(
 		root: FileNode,
@@ -319,6 +322,73 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				});
 			},
 
+			async applyRuntimeMutations(mutations) {
+				for (const mutation of mutations) {
+					switch (mutation.type) {
+						case "mkdirAll": {
+							await _fs().mkdirAll(mutation.path);
+							set((s) => {
+								s.expandedPaths.add(mutation.path);
+							});
+							break;
+						}
+						case "writeFile": {
+							const written = await _fs().writeFile(
+								mutation.path,
+								mutation.content,
+							);
+							if (!written) break;
+							const dirs = ancestorDirPathsForFile(mutation.path);
+							set((s) => {
+								for (const d of dirs) s.expandedPaths.add(d);
+								if (
+									s.activeFile?.path === mutation.path &&
+									!s.activeFile.dirty
+								) {
+									s.activeFile.content = mutation.content;
+								}
+							});
+							break;
+						}
+						case "remove": {
+							const removed = await _fs().remove(mutation.path);
+							if (!removed) break;
+							set((s) => {
+								const activePath = s.activeFile?.path;
+								if (
+									activePath === mutation.path ||
+									activePath?.startsWith(`${mutation.path}/`)
+								) {
+									s.activeFile = null;
+								}
+							});
+							break;
+						}
+						case "move": {
+							const moved = await _fs().move(
+								mutation.oldPath,
+								mutation.newPath,
+							);
+							if (!moved) break;
+							set((s) => {
+								const activePath = s.activeFile?.path;
+								if (!activePath || !s.activeFile) return;
+								if (activePath === mutation.oldPath) {
+									s.activeFile.path = mutation.newPath;
+								} else if (activePath.startsWith(`${mutation.oldPath}/`)) {
+									s.activeFile.path = `${mutation.newPath}${activePath.slice(mutation.oldPath.length)}`;
+								}
+								for (const d of ancestorDirPathsForFile(s.activeFile.path)) {
+									s.expandedPaths.add(d);
+								}
+							});
+							break;
+						}
+					}
+				}
+				await get()._syncTrees();
+			},
+
 			async _syncTrees() {
 				const fs = _fs();
 				const tempTree = await fs.tempTree();
@@ -383,6 +453,7 @@ export const useFileTreeActions = () =>
 			toggleDir: s.toggleDir,
 			expandDir: s.expandDir,
 			collapseDir: s.collapseDir,
+			applyRuntimeMutations: s.applyRuntimeMutations,
 			loadSharedFiles: s.loadSharedFiles,
 		})),
 	);

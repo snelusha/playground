@@ -22,6 +22,8 @@ import (
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
+	"io/fs"
+	"path"
 	"syscall/js"
 )
 
@@ -37,6 +39,14 @@ func runOutcome(stdout, stderr string) map[string]any {
 		"stdout": stdout,
 		"stderr": stderr,
 	}
+}
+
+func workingDirForRunPath(fsys fs.FS, runPath string) string {
+	info, err := fs.Stat(fsys, runPath)
+	if err == nil && info.IsDir() {
+		return runPath
+	}
+	return path.Dir(runPath)
 }
 
 func run(_ js.Value, args []js.Value) any {
@@ -92,7 +102,7 @@ func run(_ js.Value, args []js.Value) any {
 				return
 			}
 
-			pal := wasmPal(stderr, stdout)
+			pal := wasmPal(stderr, stdout, fsys, workingDirForRunPath(fsys, path))
 			rt := runtime.NewRuntime(pal, project.Environment().TypeEnv())
 			for _, birPkg := range birPkgs {
 				if err := rt.Interpret(*birPkg); err != nil {

@@ -6,6 +6,8 @@ import { SnapshotFS } from "@/lib/fs/snapshot";
 
 import { useFS } from "@/providers/fs-provider";
 
+import { useFileTreeStore } from "@/stores/file-tree-store";
+
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
@@ -48,6 +50,9 @@ export function useBallerina() {
 
 			const snapshot = await SnapshotFS.from(fs, path);
 			await clientRef.current.run(snapshot, path, onOutput);
+			await useFileTreeStore
+				.getState()
+				.applyRuntimeMutations(snapshot.getMutations());
 		},
 		[fs],
 	);
