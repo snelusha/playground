@@ -49,10 +49,30 @@ export function useBallerina() {
 			}
 
 			const snapshot = await SnapshotFS.from(fs, path);
-			await clientRef.current.run(snapshot, path, onOutput);
-			await useFileTreeStore
-				.getState()
-				.applyRuntimeMutations(snapshot.getMutations());
+			let appliedMutationCount = 0;
+			let mutationSync = Promise.resolve();
+			snapshot.setMutationListener((mutation) => {
+				appliedMutationCount += 1;
+				mutationSync = mutationSync.then(() =>
+					useFileTreeStore.getState().applyRuntimeMutations([mutation]),
+				);
+			});
+
+			try {
+				await clientRef.current.run(snapshot, path, onOutput);
+			} finally {
+				snapshot.setMutationListener(null);
+				await mutationSync;
+
+				const missedMutations = snapshot
+					.getMutations()
+					.slice(appliedMutationCount);
+				if (missedMutations.length > 0) {
+					await useFileTreeStore
+						.getState()
+						.applyRuntimeMutations(missedMutations);
+				}
+			}
 		},
 		[fs],
 	);

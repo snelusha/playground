@@ -33,8 +33,11 @@ export type SnapshotFSMutation =
 	| { type: "move"; oldPath: string; newPath: string }
 	| { type: "mkdirAll"; path: string };
 
+export type SnapshotFSMutationListener = (mutation: SnapshotFSMutation) => void;
+
 export class SnapshotFS implements FS {
 	private readonly mutations: SnapshotFSMutation[] = [];
+	private mutationListener: SnapshotFSMutationListener | null = null;
 
 	private constructor(private readonly nodes: Map<string, SnapshotNode>) {}
 
@@ -77,6 +80,10 @@ export class SnapshotFS implements FS {
 		return [...this.mutations];
 	}
 
+	setMutationListener(listener: SnapshotFSMutationListener | null): void {
+		this.mutationListener = listener;
+	}
+
 	async writeFile(path: string, content: string): Promise<boolean> {
 		const parentPath = dirname(path);
 		const parent = this.nodes.get(parentPath);
@@ -92,7 +99,7 @@ export class SnapshotFS implements FS {
 			size: content.length,
 		});
 		this.refreshDirEntries(parentPath);
-		this.mutations.push({ type: "writeFile", path, content });
+		this.recordMutation({ type: "writeFile", path, content });
 		return true;
 	}
 
@@ -104,7 +111,7 @@ export class SnapshotFS implements FS {
 			}
 		}
 		this.refreshDirEntries(dirname(path));
-		this.mutations.push({ type: "remove", path });
+		this.recordMutation({ type: "remove", path });
 		return true;
 	}
 
@@ -131,7 +138,7 @@ export class SnapshotFS implements FS {
 		this.refreshDirEntries(dirname(oldPath));
 		for (const [key, value] of moved) this.nodes.set(key, value);
 		this.refreshDirEntries(newParentPath);
-		this.mutations.push({ type: "move", oldPath, newPath });
+		this.recordMutation({ type: "move", oldPath, newPath });
 		return true;
 	}
 
@@ -156,8 +163,13 @@ export class SnapshotFS implements FS {
 				this.refreshDirEntries(dirname(current));
 			}
 		}
-		this.mutations.push({ type: "mkdirAll", path });
+		this.recordMutation({ type: "mkdirAll", path });
 		return true;
+	}
+
+	private recordMutation(mutation: SnapshotFSMutation): void {
+		this.mutations.push(mutation);
+		this.mutationListener?.(mutation);
 	}
 
 	private refreshDirEntries(path: string): void {
