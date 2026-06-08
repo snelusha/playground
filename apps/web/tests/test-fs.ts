@@ -5,12 +5,24 @@ export function createFs(inputFiles: Map<string, string>) {
 	);
 	const dirs = new Set<string>(["/"]);
 
-	for (const file of files.keys()) {
-		let dir = file.split("/").slice(0, -1).join("/") || "/";
+	function dirname(path: string) {
+		return path.split("/").slice(0, -1).join("/") || "/";
+	}
+
+	function basename(path: string) {
+		return path.split("/").pop() || "/";
+	}
+
+	function ensureDirs(path: string) {
+		let dir = path;
 		while (!dirs.has(dir)) {
 			dirs.add(dir);
-			dir = dir.split("/").slice(0, -1).join("/") || "/";
+			dir = dirname(dir);
 		}
+	}
+
+	for (const file of files.keys()) {
+		ensureDirs(dirname(file));
 	}
 
 	return {
@@ -22,7 +34,7 @@ export function createFs(inputFiles: Map<string, string>) {
 		async stat(path: string) {
 			if (dirs.has(path)) {
 				return {
-					name: path.split("/").pop() || "/",
+					name: basename(path),
 					size: 0,
 					modTime,
 					isDir: true,
@@ -32,7 +44,7 @@ export function createFs(inputFiles: Map<string, string>) {
 			const content = files.get(path);
 			if (content === undefined) return null;
 			return {
-				name: path.split("/").pop(),
+				name: basename(path),
 				size: content.length,
 				modTime,
 				isDir: false,
@@ -57,6 +69,36 @@ export function createFs(inputFiles: Map<string, string>) {
 			}
 
 			return [...entries.values()];
+		},
+		async writeFile(path: string, content: string) {
+			if (!dirs.has(dirname(path))) return false;
+			if (dirs.has(path)) return false;
+			files.set(path, content);
+			return true;
+		},
+		async mkdirAll(path: string) {
+			if (files.has(path)) return false;
+			ensureDirs(path);
+			return true;
+		},
+		async remove(path: string) {
+			if (files.delete(path)) return true;
+			if (!dirs.has(path) || path === "/") return false;
+			dirs.delete(path);
+			for (const file of [...files.keys()]) {
+				if (file.startsWith(`${path}/`)) files.delete(file);
+			}
+			for (const dir of [...dirs]) {
+				if (dir.startsWith(`${path}/`)) dirs.delete(dir);
+			}
+			return true;
+		},
+		async move(oldPath: string, newPath: string) {
+			const content = files.get(oldPath);
+			if (content === undefined || !dirs.has(dirname(newPath))) return false;
+			files.set(newPath, content);
+			files.delete(oldPath);
+			return true;
 		},
 	};
 }
