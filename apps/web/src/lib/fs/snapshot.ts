@@ -1,4 +1,9 @@
-import { basename, join } from "@/lib/fs/core/path-utils";
+import {
+	basename,
+	dirname,
+	join,
+	pathSegments,
+} from "@/lib/fs/core/path-utils";
 
 import type {
 	DirEntry,
@@ -22,15 +27,42 @@ type SnapshotDirNode = {
 
 type SnapshotNode = SnapshotFileNode | SnapshotDirNode;
 
+export type SnapshotFSMutation =
+	| { type: "writeFile"; path: string; content: string }
+	| { type: "mkdirAll"; path: string };
+
+export type SnapshotFSListener = (mutation: SnapshotFSMutation) => void;
+
 export class SnapshotFS implements FS {
-	private constructor(
-		private readonly nodes: ReadonlyMap<string, SnapshotNode>,
-	) {}
+	private readonly listeners: Set<SnapshotFSListener> = new Set();
+
+	private constructor(private readonly nodes: Map<string, SnapshotNode>) {}
 
 	static async from(source: FS, rootPath: string): Promise<SnapshotFS> {
 		const nodes = new Map<string, SnapshotNode>();
 		await collectNodes(source, nodes, rootPath);
+		await collectAncestorDirs(source, nodes, rootPath);
 		return new SnapshotFS(nodes);
+	}
+
+	private notifyListeners(mutation: SnapshotFSMutation) {
+		for (const listener of this.listeners) {
+			listener(mutation);
+		}
+	}
+
+	onMutation(listener: SnapshotFSListener): () => void {
+		this.listeners.add(listener);
+		return () => this.listeners.delete(listener);
+	}
+
+	private getDirectoryEntries(path: string): DirEntry[] {
+		const entries: DirEntry[] = [];
+		for (const [candidate, node] of this.nodes) {
+			if (candidate === path || dirname(candidate) !== path) continue;
+			entries.push({ name: basename(candidate), isDir: node.isDir });
+		}
+		return entries.sort((a, b) => a.name.localeCompare(b.name));
 	}
 
 	async open(path: string): Promise<OpenResult | null> {
@@ -58,19 +90,59 @@ export class SnapshotFS implements FS {
 	async readDir(path: string): Promise<DirEntry[] | null> {
 		const node = this.nodes.get(path);
 		if (!node?.isDir) return null;
-		return [...node.entries];
+		return this.getDirectoryEntries(path);
 	}
 
-	async writeFile(): Promise<boolean> {
-		return false;
+	async writeFile(path: string, content: string): Promise<boolean> {
+		const parentPath = dirname(path);
+		if (parentPath && parentPath !== "." && !this.nodes.has(parentPath)) {
+			return false;
+		}
+
+		const existing = this.nodes.get(path);
+		if (existing?.isDir) return false;
+
+		this.nodes.set(path, {
+			isDir: false,
+			content,
+			modTime: Date.now(),
+			size: content.length,
+		});
+		this.notifyListeners({ type: "writeFile", path, content });
+		return true;
 	}
+
+	async mkdirAll(path: string): Promise<boolean> {
+		if (!path || path === "." || path === "/") return true;
+
+		const leading = path.startsWith("/") ? "/" : "";
+		let current = leading || ".";
+
+		for (const segment of pathSegments(path)) {
+			current =
+				current === "/" || current === "."
+					? `${leading}${segment}`
+					: join(current, segment);
+
+			const existing = this.nodes.get(current);
+			if (existing && !existing.isDir) return false;
+			if (!existing) {
+				this.nodes.set(current, {
+					isDir: true,
+					modTime: Date.now(),
+					entries: [],
+				});
+			}
+		}
+		this.notifyListeners({ type: "mkdirAll", path });
+		return true;
+	}
+
 	async remove(): Promise<boolean> {
 		return false;
 	}
+
 	async move(): Promise<boolean> {
-		return false;
-	}
-	async mkdirAll(): Promise<boolean> {
 		return false;
 	}
 }
@@ -120,5 +192,26 @@ async function collectDirNode(
 
 	for (const entry of entries) {
 		await collectNodes(source, nodes, join(path, entry.name));
+	}
+}
+
+async function collectAncestorDirs(
+	source: FS,
+	nodes: Map<string, SnapshotNode>,
+	path: string,
+): Promise<void> {
+	let current = dirname(path);
+	while (current && current !== ".") {
+		if (!nodes.has(current)) {
+			const info = await source.stat(current);
+			if (!info?.isDir) return;
+			nodes.set(current, {
+				isDir: true,
+				modTime: info.modTime,
+				entries: [],
+			});
+		}
+		if (current === "/") return;
+		current = dirname(current);
 	}
 }
