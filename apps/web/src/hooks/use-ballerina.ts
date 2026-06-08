@@ -5,6 +5,7 @@ import * as React from "react";
 import { SnapshotFS } from "@/lib/fs/snapshot";
 
 import { useFS } from "@/providers/fs-provider";
+import { useFileTreeStore } from "@/stores/file-tree-store";
 
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
@@ -47,7 +48,30 @@ export function useBallerina() {
 			}
 
 			const snapshot = await SnapshotFS.from(fs, path);
-			await clientRef.current.run(snapshot, path, onOutput);
+
+			let mutationSync = Promise.resolve();
+			const unsubscribe = snapshot.onMutation((mutation) => {
+				mutationSync = mutationSync
+					// Keep the mutation queue alive even if the previous sync failed.
+					.catch(() => undefined)
+					.then(async () => {
+						try {
+							await useFileTreeStore.getState().applyMutation(mutation);
+						} catch (error) {
+							onOutput({
+								stream: "stderr",
+								text: `Failed to sync file system mutation: ${String(error)}\n`,
+							});
+						}
+					});
+			});
+
+			try {
+				await clientRef.current.run(snapshot, path, onOutput);
+				await mutationSync;
+			} finally {
+				unsubscribe();
+			}
 		},
 		[fs],
 	);

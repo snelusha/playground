@@ -7,6 +7,7 @@ import { ancestorDirPathsForFile, isUnder } from "@/lib/fs/core/path-utils";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
 import type { FileNode } from "@/lib/fs/core/file-node.types";
+import type { SnapshotFSMutation } from "@/lib/fs/snapshot";
 
 const DEFAULT_MAIN_BAL = `import ballerina/io;
 
@@ -82,6 +83,8 @@ type FileTreeActions = {
 	collapseDir(path: string): void;
 
 	_syncTrees(): Promise<void>;
+
+	applyMutation(mutation: SnapshotFSMutation): Promise<void>;
 
 	loadSharedFiles(
 		root: FileNode,
@@ -327,6 +330,31 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 					s.tempTree = tempTree;
 					s.localTree = localTree;
 				});
+			},
+
+			async applyMutation(mutation: SnapshotFSMutation) {
+				const fs = _fs();
+				switch (mutation.type) {
+					case "writeFile": {
+						const result = await fs.writeFile(mutation.path, mutation.content);
+						if (!result) break;
+						const dirs = ancestorDirPathsForFile(mutation.path);
+						set((s) => {
+							for (const d of dirs) s.expandedPaths.add(d);
+							if (s.activeFile?.path === mutation.path && !s.activeFile.dirty) {
+								s.activeFile.content = mutation.content;
+							}
+						});
+						break;
+					}
+					case "mkdirAll":
+						await fs.mkdirAll(mutation.path);
+						set((s) => {
+							s.expandedPaths.add(mutation.path);
+						});
+						break;
+				}
+				await get()._syncTrees();
 			},
 
 			async loadSharedFiles(
