@@ -4,6 +4,7 @@ import type {
 	BallerinaWorkerAPI,
 	RunOutputCallback,
 	RuntimeSignal,
+	ServiceModel,
 } from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
@@ -55,6 +56,14 @@ export class BallerinaWorkerClient {
 	): Promise<Array<Record<string, unknown>>> {
 		if (!this.api) return Promise.resolve([]);
 		return this.api.getDiagnostics(Comlink.proxy(snapshot), path);
+	}
+
+	async getServiceModel(
+		snapshot: SnapshotFS,
+		path: string,
+	): Promise<ServiceModel> {
+		if (!this.api) return Promise.resolve({});
+		return this.api.getServiceModel(Comlink.proxy(snapshot), path);
 	}
 
 	async sendSignal(signal: RuntimeSignal): Promise<boolean> {

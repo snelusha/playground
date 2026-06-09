@@ -262,14 +262,18 @@ function OutputPane() {
 
 function EditorPane({
 	onRun,
+	onGetServices,
 	onGracefulStop,
 	onImmediateStop,
 	isRunning,
+	isInspectingServices,
 }: {
 	onRun: () => Promise<void>;
+	onGetServices: () => Promise<void>;
 	onGracefulStop: () => Promise<void>;
 	onImmediateStop: () => Promise<void>;
 	isRunning: boolean;
+	isInspectingServices: boolean;
 }) {
 	const activeFile = useActiveFile();
 
@@ -318,7 +322,21 @@ function EditorPane({
 							</>
 						)}
 					</Button>
-					{ /* TODO: Should something with these two stop buttons. */ }	
+					<Button
+						className="h-full rounded-none"
+						variant="ghost"
+						data-testid="service-model-button"
+						onClick={() => void onGetServices()}
+						disabled={
+							isRunning ||
+							isInspectingServices ||
+							!activeFile ||
+							getLanguage(activeFile.path) !== "ballerina"
+						}
+					>
+						<span>{isInspectingServices ? "[...]" : "Services"}</span>
+					</Button>
+					{/* TODO: Should something with these two stop buttons. */}
 					<Button
 						className="h-full rounded-none"
 						variant="ghost"
@@ -384,12 +402,14 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run, sendSignal } = useBallerina();
+	const { isReady, progress, run, getServiceModel, sendSignal } =
+		useBallerina();
 
 	const activeFile = useActiveFile();
 
 	const { saveFile } = useFileTreeActions();
 	const [isRunning, setIsRunning] = React.useState(false);
+	const [isInspectingServices, setIsInspectingServices] = React.useState(false);
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
 	const appendOutput = useEditorStore((s) => s.appendOutput);
@@ -411,6 +431,29 @@ function EditorContent() {
 			setIsRunning(false);
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
+
+	const handleGetServices = React.useCallback(async () => {
+		if (isInspectingServices) return;
+		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
+
+		setIsInspectingServices(true);
+		try {
+			await saveFile();
+
+			const target = await getBallerinaProjectTarget(fs, activeFile.path);
+			const model = await getServiceModel(target);
+			openOutputWith(`${JSON.stringify(model, null, 2)}\n`);
+		} finally {
+			setIsInspectingServices(false);
+		}
+	}, [
+		activeFile,
+		fs,
+		saveFile,
+		getServiceModel,
+		openOutputWith,
+		isInspectingServices,
+	]);
 
 	const handleGracefulStop = React.useCallback(async () => {
 		await sendSignal("graceful");
@@ -438,9 +481,11 @@ function EditorContent() {
 				<main className="flex flex-col lg:flex-row flex-1 min-h-0">
 					<EditorPane
 						onRun={handleRun}
+						onGetServices={handleGetServices}
 						onGracefulStop={handleGracefulStop}
 						onImmediateStop={handleImmediateStop}
 						isRunning={isRunning}
+						isInspectingServices={isInspectingServices}
 					/>
 					<OutputPane />
 				</main>

@@ -12,6 +12,7 @@ import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 import type {
 	RunOutputCallback,
 	RuntimeSignal,
+	ServiceModel,
 } from "@/workers/ballerina-worker-api";
 
 export function useBallerina() {
@@ -55,6 +56,16 @@ export function useBallerina() {
 		[fs],
 	);
 
+	const getServiceModel = React.useCallback(
+		async (path: string): Promise<ServiceModel> => {
+			if (!clientRef.current || !fs) return {};
+
+			const snapshot = await SnapshotFS.from(fs, path);
+			return clientRef.current.getServiceModel(snapshot, path);
+		},
+		[fs],
+	);
+
 	const sendSignal = React.useCallback(
 		async (signal: RuntimeSignal): Promise<boolean> => {
 			if (!clientRef.current) return false;
@@ -63,5 +74,5 @@ export function useBallerina() {
 		[],
 	);
 
-	return { isReady, progress, run, sendSignal };
+	return { isReady, progress, run, getServiceModel, sendSignal };
 }

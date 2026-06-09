@@ -29,6 +29,7 @@ import (
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
 	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
+	js.Global().Set("getServiceModel", js.FuncOf(getServiceModel))
 	js.Global().Set("sendSignal", js.FuncOf(sendSignal))
 
 	select {}

@@ -11,6 +11,8 @@ export type RunOutputCallback = (output: RunOutput) => void;
 
 export type RuntimeSignal = "graceful" | "immediate";
 
+export type ServiceModel = Record<string, unknown>;
+
 export interface BallerinaWorkerAPI {
 	init(wasmUrl: string, onProgress: (progress: number) => void): Promise<void>;
 	run(
@@ -22,5 +24,6 @@ export interface BallerinaWorkerAPI {
 		snapshot: SnapshotFS,
 		path: string,
 	): Promise<Array<Record<string, unknown>>>;
+	getServiceModel(snapshot: SnapshotFS, path: string): Promise<ServiceModel>;
 	sendSignal(signal: RuntimeSignal): Promise<boolean>;
 }

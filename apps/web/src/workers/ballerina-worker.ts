@@ -6,6 +6,7 @@ import type {
 	BallerinaWorkerAPI,
 	RunOutputCallback,
 	RuntimeSignal,
+	ServiceModel,
 } from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
@@ -25,6 +26,7 @@ declare const self: typeof globalThis & {
 		fs: SnapshotFS,
 		path: string,
 	) => Promise<Array<Record<string, unknown>>>;
+	getServiceModel: (fs: SnapshotFS, path: string) => Promise<ServiceModel>;
 	sendSignal: (signal: RuntimeSignal) => boolean;
 };
 
@@ -114,6 +116,13 @@ const api: BallerinaWorkerAPI = {
 	): Promise<Array<Record<string, unknown>>> => {
 		if (typeof self.getDiagnostics !== "function") return Promise.resolve([]);
 		return Promise.resolve(self.getDiagnostics(snapshot, path) ?? []);
+	},
+	getServiceModel: (
+		snapshot: SnapshotFS,
+		path: string,
+	): Promise<ServiceModel> => {
+		if (typeof self.getServiceModel !== "function") return Promise.resolve({});
+		return Promise.resolve(self.getServiceModel(snapshot, path) ?? {});
 	},
 	sendSignal: (signal: RuntimeSignal): Promise<boolean> => {
 		if (typeof self.sendSignal !== "function") return Promise.resolve(false);
