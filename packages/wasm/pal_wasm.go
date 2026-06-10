@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+	"sync"
 	"syscall/js"
 	"time"
 )
@@ -191,6 +192,61 @@ func redirectMode(enabled bool) string {
 	return "manual"
 }
 
+var (
+	activeSignalsMu sync.Mutex
+	activeSignals   *signalSource
+)
+
+type signalSource struct {
+	ch chan pal.Signal
+}
+
+func (s *signalSource) send(sig pal.Signal) bool {
+	select {
+	case s.ch <- sig:
+		return true
+	default:
+		return false
+	}
+}
+
+// func newSignalSource() (pal.SignalSource, *signalSource) {
+// ch := make(chan pal.Signal, 4)
+// return pal.SignalSource{Signals: ch}, &signalSource{ch: ch}
+// }
+
+func newSignalSource() (*signalSource, pal.SignalSource) {
+	ch := make(chan pal.Signal, 4)
+	return &signalSource{ch: ch}, pal.SignalSource{Signals: ch}
+}
+
+func activateSignalSource(s *signalSource) bool {
+	activeSignalsMu.Lock()
+	defer activeSignalsMu.Unlock()
+	if activeSignals != nil {
+		return false
+	}
+	activeSignals = s
+	return true
+}
+
+func deactivateSignalSource(s *signalSource) {
+	activeSignalsMu.Lock()
+	defer activeSignalsMu.Unlock()
+	if activeSignals == s {
+		activeSignals = nil
+	}
+}
+
+func sendSignal(sig pal.Signal) bool {
+	activeSignalsMu.Lock()
+	defer activeSignalsMu.Unlock()
+	if activeSignals == nil {
+		return false
+	}
+	return activeSignals.send(sig)
+}
+
 func resolvePath(cwd string, p string) string {
 	if path.IsAbs(p) {
 		return p
@@ -198,7 +254,7 @@ func resolvePath(cwd string, p string) string {
 	return path.Join(cwd, p)
 }
 
-func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer) pal.Platform {
+func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.SignalSource) pal.Platform {
 	return pal.Platform{
 		IO: pal.IO{
 			Stdout: stdout.Write,
@@ -229,5 +285,6 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer) pal.Platform 
 				return &fetchHTTPClient{cfg: cfg}
 			},
 		},
+		Signals: signals,
 	}
 }
