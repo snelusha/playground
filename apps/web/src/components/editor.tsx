@@ -342,7 +342,7 @@ function EditorPane({
 							/>
 							<DropdownMenuContent>
 								<DropdownMenuItem onClick={() => onStop("graceful")}>
-									Graceful Stop
+									Graceful Stop (Default)
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => onStop("immediate")}>
 									Immediate Stop
