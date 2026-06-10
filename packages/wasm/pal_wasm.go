@@ -216,7 +216,7 @@ func (s *signalSource) send(sig pal.Signal) bool {
 // }
 
 func newSignalSource() (*signalSource, pal.SignalSource) {
-	ch := make(chan pal.Signal, 4)
+	ch := make(chan pal.Signal, 2)
 	return &signalSource{ch: ch}, pal.SignalSource{Signals: ch}
 }
 
