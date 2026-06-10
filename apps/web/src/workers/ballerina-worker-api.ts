@@ -9,6 +9,8 @@ export interface RunOutput {
 
 export type RunOutputCallback = (output: RunOutput) => void;
 
+export type RuntimeSignal = "graceful" | "immediate";
+
 export interface BallerinaWorkerAPI {
 	init(wasmUrl: string, onProgress: (progress: number) => void): Promise<void>;
 	run(
@@ -16,6 +18,7 @@ export interface BallerinaWorkerAPI {
 		path: string,
 		onOutput: RunOutputCallback,
 	): Promise<void>;
+	sendStopSignal(signal: RuntimeSignal): Promise<boolean>;
 	getDiagnostics(
 		snapshot: SnapshotFS,
 		path: string,
