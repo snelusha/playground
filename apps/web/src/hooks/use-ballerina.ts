@@ -10,6 +10,8 @@ import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 import type {
+	HttpMethod,
+	HttpServiceResponse,
 	RunOutputCallback,
 	RuntimeSignal,
 } from "@/workers/ballerina-worker-api";
@@ -63,5 +65,18 @@ export function useBallerina() {
 		[],
 	);
 
-	return { isReady, progress, run, sendStopSignal };
+	const invokeHttpService = React.useCallback(
+		async (
+			method: HttpMethod,
+			path: string,
+			port: number,
+			body?: string,
+		): Promise<HttpServiceResponse> => {
+			if (!clientRef.current) throw new Error("Ballerina runtime is not ready");
+			return clientRef.current.invokeHttpService(method, path, port, body);
+		},
+		[],
+	);
+
+	return { isReady, progress, run, sendStopSignal, invokeHttpService };
 }

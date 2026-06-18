@@ -29,6 +29,7 @@ import (
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
 	js.Global().Set("sendStopSignal", js.FuncOf(sendStopSignal))
+	js.Global().Set("invokeHttpService", js.FuncOf(invokeHTTPService))
 
 	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
 
@@ -131,6 +132,36 @@ func sendStopSignal(_ js.Value, args []js.Value) any {
 	default:
 		return false
 	}
+}
+
+func invokeHTTPService(_ js.Value, args []js.Value) any {
+	return newPromise(func(resolve js.Value, reject js.Value) {
+		go func() {
+			method := "GET"
+			targetPath := "/"
+			port := 0
+			body := ""
+			if len(args) > 0 && args[0].Truthy() {
+				method = args[0].String()
+			}
+			if len(args) > 1 && args[1].Truthy() {
+				targetPath = args[1].String()
+			}
+			if len(args) > 2 && args[2].Truthy() {
+				port = args[2].Int()
+			}
+			if len(args) > 3 && args[3].Truthy() {
+				body = args[3].String()
+			}
+
+			result, err := activeHTTPServices.invoke(port, method, targetPath, body)
+			if err != nil {
+				reject.Invoke(err.Error())
+				return
+			}
+			resolve.Invoke(js.ValueOf(result))
+		}()
+	})
 }
 
 func getDiagnostics(_ js.Value, args []js.Value) any {
