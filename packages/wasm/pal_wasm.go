@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
+	"net/http/httptest"
 	"path"
 	"strings"
 	"sync"
@@ -16,6 +18,100 @@ import (
 )
 
 var wasmProcessStart = time.Now()
+
+var activeHTTPServices = wasmHTTPServices{handlers: map[int]http.Handler{}}
+
+type wasmHTTPServices struct {
+	mu       sync.Mutex
+	handlers map[int]http.Handler
+}
+
+type wasmHTTPServerHandle struct {
+	port int
+}
+
+func (h wasmHTTPServerHandle) Shutdown(context.Context) error {
+	activeHTTPServices.unregister(h.port)
+	return nil
+}
+
+func (h wasmHTTPServerHandle) Close() error {
+	activeHTTPServices.unregister(h.port)
+	return nil
+}
+
+func (s *wasmHTTPServices) register(cfg pal.ServerConfig, handler http.Handler) (pal.ServerHandle, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	port := cfg.Port
+	if port == 0 {
+		port = len(s.handlers) + 1
+	}
+	s.handlers[port] = handler
+	return wasmHTTPServerHandle{port: port}, nil
+}
+
+func (s *wasmHTTPServices) unregister(port int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.handlers, port)
+}
+
+func (s *wasmHTTPServices) invoke(port int, method, targetPath, body string) (map[string]any, error) {
+	s.mu.Lock()
+	var handler http.Handler
+	if port > 0 {
+		handler = s.handlers[port]
+	} else if len(s.handlers) == 1 {
+		for _, h := range s.handlers {
+			handler = h
+		}
+	}
+	handlerCount := len(s.handlers)
+	s.mu.Unlock()
+	if handler == nil {
+		if port > 0 {
+			return nil, fmt.Errorf("no active HTTP service is listening on port %d", port)
+		}
+		if handlerCount > 1 {
+			return nil, fmt.Errorf("multiple HTTP services are listening; specify a port")
+		}
+		return nil, fmt.Errorf("no active HTTP service is listening")
+	}
+
+	if targetPath == "" {
+		targetPath = "/"
+	}
+	if !strings.HasPrefix(targetPath, "/") {
+		targetPath = "/" + targetPath
+	}
+
+	req := httptest.NewRequest(strings.ToUpper(method), targetPath, strings.NewReader(body))
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	resp := res.Result()
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := map[string]any{}
+	for name, values := range resp.Header {
+		headers[name] = strings.Join(values, ", ")
+	}
+
+	return map[string]any{
+		"status":  resp.StatusCode,
+		"headers": headers,
+		"body":    string(respBody),
+	}, nil
+}
 
 type fetchHTTPClient struct {
 	cfg pal.ClientConfig
@@ -210,11 +306,6 @@ func (s *signalSource) send(sig pal.Signal) bool {
 	}
 }
 
-// func newSignalSource() (pal.SignalSource, *signalSource) {
-// ch := make(chan pal.Signal, 4)
-// return pal.SignalSource{Signals: ch}, &signalSource{ch: ch}
-// }
-
 func newSignalSource() (*signalSource, pal.SignalSource) {
 	ch := make(chan pal.Signal, 2)
 	return &signalSource{ch: ch}, pal.SignalSource{Signals: ch}
@@ -276,6 +367,29 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 				return fsys.WriteFile(resolved, append(current, data...), 0o644)
 			},
 		},
+		OS: pal.OS{
+			GetEnv: func(name string) string {
+				panic("GetEnv is not supported in WASM environment")
+			},
+			GetUsername: func() string {
+				panic("GetUsername is not supported in WASM environment")
+			},
+			GetUserHome: func() string {
+				panic("GetUserHome is not supported in WASM environment")
+			},
+			SetEnv: func(key, val string) error {
+				panic("SetEnv is not supported in WASM environment")
+			},
+			UnsetEnv: func(key string) error {
+				panic("UnsetEnv is not supported in WASM environment")
+			},
+			ListEnv: func() map[string]string {
+				panic("ListEnv is not supported in WASM environment")
+			},
+			Exec: func(command string, args []string, envOverride map[string]string) (pal.ProcessHandle, error) {
+				panic("Exec is not supported in WASM environment")
+			},
+		},
 		Time: pal.Time{
 			Now:          time.Now,
 			MonotonicNow: func() time.Duration { return time.Since(wasmProcessStart) },
@@ -284,6 +398,7 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 			NewClient: func(cfg pal.ClientConfig) pal.HTTPClient {
 				return &fetchHTTPClient{cfg: cfg}
 			},
+			Listen: activeHTTPServices.register,
 		},
 		Signals: signals,
 	}

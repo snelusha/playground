@@ -7,11 +7,13 @@ import {
 	CleanIcon,
 	GithubFreeIcons,
 	PlayIcon,
+	StopIcon,
 } from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "./ui/button-group";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
 	SidebarInset,
@@ -36,13 +38,18 @@ import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
 import type { EditorLanguage } from "@/components/code-editor";
-import type { RuntimeSignal } from "@/workers/ballerina-worker-api";
+import type {
+	HttpMethod,
+	HttpServiceResponse,
+	RuntimeSignal,
+} from "@/workers/ballerina-worker-api";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Separator } from "./ui/separator";
 
 function getLanguage(path: string): EditorLanguage {
 	const ex = ext(path);
@@ -168,7 +175,15 @@ function formatJsonOutput(output: string): string {
 	}
 }
 
-function OutputPane() {
+function OutputPane({
+	onInvokeHttpService,
+}: {
+	onInvokeHttpService: (
+		method: HttpMethod,
+		path: string,
+		port: number,
+	) => Promise<HttpServiceResponse>;
+}) {
 	const output = useEditorStore((s) => s.output);
 	const formattedOutput = React.useMemo(
 		() => formatJsonOutput(output),
@@ -177,6 +192,11 @@ function OutputPane() {
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
+	const appendOutput = useEditorStore((s) => s.appendOutput);
+	const [httpMethod, setHttpMethod] = React.useState<HttpMethod>("GET");
+	const [httpPath, setHttpPath] = React.useState("/");
+	const [httpPort, setHttpPort] = React.useState("9090");
+	const [isInvoking, setIsInvoking] = React.useState(false);
 	const scrollRef = React.useRef<HTMLDivElement>(null);
 	const shouldAutoScrollRef = React.useRef(true);
 	const previousOutputLengthRef = React.useRef(output.length);
@@ -190,6 +210,29 @@ function OutputPane() {
 			element.scrollHeight - element.scrollTop - element.clientHeight;
 		shouldAutoScrollRef.current = distanceFromBottom < 24;
 	}, []);
+
+	const handleInvokeHTTP = React.useCallback(async () => {
+		if (isInvoking) return;
+		setIsInvoking(true);
+		try {
+			const port = Number.parseInt(httpPort, 10) || 0;
+			const response = await onInvokeHttpService(httpMethod, httpPath, port);
+			appendOutput(
+				`\n> ${httpMethod} :${port || "?"}${httpPath || "/"}\n< ${response.status}\n${response.body}\n`,
+			);
+		} catch (error) {
+			appendOutput(`\nHTTP invoke failed: ${String(error)}\n`);
+		} finally {
+			setIsInvoking(false);
+		}
+	}, [
+		appendOutput,
+		httpMethod,
+		httpPath,
+		httpPort,
+		isInvoking,
+		onInvokeHttpService,
+	]);
 
 	React.useLayoutEffect(() => {
 		const element = scrollRef.current;
@@ -222,12 +265,51 @@ function OutputPane() {
 			)}
 		>
 			<div className="flex h-10 shrink-0 items-center justify-between border-b border-t lg:border-t-0">
-				<div className="flex items-center h-full">
-					<span className="px-4 h-full text-xs text-muted-foreground flex items-center">
+				<div className="flex items-center h-full min-w-0 flex-1">
+					<span className="px-4 h-full text-xs text-muted-foreground flex items-center shrink-0">
 						Output
 					</span>
+					<div className="flex items-center h-full min-w-0 flex-1 border-l">
+						<select
+							className="h-full bg-transparent px-2 text-xs outline-none border-r"
+							value={httpMethod}
+							onChange={(event) =>
+								setHttpMethod(event.target.value as HttpMethod)
+							}
+							aria-label="HTTP method"
+						>
+							<option value="GET">GET</option>
+							<option value="POST">POST</option>
+							<option value="PUT">PUT</option>
+							<option value="PATCH">PATCH</option>
+							<option value="DELETE">DELETE</option>
+						</select>
+						<Input
+							className="h-full w-20 rounded-none border-0 border-r text-xs shadow-none focus-visible:ring-0"
+							value={httpPort}
+							onChange={(event) => setHttpPort(event.target.value)}
+							placeholder="port"
+							inputMode="numeric"
+							aria-label="HTTP service port"
+						/>
+						<Input
+							className="h-full min-w-0 rounded-none border-0 text-xs shadow-none focus-visible:ring-0"
+							value={httpPath}
+							onChange={(event) => setHttpPath(event.target.value)}
+							placeholder="/path"
+							aria-label="HTTP endpoint path"
+						/>
+						<Button
+							className="h-full rounded-none border-l"
+							variant="ghost"
+							onClick={() => void handleInvokeHTTP()}
+							disabled={isInvoking}
+						>
+							{isInvoking ? "Sending..." : "Send"}
+						</Button>
+					</div>
 				</div>
-				<div className="flex items-center h-full">
+				<div className="flex items-center h-full shrink-0">
 					<Button
 						className="h-full border-l lg:hidden"
 						variant="ghost"
@@ -303,54 +385,53 @@ function EditorPane({
 				<span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
-				<div className="h-full flex items-center gap-2">
+				<ButtonGroup className="h-full">
 					<Button
-						className="h-full rounded-none"
+						className="h-full"
 						variant="ghost"
 						data-testid="run-button"
-						onClick={() => void onRun()}
+						onClick={
+							isRunning ? () => void onStop("graceful") : () => void onRun()
+						}
 						disabled={
-							isRunning ||
-							!activeFile ||
-							getLanguage(activeFile.path) !== "ballerina"
+							!activeFile || getLanguage(activeFile.path) !== "ballerina"
 						}
 					>
-						{isRunning ? (
-							<span>[...]</span>
-						) : (
+						{!isRunning ? (
 							<>
 								<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-								<span>Run</span>
+								<span className="min-w-7.5">Run</span>
+							</>
+						) : (
+							<>
+								<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
+								<span className="min-w-7.5">Stop</span>
 							</>
 						)}
 					</Button>
-					<ButtonGroup className="h-full">
-						<Button
-							className="h-full"
-							variant="ghost"
-							onClick={() => onStop("graceful")}
-						>
-							Stop
-						</Button>
-						<DropdownMenu>
-							<DropdownMenuTrigger
-								render={
-									<Button className="h-full px-0!" variant="ghost">
-										<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
-									</Button>
-								}
-							/>
-							<DropdownMenuContent>
-								<DropdownMenuItem onClick={() => onStop("graceful")}>
-									Graceful Stop (Default)
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={() => onStop("immediate")}>
-									Immediate Stop
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</ButtonGroup>
-				</div>
+					<Separator orientation="vertical" />
+					<DropdownMenu disabled={!isRunning}>
+						<DropdownMenuTrigger
+							render={
+								<Button
+									className="h-full"
+									variant="ghost"
+									data-testid="stop-options-button"
+								>
+									<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
+								</Button>
+							}
+						/>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem onClick={() => onStop("graceful")}>
+								Graceful Stop (Default)
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => onStop("immediate")}>
+								Immediate Stop
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</ButtonGroup>
 			</div>
 			{activeFile && (
 				<CodeEditor
@@ -397,7 +478,8 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run, sendStopSignal } = useBallerina();
+	const { isReady, progress, run, sendStopSignal, invokeHttpService } =
+		useBallerina();
 
 	const activeFile = useActiveFile();
 
@@ -425,9 +507,12 @@ function EditorContent() {
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
-	const handleStop = React.useCallback(async (signal: RuntimeSignal) => {
-		await sendStopSignal(signal);
-	}, []);
+	const handleStop = React.useCallback(
+		async (signal: RuntimeSignal) => {
+			await sendStopSignal(signal);
+		},
+		[sendStopSignal],
+	);
 
 	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,
@@ -450,7 +535,7 @@ function EditorContent() {
 						isRunning={isRunning}
 						onStop={handleStop}
 					/>
-					<OutputPane />
+					<OutputPane onInvokeHttpService={invokeHttpService} />
 				</main>
 			</SidebarInset>
 		</>
