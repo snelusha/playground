@@ -9,7 +9,10 @@ import { useFS } from "@/providers/fs-provider";
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
-import type { RunOutputCallback } from "@/workers/ballerina-worker-api";
+import type {
+	RunOutputCallback,
+	RuntimeSignal,
+} from "@/workers/ballerina-worker-api";
 
 export function useBallerina() {
 	const fs = useFS();
@@ -52,5 +55,13 @@ export function useBallerina() {
 		[fs],
 	);
 
-	return { isReady, progress, run };
+	const sendStopSignal = React.useCallback(
+		async (signal: RuntimeSignal): Promise<boolean> => {
+			if (!clientRef.current) return false;
+			return clientRef.current.sendStopSignal(signal);
+		},
+		[],
+	);
+
+	return { isReady, progress, run, sendStopSignal };
 }
