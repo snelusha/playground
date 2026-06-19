@@ -7,16 +7,25 @@ import {
 	CleanIcon,
 	GithubFreeIcons,
 	PlayIcon,
+	StopIcon,
 } from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import {
 	SidebarInset,
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Progress } from "@/components/ui/progress";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
@@ -35,6 +44,7 @@ import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
 import type { EditorLanguage } from "@/components/code-editor";
+import type { RuntimeSignal } from "@/workers/ballerina-worker-api";
 
 function getLanguage(path: string): EditorLanguage {
 	const ex = ext(path);
@@ -263,9 +273,11 @@ function OutputPane() {
 function EditorPane({
 	onRun,
 	isRunning,
+	onStop,
 }: {
 	onRun: () => Promise<void>;
 	isRunning: boolean;
+	onStop: (signal: RuntimeSignal) => Promise<void>;
 }) {
 	const activeFile = useActiveFile();
 
@@ -293,26 +305,53 @@ function EditorPane({
 				<span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
-				<Button
-					className="h-full rounded-none"
-					variant="ghost"
-					data-testid="run-button"
-					onClick={() => void onRun()}
-					disabled={
-						isRunning ||
-						!activeFile ||
-						getLanguage(activeFile.path) !== "ballerina"
-					}
-				>
-					{isRunning ? (
-						<span>[...]</span>
-					) : (
-						<>
-							<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-							<span>Run</span>
-						</>
-					)}
-				</Button>
+				<ButtonGroup className="h-full">
+					<Button
+						className="h-full"
+						variant="ghost"
+						data-testid="run-button"
+						onClick={
+							isRunning ? () => void onStop("graceful") : () => void onRun()
+						}
+						disabled={
+							!activeFile || getLanguage(activeFile.path) !== "ballerina"
+						}
+					>
+						{!isRunning ? (
+							<>
+								<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+								<span className="min-w-7.5">Run</span>
+							</>
+						) : (
+							<>
+								<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
+								<span className="min-w-7.5">Stop</span>
+							</>
+						)}
+					</Button>
+					<Separator orientation="vertical" />
+					<DropdownMenu disabled={!isRunning}>
+						<DropdownMenuTrigger
+							render={
+								<Button
+									className="h-full"
+									variant="ghost"
+									data-testid="stop-options-button"
+								>
+									<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
+								</Button>
+							}
+						/>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem onClick={() => onStop("graceful")}>
+								Graceful Stop (Default)
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => onStop("immediate")}>
+								Immediate Stop
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</ButtonGroup>
 			</div>
 			{activeFile && (
 				<CodeEditor
@@ -359,7 +398,7 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run } = useBallerina();
+	const { isReady, progress, run, sendStopSignal } = useBallerina();
 
 	const activeFile = useActiveFile();
 
@@ -387,6 +426,13 @@ function EditorContent() {
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
+	const handleStop = React.useCallback(
+		async (signal: RuntimeSignal) => {
+			await sendStopSignal(signal);
+		},
+		[sendStopSignal],
+	);
+
 	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,
 	});
@@ -403,7 +449,11 @@ function EditorContent() {
 			<SidebarInset className="flex flex-col h-dvh overflow-hidden">
 				<EditorHeader />
 				<main className="flex flex-col lg:flex-row flex-1 min-h-0">
-					<EditorPane onRun={handleRun} isRunning={isRunning} />
+					<EditorPane
+						onRun={handleRun}
+						isRunning={isRunning}
+						onStop={handleStop}
+					/>
 					<OutputPane />
 				</main>
 			</SidebarInset>
