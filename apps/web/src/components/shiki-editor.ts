@@ -1138,18 +1138,50 @@ function partitionOptions<TThemes extends ThemeRegistry>(
 	};
 }
 
+const playgroundHighlighterCache = new Map<string, Promise<Highlighter>>();
+
+function getThemeNames(themes: ThemeRegistry): string[] {
+	return [
+		...new Set(
+			Object.values(themes)
+				.map((theme) =>
+					typeof theme === "string"
+						? theme
+						: String((theme as { name?: string }).name),
+				)
+				.filter(Boolean),
+		),
+	].sort();
+}
+
 async function initPlaygroundHighlighter(
 	options: Omit<ShikiToCMOptions, "theme">,
 ): Promise<Highlighter> {
-	const themeNames = Object.values(options.themes)
-		.map((t) =>
-			typeof t === "string" ? t : String((t as { name?: string }).name),
-		)
-		.filter(Boolean) as string[];
-	const highlighter = await createHighlighter({
-		themes: themeNames,
+	if (options.highlighter) {
+		assertCompatibleHighlighter(
+			options.highlighter,
+			"[shiki-editor]",
+			options.warnings,
+			options.versionGuard !== false,
+		);
+		return options.highlighter;
+	}
+
+	const themeNames = getThemeNames(options.themes);
+	const cacheKey = JSON.stringify({
 		langs: ["ballerina", "toml", "log"],
+		themes: themeNames,
 	});
+	let highlighterPromise = playgroundHighlighterCache.get(cacheKey);
+	if (!highlighterPromise) {
+		highlighterPromise = createHighlighter({
+			themes: themeNames,
+			langs: ["ballerina", "toml", "log"],
+		}) as Promise<Highlighter>;
+		playgroundHighlighterCache.set(cacheKey, highlighterPromise);
+	}
+
+	const highlighter = await highlighterPromise;
 	assertCompatibleHighlighter(
 		highlighter,
 		"[shiki-editor]",
