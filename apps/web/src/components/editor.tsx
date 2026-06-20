@@ -27,6 +27,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
@@ -381,74 +382,139 @@ function EditorPane({
 				outputOpen ? "h-1/2" : "flex-1",
 			)}
 		>
-			<div className="flex h-10 shrink-0 items-center justify-between border-b">
-				<span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
-					{activeFile ? basename(activeFile.path) : "No file selected"}
-				</span>
-				<ButtonGroup className="h-full">
-					<Button
-						className="h-full"
-						variant="ghost"
-						data-testid="run-button"
-						onClick={
-							isRunning ? () => void onStop("graceful") : () => void onRun()
-						}
-						disabled={
-							!isRunning &&
-							(!activeFile || getLanguage(activeFile.path) !== "ballerina")
-						}
-					>
-						{!isRunning ? (
-							<>
-								<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-								<span className="min-w-7.5">Run</span>
-							</>
-						) : (
-							<>
-								<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
-								<span className="min-w-7.5">Stop</span>
-							</>
-						)}
-					</Button>
-					<Separator orientation="vertical" />
-					<DropdownMenu disabled={!isRunning}>
-						<DropdownMenuTrigger
-							render={
-								<Button
-									className="h-full"
-									variant="ghost"
-									aria-label="Stop options"
-									data-testid="stop-options-button"
-								>
-									<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
-								</Button>
+			<Tabs defaultValue="editor">
+				<div className="flex h-10 shrink-0 items-center justify-between border-b">
+					<TabsList className="h-full! p-0!">
+						<TabsTrigger
+							value="editor"
+							className="bg-background! text-xs truncate px-4 h-full! border-r! border-0 border-border!"
+						>
+							{activeFile ? basename(activeFile.path) : "No file selected"}
+						</TabsTrigger>
+						<TabsTrigger
+							value="tryit"
+							className="bg-background! text-xs truncate px-4 h-full! border-r! border-0 border-border!"
+						>
+							try it
+						</TabsTrigger>
+					</TabsList>
+					<ButtonGroup className="h-full">
+						<Button
+							className="h-full"
+							variant="ghost"
+							data-testid="run-button"
+							onClick={
+								isRunning ? () => void onStop("graceful") : () => void onRun()
 							}
+							disabled={
+								!isRunning &&
+								(!activeFile || getLanguage(activeFile.path) !== "ballerina")
+							}
+						>
+							{!isRunning ? (
+								<>
+									<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+									<span className="min-w-7.5">Run</span>
+								</>
+							) : (
+								<>
+									<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
+									<span className="min-w-7.5">Stop</span>
+								</>
+							)}
+						</Button>
+						<Separator orientation="vertical" />
+						<DropdownMenu disabled={!isRunning}>
+							<DropdownMenuTrigger
+								render={
+									<Button
+										className="h-full"
+										variant="ghost"
+										aria-label="Stop options"
+										data-testid="stop-options-button"
+									>
+										<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
+									</Button>
+								}
+							/>
+							<DropdownMenuContent align="end">
+								<DropdownMenuItem onClick={() => onStop("graceful")}>
+									Graceful Stop (Default)
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => onStop("immediate")}>
+									Immediate Stop
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</ButtonGroup>
+				</div>
+
+				<TabsContent value="editor" className="flex-1 min-h-0">
+					{activeFile && (
+						<CodeEditor
+							key={activeFile.path}
+							filePath={activeFile.path}
+							value={activeFile?.content}
+							onChange={handleChange}
+							hotkeys={{
+								"Mod-Enter": () => void onRun(),
+								"Mod-Alt-v": toggleEditorMode,
+								"Mod-r": () => window.location.reload(),
+							}}
+							language={activeFile ? getLanguage(activeFile.path) : "text"}
 						/>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem onClick={() => onStop("graceful")}>
-								Graceful Stop (Default)
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => onStop("immediate")}>
-								Immediate Stop
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				</ButtonGroup>
-			</div>
-			{activeFile && (
-				<CodeEditor
-					key={activeFile.path}
-					filePath={activeFile.path}
-					value={activeFile?.content}
-					onChange={handleChange}
-					hotkeys={{
-						"Mod-Enter": () => void onRun(),
-						"Mod-Alt-v": toggleEditorMode,
-						"Mod-r": () => window.location.reload(),
-					}}
-					language={activeFile ? getLanguage(activeFile.path) : "text"}
-				/>
-			)}
+					)}
+				</TabsContent>
+			</Tabs>
+			{/* <div className="flex h-10 shrink-0 items-center justify-between border-b"> */}
+			{/*   <span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]"> */}
+			{/*     {activeFile ? basename(activeFile.path) : "No file selected"} */}
+			{/*   </span> */}
+			{/*   <ButtonGroup className="h-full"> */}
+			{/*     <Button */}
+			{/*       className="h-full" */}
+			{/*       variant="ghost" */}
+			{/*       data-testid="run-button" */}
+			{/*       onClick={isRunning ? () => void onStop("graceful") : () => void onRun()} */}
+			{/*       disabled={!isRunning && (!activeFile || getLanguage(activeFile.path) !== "ballerina")} */}
+			{/*     > */}
+			{/*       {!isRunning ? ( */}
+			{/*         <> */}
+			{/*           <HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} /> */}
+			{/*           <span className="min-w-7.5">Run</span> */}
+			{/*         </> */}
+			{/*       ) : ( */}
+			{/*         <> */}
+			{/*           <HugeiconsIcon icon={StopIcon} strokeWidth={1.5} /> */}
+			{/*           <span className="min-w-7.5">Stop</span> */}
+			{/*         </> */}
+			{/*       )} */}
+			{/*     </Button> */}
+			{/*     <Separator orientation="vertical" /> */}
+			{/*     <DropdownMenu disabled={!isRunning}> */}
+			{/*       <DropdownMenuTrigger */}
+			{/*         render={ */}
+			{/*           <Button */}
+			{/*             className="h-full" */}
+			{/*             variant="ghost" */}
+			{/*             aria-label="Stop options" */}
+			{/*             data-testid="stop-options-button" */}
+			{/*           > */}
+			{/*             <HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} /> */}
+			{/*           </Button> */}
+			{/*         } */}
+			{/*       /> */}
+			{/*       <DropdownMenuContent align="end"> */}
+			{/*         <DropdownMenuItem onClick={() => onStop("graceful")}> */}
+			{/*           Graceful Stop (Default) */}
+			{/*         </DropdownMenuItem> */}
+			{/*         <DropdownMenuItem onClick={() => onStop("immediate")}> */}
+			{/*           Immediate Stop */}
+			{/*         </DropdownMenuItem> */}
+			{/*       </DropdownMenuContent> */}
+			{/*     </DropdownMenu> */}
+			{/*   </ButtonGroup> */}
+			{/* </div> */}
 		</div>
 	);
 }
