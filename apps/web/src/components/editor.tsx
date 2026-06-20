@@ -314,7 +314,8 @@ function EditorPane({
 							isRunning ? () => void onStop("graceful") : () => void onRun()
 						}
 						disabled={
-							!activeFile || getLanguage(activeFile.path) !== "ballerina"
+							!isRunning &&
+							(!activeFile || getLanguage(activeFile.path) !== "ballerina")
 						}
 					>
 						{!isRunning ? (
@@ -336,6 +337,7 @@ function EditorPane({
 								<Button
 									className="h-full"
 									variant="ghost"
+									aria-label="Stop options"
 									data-testid="stop-options-button"
 								>
 									<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />

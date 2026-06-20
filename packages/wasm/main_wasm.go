@@ -55,6 +55,8 @@ func run(_ js.Value, args []js.Value) any {
 			done := func() { resolve.Invoke(js.Undefined()) }
 
 			signalSource, signals := newSignalSource()
+			defer signalSource.cleanup()
+
 			if !activateSignalSource(signalSource) {
 				fmt.Fprintf(stderr, "another Ballerina run is already active\n")
 				done()
@@ -113,7 +115,6 @@ func run(_ js.Value, args []js.Value) any {
 			}
 			rt.Listen()
 			_ = <-rt.ExitStatus
-			signalSource.cleanup()
 		}()
 	})
 }
