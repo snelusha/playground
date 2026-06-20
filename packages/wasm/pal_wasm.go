@@ -2,6 +2,7 @@ package main
 
 import (
 	"ballerina-lang-go/platform/pal"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -127,16 +128,25 @@ func (ctx *requestContext) cleanup() {
 	}
 }
 
-func (c *fetchHTTPClient) Execute(method, url string, body []byte, contentType string, reqHeaders map[string][]string) (int, map[string][]string, []byte, error) {
+func (c *fetchHTTPClient) Execute(_ context.Context, method, url string, body io.Reader, _ int64, contentType string, reqHeaders map[string][]string) (int, map[string][]string, io.ReadCloser, error) {
 	fetch := js.Global().Get("fetch")
 	if !fetch.Truthy() {
 		return 0, nil, nil, fmt.Errorf("browser fetch API is not available")
 	}
 
+	var bodyBytes []byte
+	if body != nil {
+		b, err := io.ReadAll(body)
+		if err != nil {
+			return 0, nil, nil, err
+		}
+		bodyBytes = b
+	}
+
 	reqCtx := &requestContext{}
 	defer reqCtx.cleanup()
 
-	options := c.buildFetchOptions(method, body, contentType, reqHeaders, reqCtx)
+	options := c.buildFetchOptions(method, bodyBytes, contentType, reqHeaders, reqCtx)
 
 	resp, err := c.executeRequest(fetch, url, options)
 	if err != nil {
@@ -149,7 +159,7 @@ func (c *fetchHTTPClient) Execute(method, url string, body []byte, contentType s
 		return 0, nil, nil, err
 	}
 
-	return resp.Get("status").Int(), respHeaders, respBody, nil
+	return resp.Get("status").Int(), respHeaders, io.NopCloser(bytes.NewReader(respBody)), nil
 }
 
 func (c *fetchHTTPClient) buildFetchOptions(method string, body []byte, contentType string, reqHeaders map[string][]string, reqCtx *requestContext) map[string]any {
