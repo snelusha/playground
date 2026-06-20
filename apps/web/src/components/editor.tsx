@@ -87,6 +87,21 @@ function findJsonFragmentEnd(text: string, start: number): number | null {
 	return null;
 }
 
+function isStandaloneJsonFragment(
+	text: string,
+	start: number,
+	end: number,
+): boolean {
+	const lineStart = text.lastIndexOf("\n", start - 1) + 1;
+	const nextLineBreak = text.indexOf("\n", end);
+	const lineEnd = nextLineBreak === -1 ? text.length : nextLineBreak;
+
+	return (
+		text.slice(lineStart, start).trim() === "" &&
+		text.slice(end, lineEnd).trim() === ""
+	);
+}
+
 function normalizeJsonValue(value: unknown): unknown {
 	if (typeof value === "string") {
 		const trimmed = value.trim();
@@ -141,6 +156,12 @@ function formatJsonOutput(output: string): string {
 
 			const end = findJsonFragmentEnd(output, cursor);
 			if (end === null) {
+				formatted += char;
+				cursor += 1;
+				continue;
+			}
+
+			if (!isStandaloneJsonFragment(output, cursor, end)) {
 				formatted += char;
 				cursor += 1;
 				continue;
