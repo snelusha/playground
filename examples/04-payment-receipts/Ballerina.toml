@@ -1,0 +1,4 @@
+[package]
+org = "playground"
+name = "payment_receipts_client"
+version = "0.1.0"

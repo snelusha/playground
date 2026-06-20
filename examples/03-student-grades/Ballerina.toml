@@ -1,0 +1,4 @@
+[package]
+org = "playground"
+name = "student_grades_client"
+version = "0.1.0"
