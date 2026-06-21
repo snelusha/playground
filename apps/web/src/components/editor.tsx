@@ -178,12 +178,14 @@ function formatJsonOutput(output: string): string {
 
 function OutputPane({
 	onInvokeHttpService,
+	variant = "split",
 }: {
 	onInvokeHttpService: (
 		method: HttpMethod,
 		path: string,
 		port: number,
 	) => Promise<HttpServiceResponse>;
+	variant?: "split" | "tab";
 }) {
 	const output = useEditorStore((s) => s.output);
 	const formattedOutput = React.useMemo(
@@ -261,15 +263,17 @@ function OutputPane({
 		<div
 			className={cn(
 				"flex flex-col min-h-0 min-w-0",
-				"lg:w-1/2 lg:flex-none",
-				outputOpen ? "flex-1 lg:flex" : "shrink-0 lg:flex",
+				variant === "split" && "hidden lg:flex lg:w-1/2 lg:flex-none",
+				variant === "tab" && "flex-1",
 			)}
 		>
 			<div className="flex h-10 shrink-0 items-center justify-between border-b border-t lg:border-t-0">
 				<div className="flex items-center h-full min-w-0 flex-1">
-					<span className="px-4 h-full text-xs text-muted-foreground flex items-center shrink-0">
-						Output
-					</span>
+					{variant === "split" && (
+						<span className="px-4 h-full text-xs text-muted-foreground flex items-center shrink-0">
+							Output
+						</span>
+					)}
 					<div className="flex items-center h-full min-w-0 flex-1 border-l">
 						<select
 							className="h-full bg-transparent px-2 text-xs outline-none border-r"
@@ -311,19 +315,21 @@ function OutputPane({
 					</div>
 				</div>
 				<div className="flex items-center h-full shrink-0">
-					<Button
-						className="h-full border-l lg:hidden"
-						variant="ghost"
-						onClick={toggleOutputOpen}
-					>
-						<HugeiconsIcon
-							icon={outputOpen ? ChevronDown : ChevronUp}
-							strokeWidth={1.5}
-						/>
-						<span className="text-xs">
-							{outputOpen ? "Minimize" : "Show Output"}
-						</span>
-					</Button>
+					{variant === "split" && (
+						<Button
+							className="h-full border-l lg:hidden"
+							variant="ghost"
+							onClick={toggleOutputOpen}
+						>
+							<HugeiconsIcon
+								icon={outputOpen ? ChevronDown : ChevronUp}
+								strokeWidth={1.5}
+							/>
+							<span className="text-xs">
+								{outputOpen ? "Minimize" : "Show Output"}
+							</span>
+						</Button>
+					)}
 					<Button
 						className="h-full border-l"
 						variant="ghost"
@@ -336,11 +342,11 @@ function OutputPane({
 			</div>
 			<div
 				ref={scrollRef}
-				data-testid="output-pane"
+				data-testid={variant === "split" ? "output-pane" : "mobile-output-pane"}
 				onScroll={updateAutoScrollState}
 				className={cn(
 					"min-h-0 overflow-y-auto p-4",
-					outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
+					variant === "tab" ? "flex-1" : "lg:block lg:flex-1",
 				)}
 			>
 				<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
@@ -355,10 +361,16 @@ function EditorPane({
 	onRun,
 	isRunning,
 	onStop,
+	onInvokeHttpService,
 }: {
 	onRun: () => Promise<void>;
 	isRunning: boolean;
 	onStop: (signal: RuntimeSignal) => Promise<void>;
+	onInvokeHttpService: (
+		method: HttpMethod,
+		path: string,
+		port: number,
+	) => Promise<HttpServiceResponse>;
 }) {
 	const activeFile = useActiveFile();
 
@@ -366,6 +378,7 @@ function EditorPane({
 
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleEditorMode = useEditorStore((s) => s.toggleEditorMode);
+	const [activeTab, setActiveTab] = React.useState("editor");
 
 	const handleChange = React.useCallback(
 		(next: string) => {
@@ -374,15 +387,43 @@ function EditorPane({
 		},
 		[activeFile, updateFileContent],
 	);
+	React.useEffect(() => {
+		const mediaQuery = window.matchMedia("(max-width: 1023px)");
+		const syncForViewport = () => {
+			if (!mediaQuery.matches) {
+				setActiveTab("editor");
+			}
+		};
+
+		syncForViewport();
+		mediaQuery.addEventListener("change", syncForViewport);
+		return () => mediaQuery.removeEventListener("change", syncForViewport);
+	}, []);
+
+	React.useEffect(() => {
+		if (outputOpen && window.matchMedia("(max-width: 1023px)").matches) {
+			setActiveTab("output");
+		}
+	}, [outputOpen]);
+
+	const showOutputTabOnMobile = React.useCallback(() => {
+		if (window.matchMedia("(max-width: 1023px)").matches) {
+			setActiveTab("output");
+		}
+	}, []);
+
+	const handleRunFromEditor = React.useCallback(async () => {
+		showOutputTabOnMobile();
+		await onRun();
+	}, [onRun, showOutputTabOnMobile]);
+
 	return (
-		<div
-			className={cn(
-				"flex flex-col lg:border-b-0 lg:border-r min-h-0",
-				"lg:w-1/2 lg:flex-none lg:h-full",
-				outputOpen ? "h-1/2" : "flex-1",
-			)}
-		>
-			<Tabs defaultValue="editor">
+		<div className="flex flex-1 flex-col min-h-0 lg:border-b-0 lg:border-r lg:w-1/2 lg:flex-none lg:h-full">
+			<Tabs
+				value={activeTab}
+				onValueChange={setActiveTab}
+				className="flex-1 min-h-0 gap-0"
+			>
 				<div className="flex h-10 shrink-0 items-center justify-between border-b">
 					<TabsList className="h-full! p-0!">
 						<TabsTrigger
@@ -392,10 +433,10 @@ function EditorPane({
 							{activeFile ? basename(activeFile.path) : "No file selected"}
 						</TabsTrigger>
 						<TabsTrigger
-							value="tryit"
-							className="bg-background! text-xs truncate px-4 h-full! border-r! border-0 border-border!"
+							value="output"
+							className="bg-background! text-xs truncate px-4 h-full! border-r! border-0 border-border! lg:hidden"
 						>
-							try it
+							Output
 						</TabsTrigger>
 					</TabsList>
 					<ButtonGroup className="h-full">
@@ -404,7 +445,9 @@ function EditorPane({
 							variant="ghost"
 							data-testid="run-button"
 							onClick={
-								isRunning ? () => void onStop("graceful") : () => void onRun()
+								isRunning
+									? () => void onStop("graceful")
+									: () => void handleRunFromEditor()
 							}
 							disabled={
 								!isRunning &&
@@ -457,7 +500,7 @@ function EditorPane({
 							value={activeFile?.content}
 							onChange={handleChange}
 							hotkeys={{
-								"Mod-Enter": () => void onRun(),
+								"Mod-Enter": () => void handleRunFromEditor(),
 								"Mod-Alt-v": toggleEditorMode,
 								"Mod-r": () => window.location.reload(),
 							}}
@@ -465,56 +508,10 @@ function EditorPane({
 						/>
 					)}
 				</TabsContent>
+				<TabsContent value="output" className="flex-1 min-h-0 lg:hidden">
+					<OutputPane onInvokeHttpService={onInvokeHttpService} variant="tab" />
+				</TabsContent>
 			</Tabs>
-			{/* <div className="flex h-10 shrink-0 items-center justify-between border-b"> */}
-			{/*   <span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]"> */}
-			{/*     {activeFile ? basename(activeFile.path) : "No file selected"} */}
-			{/*   </span> */}
-			{/*   <ButtonGroup className="h-full"> */}
-			{/*     <Button */}
-			{/*       className="h-full" */}
-			{/*       variant="ghost" */}
-			{/*       data-testid="run-button" */}
-			{/*       onClick={isRunning ? () => void onStop("graceful") : () => void onRun()} */}
-			{/*       disabled={!isRunning && (!activeFile || getLanguage(activeFile.path) !== "ballerina")} */}
-			{/*     > */}
-			{/*       {!isRunning ? ( */}
-			{/*         <> */}
-			{/*           <HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} /> */}
-			{/*           <span className="min-w-7.5">Run</span> */}
-			{/*         </> */}
-			{/*       ) : ( */}
-			{/*         <> */}
-			{/*           <HugeiconsIcon icon={StopIcon} strokeWidth={1.5} /> */}
-			{/*           <span className="min-w-7.5">Stop</span> */}
-			{/*         </> */}
-			{/*       )} */}
-			{/*     </Button> */}
-			{/*     <Separator orientation="vertical" /> */}
-			{/*     <DropdownMenu disabled={!isRunning}> */}
-			{/*       <DropdownMenuTrigger */}
-			{/*         render={ */}
-			{/*           <Button */}
-			{/*             className="h-full" */}
-			{/*             variant="ghost" */}
-			{/*             aria-label="Stop options" */}
-			{/*             data-testid="stop-options-button" */}
-			{/*           > */}
-			{/*             <HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} /> */}
-			{/*           </Button> */}
-			{/*         } */}
-			{/*       /> */}
-			{/*       <DropdownMenuContent align="end"> */}
-			{/*         <DropdownMenuItem onClick={() => onStop("graceful")}> */}
-			{/*           Graceful Stop (Default) */}
-			{/*         </DropdownMenuItem> */}
-			{/*         <DropdownMenuItem onClick={() => onStop("immediate")}> */}
-			{/*           Immediate Stop */}
-			{/*         </DropdownMenuItem> */}
-			{/*       </DropdownMenuContent> */}
-			{/*     </DropdownMenu> */}
-			{/*   </ButtonGroup> */}
-			{/* </div> */}
 		</div>
 	);
 }
@@ -602,6 +599,7 @@ function EditorContent() {
 						onRun={handleRun}
 						isRunning={isRunning}
 						onStop={handleStop}
+						onInvokeHttpService={invokeHttpService}
 					/>
 					<OutputPane onInvokeHttpService={invokeHttpService} />
 				</main>
