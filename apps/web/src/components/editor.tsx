@@ -3,7 +3,6 @@ import * as React from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
 	ChevronDown,
-	ChevronUp,
 	CleanIcon,
 	GithubFreeIcons,
 	PlayIcon,
@@ -37,8 +36,6 @@ import { ANSI } from "@/components/ansi";
 
 import { basename, ext } from "@/lib/fs/core/path-utils";
 import { getBallerinaProjectTarget } from "@/lib/fs/project-target";
-import { cn } from "@/lib/utils";
-
 import { useEditorStore } from "@/stores/editor-store";
 import { useActiveFile, useFileTreeActions } from "@/stores/file-tree-store";
 
@@ -177,15 +174,9 @@ function formatJsonOutput(output: string): string {
 }
 
 function OutputPane({
-	onInvokeHttpService,
-	variant = "split",
+	variant = "desktop",
 }: {
-	onInvokeHttpService: (
-		method: HttpMethod,
-		path: string,
-		port: number,
-	) => Promise<HttpServiceResponse>;
-	variant?: "split" | "tab";
+	variant?: "desktop" | "mobile";
 }) {
 	const output = useEditorStore((s) => s.output);
 	const formattedOutput = React.useMemo(
@@ -193,13 +184,7 @@ function OutputPane({
 		[output],
 	);
 	const outputOpen = useEditorStore((s) => s.outputOpen);
-	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
-	const appendOutput = useEditorStore((s) => s.appendOutput);
-	const [httpMethod, setHttpMethod] = React.useState<HttpMethod>("GET");
-	const [httpPath, setHttpPath] = React.useState("/");
-	const [httpPort, setHttpPort] = React.useState("9090");
-	const [isInvoking, setIsInvoking] = React.useState(false);
 	const scrollRef = React.useRef<HTMLDivElement>(null);
 	const shouldAutoScrollRef = React.useRef(true);
 	const previousOutputLengthRef = React.useRef(output.length);
@@ -213,29 +198,6 @@ function OutputPane({
 			element.scrollHeight - element.scrollTop - element.clientHeight;
 		shouldAutoScrollRef.current = distanceFromBottom < 24;
 	}, []);
-
-	const handleInvokeHTTP = React.useCallback(async () => {
-		if (isInvoking) return;
-		setIsInvoking(true);
-		try {
-			const port = Number.parseInt(httpPort, 10) || 0;
-			const response = await onInvokeHttpService(httpMethod, httpPath, port);
-			appendOutput(
-				`\n> ${httpMethod} :${port || "?"}${httpPath || "/"}\n< ${response.status}\n${response.body}\n`,
-			);
-		} catch (error) {
-			appendOutput(`\nHTTP invoke failed: ${String(error)}\n`);
-		} finally {
-			setIsInvoking(false);
-		}
-	}, [
-		appendOutput,
-		httpMethod,
-		httpPath,
-		httpPort,
-		isInvoking,
-		onInvokeHttpService,
-	]);
 
 	React.useLayoutEffect(() => {
 		const element = scrollRef.current;
@@ -260,99 +222,115 @@ function OutputPane({
 	}, [output, outputOpen]);
 
 	return (
-		<div
-			className={cn(
-				"flex flex-col min-h-0 min-w-0",
-				variant === "split" && "hidden lg:flex lg:w-1/2 lg:flex-none",
-				variant === "tab" && "flex-1",
-			)}
-		>
-			<div className="flex h-10 shrink-0 items-center justify-between border-b border-t lg:border-t-0">
-				<div className="flex items-center h-full min-w-0 flex-1">
-					{variant === "split" && (
-						<span className="px-4 h-full text-xs text-muted-foreground flex items-center shrink-0">
-							Output
-						</span>
-					)}
-					<div className="flex items-center h-full min-w-0 flex-1 border-l">
-						<select
-							className="h-full bg-transparent px-2 text-xs outline-none border-r"
-							value={httpMethod}
-							onChange={(event) =>
-								setHttpMethod(event.target.value as HttpMethod)
-							}
-							aria-label="HTTP method"
-						>
-							<option value="GET">GET</option>
-							<option value="POST">POST</option>
-							<option value="PUT">PUT</option>
-							<option value="PATCH">PATCH</option>
-							<option value="DELETE">DELETE</option>
-						</select>
-						<Input
-							className="h-full w-20 rounded-none border-0 border-r text-xs shadow-none focus-visible:ring-0"
-							value={httpPort}
-							onChange={(event) => setHttpPort(event.target.value)}
-							placeholder="port"
-							inputMode="numeric"
-							aria-label="HTTP service port"
-						/>
-						<Input
-							className="h-full min-w-0 rounded-none border-0 text-xs shadow-none focus-visible:ring-0"
-							value={httpPath}
-							onChange={(event) => setHttpPath(event.target.value)}
-							placeholder="/path"
-							aria-label="HTTP endpoint path"
-						/>
-						<Button
-							className="h-full rounded-none border-l"
-							variant="ghost"
-							onClick={() => void handleInvokeHTTP()}
-							disabled={isInvoking}
-						>
-							{isInvoking ? "Sending..." : "Send"}
-						</Button>
-					</div>
-				</div>
-				<div className="flex items-center h-full shrink-0">
-					{variant === "split" && (
-						<Button
-							className="h-full border-l lg:hidden"
-							variant="ghost"
-							onClick={toggleOutputOpen}
-						>
-							<HugeiconsIcon
-								icon={outputOpen ? ChevronDown : ChevronUp}
-								strokeWidth={1.5}
-							/>
-							<span className="text-xs">
-								{outputOpen ? "Minimize" : "Show Output"}
-							</span>
-						</Button>
-					)}
-					<Button
-						className="h-full border-l"
-						variant="ghost"
-						onClick={clearOutput}
-					>
-						<HugeiconsIcon icon={CleanIcon} strokeWidth={1.5} />
-						<span className="hidden sm:inline">Clear</span>
-					</Button>
-				</div>
+		<div className="flex flex-1 flex-col min-h-0 min-w-0">
+			<div className="flex h-10 shrink-0 items-center justify-end border-b">
+				<Button
+					className="h-full border-l"
+					variant="ghost"
+					onClick={clearOutput}
+				>
+					<HugeiconsIcon icon={CleanIcon} strokeWidth={1.5} />
+					<span className="hidden sm:inline">Clear</span>
+				</Button>
 			</div>
 			<div
 				ref={scrollRef}
-				data-testid={variant === "split" ? "output-pane" : "mobile-output-pane"}
+				data-testid={
+					variant === "desktop" ? "output-pane" : "mobile-output-pane"
+				}
 				onScroll={updateAutoScrollState}
-				className={cn(
-					"min-h-0 overflow-y-auto p-4",
-					variant === "tab" ? "flex-1" : "lg:block lg:flex-1",
-				)}
+				className="min-h-0 flex-1 overflow-y-auto p-4"
 			>
 				<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
 					<ANSI value={formattedOutput} />
 				</pre>
 			</div>
+		</div>
+	);
+}
+
+function TryItPane({
+	onInvokeHttpService,
+}: {
+	onInvokeHttpService: (
+		method: HttpMethod,
+		path: string,
+		port: number,
+	) => Promise<HttpServiceResponse>;
+}) {
+	const appendOutput = useEditorStore((s) => s.appendOutput);
+	const [httpMethod, setHttpMethod] = React.useState<HttpMethod>("GET");
+	const [httpPath, setHttpPath] = React.useState("/");
+	const [httpPort, setHttpPort] = React.useState("9090");
+	const [isInvoking, setIsInvoking] = React.useState(false);
+
+	const handleInvokeHTTP = React.useCallback(async () => {
+		if (isInvoking) return;
+		setIsInvoking(true);
+		try {
+			const port = Number.parseInt(httpPort, 10) || 0;
+			const response = await onInvokeHttpService(httpMethod, httpPath, port);
+			appendOutput(
+				`\n> ${httpMethod} :${port || "?"}${httpPath || "/"}\n< ${response.status}\n${response.body}\n`,
+			);
+		} catch (error) {
+			appendOutput(`\nHTTP invoke failed: ${String(error)}\n`);
+		} finally {
+			setIsInvoking(false);
+		}
+	}, [
+		appendOutput,
+		httpMethod,
+		httpPath,
+		httpPort,
+		isInvoking,
+		onInvokeHttpService,
+	]);
+
+	return (
+		<div className="flex flex-1 flex-col min-h-0 min-w-0 p-4 gap-4">
+			<div className="text-sm font-medium">Try It</div>
+			<div className="flex h-10 min-w-0 overflow-hidden rounded-md border">
+				<select
+					className="h-full bg-transparent px-2 text-xs outline-none border-r"
+					value={httpMethod}
+					onChange={(event) => setHttpMethod(event.target.value as HttpMethod)}
+					aria-label="HTTP method"
+				>
+					<option value="GET">GET</option>
+					<option value="POST">POST</option>
+					<option value="PUT">PUT</option>
+					<option value="PATCH">PATCH</option>
+					<option value="DELETE">DELETE</option>
+				</select>
+				<Input
+					className="h-full w-20 rounded-none border-0 border-r text-xs shadow-none focus-visible:ring-0"
+					value={httpPort}
+					onChange={(event) => setHttpPort(event.target.value)}
+					placeholder="port"
+					inputMode="numeric"
+					aria-label="HTTP service port"
+				/>
+				<Input
+					className="h-full min-w-0 rounded-none border-0 text-xs shadow-none focus-visible:ring-0"
+					value={httpPath}
+					onChange={(event) => setHttpPath(event.target.value)}
+					placeholder="/path"
+					aria-label="HTTP endpoint path"
+				/>
+				<Button
+					className="h-full rounded-none border-l"
+					variant="ghost"
+					onClick={() => void handleInvokeHTTP()}
+					disabled={isInvoking}
+				>
+					{isInvoking ? "Sending..." : "Send"}
+				</Button>
+			</div>
+			<p className="text-xs text-muted-foreground">
+				Invoke a running Ballerina HTTP service. Responses are appended to the
+				Output tab.
+			</p>
 		</div>
 	);
 }
@@ -438,6 +416,12 @@ function EditorPane({
 						>
 							Output
 						</TabsTrigger>
+						<TabsTrigger
+							value="try-it"
+							className="bg-background! text-xs truncate px-4 h-full! border-r! border-0 border-border! lg:hidden"
+						>
+							Try It
+						</TabsTrigger>
 					</TabsList>
 					<ButtonGroup className="h-full">
 						<Button
@@ -509,7 +493,10 @@ function EditorPane({
 					)}
 				</TabsContent>
 				<TabsContent value="output" className="flex-1 min-h-0 lg:hidden">
-					<OutputPane onInvokeHttpService={onInvokeHttpService} variant="tab" />
+					<OutputPane variant="mobile" />
+				</TabsContent>
+				<TabsContent value="try-it" className="flex-1 min-h-0 lg:hidden">
+					<TryItPane onInvokeHttpService={onInvokeHttpService} />
 				</TabsContent>
 			</Tabs>
 		</div>
@@ -537,6 +524,45 @@ function EditorHeader() {
 				<SettingsDialog />
 			</div>
 		</header>
+	);
+}
+
+function RightPane({
+	onInvokeHttpService,
+}: {
+	onInvokeHttpService: (
+		method: HttpMethod,
+		path: string,
+		port: number,
+	) => Promise<HttpServiceResponse>;
+}) {
+	return (
+		<div className="hidden min-h-0 min-w-0 flex-none flex-col lg:flex lg:h-full lg:w-1/2">
+			<Tabs defaultValue="output" className="flex-1 min-h-0 gap-0">
+				<div className="flex h-10 shrink-0 items-center border-b">
+					<TabsList className="h-full! p-0!">
+						<TabsTrigger
+							value="output"
+							className="bg-background! text-xs truncate px-4 h-full! border-r! border-0 border-border!"
+						>
+							Output
+						</TabsTrigger>
+						<TabsTrigger
+							value="try-it"
+							className="bg-background! text-xs truncate px-4 h-full! border-r! border-0 border-border!"
+						>
+							Try It
+						</TabsTrigger>
+					</TabsList>
+				</div>
+				<TabsContent value="output" className="flex-1 min-h-0">
+					<OutputPane />
+				</TabsContent>
+				<TabsContent value="try-it" className="flex-1 min-h-0">
+					<TryItPane onInvokeHttpService={onInvokeHttpService} />
+				</TabsContent>
+			</Tabs>
+		</div>
 	);
 }
 
@@ -601,7 +627,7 @@ function EditorContent() {
 						onStop={handleStop}
 						onInvokeHttpService={invokeHttpService}
 					/>
-					<OutputPane onInvokeHttpService={invokeHttpService} />
+					<RightPane onInvokeHttpService={invokeHttpService} />
 				</main>
 			</SidebarInset>
 		</>
