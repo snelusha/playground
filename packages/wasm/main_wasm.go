@@ -119,18 +119,8 @@ func run(_ js.Value, args []js.Value) any {
 	})
 }
 
-func sendStopSignal(_ js.Value, args []js.Value) any {
-	if len(args) < 1 {
-		return js.ValueOf(false)
-	}
-	switch args[0].String() {
-	case "graceful":
-		return sendSignal(pal.GracefulStop)
-	case "immediate":
-		return sendSignal(pal.ImmediateStop)
-	default:
-		return false
-	}
+func sendStopSignal(_ js.Value, _ []js.Value) any {
+	return sendSignal(pal.GracefulStop)
 }
 
 func getDiagnostics(_ js.Value, args []js.Value) any {
