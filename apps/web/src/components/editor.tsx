@@ -12,20 +12,12 @@ import {
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import {
 	SidebarInset,
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
@@ -305,55 +297,30 @@ function EditorPane({
 				<span className="px-4 h-full text-xs border-r flex items-center truncate max-w-[60%]">
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
-				<ButtonGroup className="h-full">
-					<Button
-						className="h-full"
-						variant="ghost"
-						data-testid="run-button"
-						onClick={
-							isRunning ? () => void onStop("graceful") : () => void onRun()
-						}
-						disabled={
-							!isRunning &&
-							(!activeFile || getLanguage(activeFile.path) !== "ballerina")
-						}
-					>
-						{!isRunning ? (
-							<>
-								<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-								<span className="min-w-7.5">Run</span>
-							</>
-						) : (
-							<>
-								<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
-								<span className="min-w-7.5">Stop</span>
-							</>
-						)}
-					</Button>
-					<Separator orientation="vertical" />
-					<DropdownMenu disabled={!isRunning}>
-						<DropdownMenuTrigger
-							render={
-								<Button
-									className="h-full"
-									variant="ghost"
-									aria-label="Stop options"
-									data-testid="stop-options-button"
-								>
-									<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
-								</Button>
-							}
-						/>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem onClick={() => onStop("graceful")}>
-								Graceful Stop (Default)
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => onStop("immediate")}>
-								Immediate Stop
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				</ButtonGroup>
+				<Button
+					className="h-full"
+					variant="ghost"
+					data-testid="run-button"
+					onClick={
+						isRunning ? () => void onStop("graceful") : () => void onRun()
+					}
+					disabled={
+						!isRunning &&
+						(!activeFile || getLanguage(activeFile.path) !== "ballerina")
+					}
+				>
+					{!isRunning ? (
+						<>
+							<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+							<span className="min-w-7.5">Run</span>
+						</>
+					) : (
+						<>
+							<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
+							<span className="min-w-7.5">Stop</span>
+						</>
+					)}
+				</Button>
 			</div>
 			{activeFile && (
 				<CodeEditor

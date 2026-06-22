@@ -10,7 +10,9 @@ class Listener {
         var _ = svc;
     }
 
-    public function 'start() returns error? {}
+    public function 'start() returns error? {
+        io:println("Listener started.");
+    }
 
     public function gracefulStop() returns error? {
         io:println("Graceful stop initiated.");

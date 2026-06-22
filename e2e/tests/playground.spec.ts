@@ -20,7 +20,7 @@ async function runAndExpectOutput(page: Page, expectedOutput: string) {
 	await expect(runButton).toBeEnabled({ timeout: 10_000 });
 
 	await runButton.click();
-	await expect(runButton).toContainText("Run", { timeout: 10_000 });
+	await expect(runButton).toHaveText("Run", { timeout: 10_000 });
 
 	await expect(page.getByTestId("output-pane")).toHaveText(expectedOutput, {
 		timeout: 10_000,
@@ -66,9 +66,7 @@ test("creates a package and runs hello world", async ({ page }) => {
 	await runAndExpectOutput(page, "Hello, World!");
 });
 
-test("runs a listener and stops it with default, graceful, and immediate options", async ({
-	page,
-}) => {
+test("runs a listener and stops", async ({ page }) => {
 	test.setTimeout(120_000);
 
 	const listenerCode = await loadFixture("listener.bal");
@@ -80,47 +78,25 @@ test("runs a listener and stops it with default, graceful, and immediate options
 	await replaceEditorContent(page, listenerCode);
 
 	const runButton = page.getByTestId("run-button");
-	await expect(runButton).toContainText("Run");
+	await expect(runButton).toHaveText("Run");
 	await runButton.click();
-	await expect(runButton).toContainText("Stop", { timeout: 10_000 });
+	await expect(runButton).toHaveText("Stop", { timeout: 10_000 });
+
+	await expect(page.getByTestId("output-pane")).toHaveText(
+		"Listener started.",
+		{
+			timeout: 10_000,
+		},
+	);
+
 	await runButton.click();
+	await expect(runButton).toHaveText("Run", { timeout: 10_000 });
 	await expect(page.getByTestId("output-pane")).toContainText(
 		"Graceful stop initiated.",
 		{
 			timeout: 10_000,
 		},
 	);
-	await expect(runButton).toContainText("Run", { timeout: 10_000 });
-
-	await page.getByRole("button", { name: "Clear" }).click();
-	await expect(page.getByTestId("output-pane")).toHaveText("");
-
-	await runButton.click();
-	await expect(runButton).toContainText("Stop", { timeout: 10_000 });
-	await page.getByTestId("stop-options-button").click();
-	await page.getByRole("menuitem", { name: "Graceful Stop (Default)" }).click();
-	await expect(page.getByTestId("output-pane")).toContainText(
-		"Graceful stop initiated.",
-		{
-			timeout: 10_000,
-		},
-	);
-	await expect(runButton).toContainText("Run", { timeout: 10_000 });
-
-	await page.getByRole("button", { name: "Clear" }).click();
-	await expect(page.getByTestId("output-pane")).toHaveText("");
-
-	await runButton.click();
-	await expect(runButton).toContainText("Stop", { timeout: 10_000 });
-	await page.getByTestId("stop-options-button").click();
-	await page.getByRole("menuitem", { name: "Immediate Stop" }).click();
-	await expect(page.getByTestId("output-pane")).toContainText(
-		"Immediate stop initiated.",
-		{
-			timeout: 10_000,
-		},
-	);
-	await expect(runButton).toContainText("Run", { timeout: 10_000 });
 });
 
 const SHARE_PAYLOAD =
