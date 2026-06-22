@@ -17,7 +17,7 @@ export function getSubtreeView(
 
 	for (const seg of segments) {
 		const dir = nodes.find((n) => n.kind === "dir" && n.name === seg);
-		if (!dir || dir.kind !== "dir") return { entries: [], basePath: rootPath };
+		if (dir?.kind !== "dir") return { entries: [], basePath: rootPath };
 		nodes = dir.children ?? [];
 	}
 
