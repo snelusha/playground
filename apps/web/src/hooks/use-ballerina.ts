@@ -10,6 +10,8 @@ import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 import type {
+	HttpDispatchRequest,
+	HttpDispatchResponse,
 	RunOutputCallback,
 	RuntimeSignal,
 } from "@/workers/ballerina-worker-api";
@@ -26,10 +28,19 @@ export function useBallerina() {
 		const client = getBallerinaWorkerClient();
 		clientRef.current = client;
 
+		window.dispatchHttpRequest = (request) =>
+			client.dispatchHttpRequest(request);
+
 		client
 			.init((p) => setProgress(p))
 			.then(() => setIsReady(true))
 			.catch(() => setIsReady(false));
+
+		return () => {
+			if (clientRef.current === client) {
+				clientRef.current = null;
+			}
+		};
 	}, []);
 
 	const run = React.useCallback(
@@ -63,5 +74,15 @@ export function useBallerina() {
 		[],
 	);
 
-	return { isReady, progress, run, sendStopSignal };
+	const dispatchHttpRequest = React.useCallback(
+		async (request: HttpDispatchRequest): Promise<HttpDispatchResponse> => {
+			if (!clientRef.current) {
+				throw new Error("Ballerina runtime is not initialized");
+			}
+			return clientRef.current.dispatchHttpRequest(request);
+		},
+		[],
+	);
+
+	return { isReady, progress, run, sendStopSignal, dispatchHttpRequest };
 }

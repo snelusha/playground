@@ -1,5 +1,9 @@
 import type { FS } from "@/lib/fs/core/fs.interface";
-import type { RunOutputCallback } from "@/workers/ballerina-worker-api";
+import type {
+	HttpDispatchRequest,
+	HttpDispatchResponse,
+	RunOutputCallback,
+} from "@/workers/ballerina-worker-api";
 
 declare global {
 	export interface Window {
@@ -9,5 +13,8 @@ declare global {
 			proxy: FS,
 			path: string,
 		) => Promise<Array<Record<string, any>> | null>;
+		dispatchHttpRequest: (
+			request: HttpDispatchRequest,
+		) => Promise<HttpDispatchResponse>;
 	}
 }

@@ -2,6 +2,8 @@ import * as Comlink from "comlink";
 
 import type {
 	BallerinaWorkerAPI,
+	HttpDispatchRequest,
+	HttpDispatchResponse,
 	RunOutputCallback,
 	RuntimeSignal,
 } from "@/workers/ballerina-worker-api";
@@ -52,6 +54,13 @@ export class BallerinaWorkerClient {
 	async sendStopSignal(signal: RuntimeSignal): Promise<boolean> {
 		if (!this.api) return Promise.resolve(false);
 		return this.api.sendStopSignal(signal);
+	}
+
+	async dispatchHttpRequest(
+		request: HttpDispatchRequest,
+	): Promise<HttpDispatchResponse> {
+		if (!this.api) throw new Error("Ballerina runtime is not ready");
+		return this.api.dispatchHttpRequest(request);
 	}
 
 	async getDiagnostics(

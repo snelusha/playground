@@ -4,6 +4,8 @@ import * as Comlink from "comlink";
 
 import type {
 	BallerinaWorkerAPI,
+	HttpDispatchRequest,
+	HttpDispatchResponse,
 	RunOutputCallback,
 } from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
@@ -21,6 +23,9 @@ declare const self: typeof globalThis & {
 		onOutput: RunOutputCallback,
 	) => Promise<void>;
 	sendStopSignal: (signal: "graceful" | "immediate") => Promise<boolean>;
+	dispatchHttpRequest: (
+		request: HttpDispatchRequest,
+	) => Promise<HttpDispatchResponse>;
 	getDiagnostics: (
 		fs: SnapshotFS,
 		path: string,
@@ -110,6 +115,12 @@ const api: BallerinaWorkerAPI = {
 	sendStopSignal: async (signal) => {
 		if (typeof self.sendStopSignal !== "function") return false;
 		return self.sendStopSignal(signal);
+	},
+	dispatchHttpRequest: async (request) => {
+		if (typeof self.dispatchHttpRequest !== "function") {
+			throw new Error("Ballerina runtime is not initialized");
+		}
+		return self.dispatchHttpRequest(request);
 	},
 	getDiagnostics: (
 		snapshot: SnapshotFS,

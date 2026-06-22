@@ -11,6 +11,21 @@ export type RunOutputCallback = (output: RunOutput) => void;
 
 export type RuntimeSignal = "graceful" | "immediate";
 
+export interface HttpDispatchRequest {
+	method?: string;
+	host?: string;
+	path?: string;
+	query?: string;
+	headers?: Record<string, string | string[]>;
+	body?: string;
+}
+
+export interface HttpDispatchResponse {
+	statusCode: number;
+	headers: Record<string, string[]>;
+	body: string;
+}
+
 export interface BallerinaWorkerAPI {
 	init(wasmUrl: string, onProgress: (progress: number) => void): Promise<void>;
 	run(
@@ -19,6 +34,9 @@ export interface BallerinaWorkerAPI {
 		onOutput: RunOutputCallback,
 	): Promise<void>;
 	sendStopSignal(signal: RuntimeSignal): Promise<boolean>;
+	dispatchHttpRequest(
+		request: HttpDispatchRequest,
+	): Promise<HttpDispatchResponse>;
 	getDiagnostics(
 		snapshot: SnapshotFS,
 		path: string,
