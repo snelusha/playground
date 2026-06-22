@@ -23,12 +23,18 @@ import (
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"syscall/js"
 )
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
 	js.Global().Set("sendStopSignal", js.FuncOf(sendStopSignal))
+	js.Global().Set("dispatchHttpRequest", js.FuncOf(dispatchHttpRequest))
 
 	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
 
@@ -117,6 +123,122 @@ func run(_ js.Value, args []js.Value) any {
 			_ = <-rt.ExitStatus
 		}()
 	})
+}
+
+func dispatchHttpRequest(_ js.Value, args []js.Value) any {
+	return newPromise(func(resolve js.Value, reject js.Value) {
+		if len(args) < 1 || args[0].Type() != js.TypeObject || args[0].IsNull() {
+			reject.Invoke(js.ValueOf("dispatchHttpRequest: expected an object argument"))
+			return
+		}
+
+		reqObj := args[0]
+		host := getString(reqObj, "host", "")
+		handler, ok := activeListeners.getHandler(host)
+		if !ok {
+			reject.Invoke(js.ValueOf(fmt.Sprintf("no service listening on %s", host)))
+			return
+		}
+
+		req, err := httpRequestFromJS(reqObj)
+		if err != nil {
+			reject.Invoke(js.ValueOf(err.Error()))
+			return
+		}
+
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, req)
+		resp := recorder.Result()
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			reject.Invoke(js.ValueOf(err.Error()))
+			return
+		}
+
+		resolve.Invoke(js.ValueOf(map[string]any{
+			"statusCode": resp.StatusCode,
+			"headers":    headersToJS(resp.Header),
+			"body":       string(body),
+		}))
+	})
+}
+
+func httpRequestFromJS(reqObj js.Value) (*http.Request, error) {
+	method := strings.ToUpper(getString(reqObj, "method", http.MethodGet))
+	host := getString(reqObj, "host", "0.0.0.0")
+	path := getString(reqObj, "path", "/")
+	if path == "" {
+		path = "/"
+	} else if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	query := getString(reqObj, "query", "")
+	query = strings.TrimPrefix(query, "?")
+	body := getString(reqObj, "body", "")
+
+	reqURL := &url.URL{Scheme: "http", Host: host, Path: path, RawQuery: query}
+	req := httptest.NewRequest(method, reqURL.RequestURI(), strings.NewReader(body))
+	req.Host = host
+	req.Header = parseHeaders(getObject(reqObj, "headers"))
+	req.ContentLength = int64(len(body))
+	return req, nil
+}
+
+func getString(obj js.Value, key string, fallback string) string {
+	value := obj.Get(key)
+	if value.Type() == js.TypeString {
+		return value.String()
+	}
+	return fallback
+}
+
+func getObject(obj js.Value, key string) js.Value {
+	value := obj.Get(key)
+	if value.Type() == js.TypeObject && !value.IsNull() {
+		return value
+	}
+	return js.Null()
+}
+
+func parseHeaders(headersObj js.Value) http.Header {
+	headers := http.Header{}
+	if headersObj.Type() != js.TypeObject || headersObj.IsNull() {
+		return headers
+	}
+
+	keys := js.Global().Get("Object").Call("keys", headersObj)
+	for i := 0; i < keys.Length(); i++ {
+		key := keys.Index(i).String()
+		value := headersObj.Get(key)
+		switch value.Type() {
+		case js.TypeString:
+			headers.Add(key, value.String())
+		case js.TypeObject:
+			if js.Global().Get("Array").Call("isArray", value).Bool() {
+				for j := 0; j < value.Length(); j++ {
+					item := value.Index(j)
+					if item.Type() == js.TypeString {
+						headers.Add(key, item.String())
+					}
+				}
+			}
+		}
+	}
+	return headers
+}
+
+func headersToJS(headers http.Header) map[string]any {
+	mapped := make(map[string]any, len(headers))
+	for key, values := range headers {
+		items := make([]any, len(values))
+		for i, value := range values {
+			items[i] = value
+		}
+		mapped[key] = items
+	}
+	return mapped
 }
 
 func sendStopSignal(_ js.Value, args []js.Value) any {
