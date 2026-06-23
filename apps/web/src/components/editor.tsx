@@ -10,9 +10,9 @@ import {
 	StopIcon,
 } from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
-
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -21,6 +21,7 @@ import {
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
+import { TryItPanel } from "@/components/try-it-panel";
 import { VersionCard } from "@/components/version-card";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { ANSI } from "@/components/ansi";
@@ -36,7 +37,11 @@ import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
 import type { EditorLanguage } from "@/components/code-editor";
-import type { RuntimeSignal } from "@/workers/ballerina-worker-api";
+import type {
+	HttpDispatchRequest,
+	HttpDispatchResponse,
+	RuntimeSignal,
+} from "@/workers/ballerina-worker-api";
 
 function getLanguage(path: string): EditorLanguage {
 	const ex = ext(path);
@@ -162,7 +167,15 @@ function formatJsonOutput(output: string): string {
 	}
 }
 
-function OutputPane() {
+function RightPane({
+	showTryIt,
+	dispatchHttpRequest,
+}: {
+	showTryIt: boolean;
+	dispatchHttpRequest: (
+		request: HttpDispatchRequest,
+	) => Promise<HttpDispatchResponse>;
+}) {
 	const output = useEditorStore((s) => s.output);
 	const formattedOutput = React.useMemo(
 		() => formatJsonOutput(output),
@@ -171,10 +184,17 @@ function OutputPane() {
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
+	const [activeTab, setActiveTab] = React.useState("output");
 	const scrollRef = React.useRef<HTMLDivElement>(null);
 	const shouldAutoScrollRef = React.useRef(true);
 	const previousOutputLengthRef = React.useRef(output.length);
 	const previousOutputOpenRef = React.useRef(outputOpen);
+
+	React.useEffect(() => {
+		if (!showTryIt && activeTab === "try-it") {
+			setActiveTab("output");
+		}
+	}, [activeTab, showTryIt]);
 
 	const updateAutoScrollState = React.useCallback(() => {
 		const element = scrollRef.current;
@@ -215,49 +235,82 @@ function OutputPane() {
 				outputOpen ? "flex-1 lg:flex" : "shrink-0 lg:flex",
 			)}
 		>
-			<div className="flex h-10 shrink-0 items-center justify-between border-b border-t lg:border-t-0">
-				<div className="flex items-center h-full">
-					<span className="px-4 h-full text-xs text-muted-foreground flex items-center">
-						Output
-					</span>
-				</div>
-				<div className="flex items-center h-full">
-					<Button
-						className="h-full border-l lg:hidden"
-						variant="ghost"
-						onClick={toggleOutputOpen}
-					>
-						<HugeiconsIcon
-							icon={outputOpen ? ChevronDown : ChevronUp}
-							strokeWidth={1.5}
-						/>
-						<span className="text-xs">
-							{outputOpen ? "Minimize" : "Show Output"}
-						</span>
-					</Button>
-					<Button
-						className="h-full border-l"
-						variant="ghost"
-						onClick={clearOutput}
-					>
-						<HugeiconsIcon icon={CleanIcon} strokeWidth={1.5} />
-						<span className="hidden sm:inline">Clear</span>
-					</Button>
-				</div>
-			</div>
-			<div
-				ref={scrollRef}
-				data-testid="output-pane"
-				onScroll={updateAutoScrollState}
-				className={cn(
-					"min-h-0 overflow-y-auto p-4",
-					outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
-				)}
+			<Tabs
+				value={activeTab}
+				onValueChange={(value) => setActiveTab(String(value))}
+				className="min-h-0 flex-1 gap-0"
 			>
-				<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
-					<ANSI value={formattedOutput} />
-				</pre>
-			</div>
+				<div className="flex h-10 shrink-0 items-center justify-between border-b border-t lg:border-t-0">
+					<TabsList className="h-full! p-0">
+						<TabsTrigger
+							value="output"
+							className="h-full px-4 bg-background border-0 border-r border-border"
+						>
+							Output
+						</TabsTrigger>
+						{showTryIt && (
+							<TabsTrigger
+								value="try-it"
+								className="h-full px-4 bg-background border-0 border-r border-border"
+							>
+								Try It
+							</TabsTrigger>
+						)}
+					</TabsList>
+					<div className="flex items-center h-full">
+						<Button
+							className="h-full border-l lg:hidden"
+							variant="ghost"
+							onClick={toggleOutputOpen}
+						>
+							<HugeiconsIcon
+								icon={outputOpen ? ChevronDown : ChevronUp}
+								strokeWidth={1.5}
+							/>
+							<span className="text-xs">
+								{outputOpen ? "Minimize" : "Show Pane"}
+							</span>
+						</Button>
+						{activeTab === "output" && (
+							<Button
+								className="h-full border-l"
+								variant="ghost"
+								onClick={clearOutput}
+							>
+								<HugeiconsIcon icon={CleanIcon} strokeWidth={1.5} />
+								<span className="hidden sm:inline">Clear</span>
+							</Button>
+						)}
+					</div>
+				</div>
+				<TabsContent
+					value="output"
+					keepMounted
+					ref={scrollRef}
+					data-testid="output-pane"
+					onScroll={updateAutoScrollState}
+					className={cn(
+						"min-h-0 overflow-y-auto p-4",
+						outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
+					)}
+				>
+					<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
+						<ANSI value={formattedOutput} />
+					</pre>
+				</TabsContent>
+				{showTryIt && (
+					<TabsContent
+						value="try-it"
+						keepMounted
+						className={cn(
+							"min-h-0 overflow-y-auto p-4",
+							outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
+						)}
+					>
+						<TryItPanel dispatchHttpRequest={dispatchHttpRequest} />
+					</TabsContent>
+				)}
+			</Tabs>
 		</div>
 	);
 }
@@ -367,7 +420,8 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run, sendStopSignal } = useBallerina();
+	const { isReady, progress, run, sendStopSignal, dispatchHttpRequest } =
+		useBallerina();
 
 	const activeFile = useActiveFile();
 
@@ -423,7 +477,10 @@ function EditorContent() {
 						isRunning={isRunning}
 						onStop={handleStop}
 					/>
-					<OutputPane />
+					<RightPane
+						showTryIt={isRunning}
+						dispatchHttpRequest={dispatchHttpRequest}
+					/>
 				</main>
 			</SidebarInset>
 		</>
