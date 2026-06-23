@@ -9,7 +9,11 @@ import { useFS } from "@/providers/fs-provider";
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
-import type { RunOutputCallback } from "@/workers/ballerina-worker-api";
+import type {
+	HttpDispatchRequest,
+	HttpDispatchResponse,
+	RunEventCallback,
+} from "@/workers/ballerina-worker-api";
 
 export function useBallerina() {
 	const fs = useFS();
@@ -27,19 +31,25 @@ export function useBallerina() {
 			.init((p) => setProgress(p))
 			.then(() => setIsReady(true))
 			.catch(() => setIsReady(false));
+
+		return () => {
+			if (clientRef.current === client) clientRef.current = null;
+		};
 	}, []);
 
 	const run = React.useCallback(
-		async (path: string, onOutput: RunOutputCallback): Promise<void> => {
+		async (path: string, onEvent: RunEventCallback): Promise<void> => {
 			if (!clientRef.current) {
-				onOutput({
+				onEvent({
+					type: "output",
 					stream: "stderr",
 					text: "Ballerina runtime is not initialized",
 				});
 				return;
 			}
 			if (!fs) {
-				onOutput({
+				onEvent({
+					type: "output",
 					stream: "stderr",
 					text: "Virtual file system is not available",
 				});
@@ -47,7 +57,7 @@ export function useBallerina() {
 			}
 
 			const snapshot = await SnapshotFS.from(fs, path);
-			await clientRef.current.run(snapshot, path, onOutput);
+			await clientRef.current.run(snapshot, path, onEvent);
 		},
 		[fs],
 	);
@@ -57,5 +67,14 @@ export function useBallerina() {
 		return clientRef.current.sendStopSignal();
 	}, []);
 
-	return { isReady, progress, run, sendStopSignal };
+	const dispatchHttpRequest = React.useCallback(
+		async (request: HttpDispatchRequest): Promise<HttpDispatchResponse> => {
+			if (!clientRef.current)
+				throw new Error("Ballerina runtime is not initialized");
+			return clientRef.current.dispatchHttpRequest(request);
+		},
+		[],
+	);
+
+	return { isReady, progress, run, sendStopSignal, dispatchHttpRequest };
 }
