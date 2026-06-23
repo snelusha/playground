@@ -6,7 +6,7 @@ import type {
 	BallerinaWorkerAPI,
 	HttpDispatchRequest,
 	HttpDispatchResponse,
-	RunOutputCallback,
+	RunEventCallback,
 } from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
@@ -20,7 +20,7 @@ declare const self: typeof globalThis & {
 	run: (
 		fs: SnapshotFS,
 		path: string,
-		onOutput: RunOutputCallback,
+		onEvent: RunEventCallback,
 	) => Promise<void>;
 	sendStopSignal: (signal: "graceful" | "immediate") => Promise<boolean>;
 	dispatchHttpRequest: (
@@ -101,16 +101,17 @@ const api: BallerinaWorkerAPI = {
 	run: async (
 		snapshot: SnapshotFS,
 		path: string,
-		onOutput: RunOutputCallback,
+		onEvent: RunEventCallback,
 	): Promise<void> => {
 		if (typeof self.run !== "function") {
-			onOutput({
+			onEvent({
+				type: "output",
 				stream: "stderr",
 				text: "Ballerina runtime is not initialized",
 			});
 			return;
 		}
-		return self.run(snapshot, path, onOutput);
+		return self.run(snapshot, path, onEvent);
 	},
 	sendStopSignal: async (signal) => {
 		if (typeof self.sendStopSignal !== "function") return false;

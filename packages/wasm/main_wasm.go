@@ -51,13 +51,13 @@ func runOutcome(stdout, stderr string) map[string]any {
 func run(_ js.Value, args []js.Value) any {
 	return newPromise(func(resolve js.Value, _ js.Value) {
 		go func() {
-			onOutput := js.Null()
+			onEvent := js.Null()
 			if len(args) >= 3 {
-				onOutput = args[2]
+				onEvent = args[2]
 			}
 
-			stderr := outputWriter{onOutput: onOutput, stream: "stderr"}
-			stdout := outputWriter{onOutput: onOutput, stream: "stdout"}
+			stderr := outputWriter{onEvent: onEvent, stream: "stderr"}
+			stdout := outputWriter{onEvent: onEvent, stream: "stdout"}
 			done := func() { resolve.Invoke(js.Undefined()) }
 
 			signalSource, signals := newSignalSource()
@@ -78,7 +78,7 @@ func run(_ js.Value, args []js.Value) any {
 			}()
 
 			if len(args) < 2 {
-				fmt.Fprintf(stderr, "expected at least 2 arguments: (fsProxy, path[, onOutput])\n")
+				fmt.Fprintf(stderr, "expected at least 2 arguments: (fsProxy, path[, onEvent])\n")
 				return
 			}
 
@@ -120,6 +120,10 @@ func run(_ js.Value, args []js.Value) any {
 				}
 			}
 			rt.Listen()
+			emitEvent(onEvent, map[string]any{
+				"type":  "listeners",
+				"hosts": activeListeners.hosts(),
+			})
 			_ = <-rt.ExitStatus
 		}()
 	})
@@ -294,23 +298,24 @@ func getDiagnostics(_ js.Value, args []js.Value) any {
 }
 
 type outputWriter struct {
-	onOutput js.Value
-	stream   string
+	onEvent js.Value
+	stream  string
 }
 
 func (w outputWriter) Write(p []byte) (int, error) {
-	emitOutput(w.onOutput, w.stream, string(p))
+	emitEvent(w.onEvent, map[string]any{
+		"type":   "output",
+		"stream": w.stream,
+		"text":   string(p),
+	})
 	return len(p), nil
 }
 
-func emitOutput(onOutput js.Value, stream, text string) {
-	if onOutput.Type() != js.TypeFunction {
+func emitEvent(onEvent js.Value, event map[string]any) {
+	if onEvent.Type() != js.TypeFunction {
 		return
 	}
-	onOutput.Invoke(map[string]any{
-		"stream": stream,
-		"text":   text,
-	})
+	onEvent.Invoke(event)
 }
 
 func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEnv) []any {

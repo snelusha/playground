@@ -168,14 +168,15 @@ function formatJsonOutput(output: string): string {
 }
 
 function RightPane({
-	showTryIt,
+	listenerHosts,
 	dispatchHttpRequest,
 }: {
-	showTryIt: boolean;
+	listenerHosts: string[];
 	dispatchHttpRequest: (
 		request: HttpDispatchRequest,
 	) => Promise<HttpDispatchResponse>;
 }) {
+	const showTryIt = listenerHosts.length > 0;
 	const output = useEditorStore((s) => s.output);
 	const formattedOutput = React.useMemo(
 		() => formatJsonOutput(output),
@@ -307,7 +308,10 @@ function RightPane({
 							outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
 						)}
 					>
-						<TryItPanel dispatchHttpRequest={dispatchHttpRequest} />
+						<TryItPanel
+							listenerHosts={listenerHosts}
+							dispatchHttpRequest={dispatchHttpRequest}
+						/>
 					</TabsContent>
 				)}
 			</Tabs>
@@ -427,6 +431,7 @@ function EditorContent() {
 
 	const { saveFile } = useFileTreeActions();
 	const [isRunning, setIsRunning] = React.useState(false);
+	const [listenerHosts, setListenerHosts] = React.useState<string[]>([]);
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
 	const appendOutput = useEditorStore((s) => s.appendOutput);
@@ -437,15 +442,20 @@ function EditorContent() {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
 		setIsRunning(true);
+		setListenerHosts([]);
 		try {
 			// FIXME: We should automatically save files on change.
 			await saveFile();
 
 			const target = await getBallerinaProjectTarget(fs, activeFile.path);
 			openOutputWith("");
-			await run(target, ({ text }) => appendOutput(text));
+			await run(target, (event) => {
+				if (event.type === "output") appendOutput(event.text);
+				if (event.type === "listeners") setListenerHosts(event.hosts);
+			});
 		} finally {
 			setIsRunning(false);
+			setListenerHosts([]);
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
@@ -478,7 +488,7 @@ function EditorContent() {
 						onStop={handleStop}
 					/>
 					<RightPane
-						showTryIt={isRunning}
+						listenerHosts={listenerHosts}
 						dispatchHttpRequest={dispatchHttpRequest}
 					/>
 				</main>

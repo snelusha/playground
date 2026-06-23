@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 )
 
@@ -53,6 +54,23 @@ func (r *listenerRegistry) getHandler(host string) (http.Handler, bool) {
 	defer r.mu.RUnlock()
 	handler, ok := r.listeners[host]
 	return handler, ok
+}
+
+func (r *listenerRegistry) hosts() []any {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	hosts := make([]string, 0, len(r.listeners))
+	for host := range r.listeners {
+		hosts = append(hosts, host)
+	}
+	sort.Strings(hosts)
+
+	mapped := make([]any, len(hosts))
+	for i, host := range hosts {
+		mapped[i] = host
+	}
+	return mapped
 }
 
 func listen(cfg pal.ServerConfig, handler http.Handler) (pal.ServerHandle, error) {

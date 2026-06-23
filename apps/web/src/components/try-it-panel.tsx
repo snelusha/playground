@@ -27,8 +27,6 @@ import type {
 } from "@/workers/ballerina-worker-api";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
-const DEFAULT_HTTP_HOST = "0.0.0.0";
-const LISTENER_PORTS = ["9090"] as const;
 
 const keyValuePairSchema = z.object({
 	key: z.string(),
@@ -54,7 +52,7 @@ const keyValuePairsSchema = z
 
 const formSchema = z.object({
 	method: z.enum(HTTP_METHODS),
-	listener: z.enum(LISTENER_PORTS),
+	listener: z.string().min(1),
 	path: z.string().refine((value) => value.trim().length > 0, {
 		message: "Enter a request path.",
 	}),
@@ -77,6 +75,7 @@ type ResponseState = {
 type FieldArrayName = "query" | "headers";
 
 type Props = {
+	listenerHosts: string[];
 	dispatchHttpRequest: (
 		request: HttpDispatchRequest,
 	) => Promise<HttpDispatchResponse>;
@@ -253,10 +252,10 @@ function buildQueryString(url: URL, entries: KeyValueEntry[]) {
 	return params.toString();
 }
 
-function parseRequestPath(value: string, listener: string) {
+function parseRequestPath(value: string, listenerHost: string) {
 	const trimmed = value.trim();
 	const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-	return new URL(path, `http://${DEFAULT_HTTP_HOST}:${listener}`);
+	return new URL(path, `http://${listenerHost}`);
 }
 
 function buildHttpDispatchRequest(values: FormValues): HttpDispatchRequest {
@@ -334,19 +333,26 @@ function ResponseSection({ response }: { response: ResponseState | null }) {
 	);
 }
 
-export function TryItPanel({ dispatchHttpRequest }: Props) {
+export function TryItPanel({ listenerHosts, dispatchHttpRequest }: Props) {
 	const [response, setResponse] = React.useState<ResponseState | null>(null);
 	const form = useForm<FormValues>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			method: "GET",
-			listener: LISTENER_PORTS[0],
+			listener: listenerHosts[0] ?? "",
 			path: "/",
 			query: [{ key: "", value: "" }],
 			headers: [{ key: "", value: "" }],
 			body: "",
 		},
 	});
+
+	React.useEffect(() => {
+		const listener = form.getValues("listener");
+		if (!listenerHosts.includes(listener)) {
+			form.setValue("listener", listenerHosts[0] ?? "");
+		}
+	}, [form, listenerHosts]);
 
 	async function onSubmit(data: FormValues) {
 		try {
@@ -426,9 +432,9 @@ export function TryItPanel({ dispatchHttpRequest }: Props) {
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent align="end">
-										{LISTENER_PORTS.map((port) => (
-											<SelectItem key={port} value={port}>
-												{port}
+										{listenerHosts.map((host) => (
+											<SelectItem key={host} value={host}>
+												{host.split(":").at(-1) ?? host}
 											</SelectItem>
 										))}
 									</SelectContent>

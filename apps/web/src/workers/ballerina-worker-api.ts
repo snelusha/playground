@@ -2,12 +2,20 @@ import type { SnapshotFS } from "@/lib/fs/snapshot";
 
 export type RunOutputStream = "stdout" | "stderr";
 
-export interface RunOutput {
+export interface RunOutputEvent {
+	type: "output";
 	stream: RunOutputStream;
 	text: string;
 }
 
-export type RunOutputCallback = (output: RunOutput) => void;
+export interface RunListenersEvent {
+	type: "listeners";
+	hosts: string[];
+}
+
+export type RunEvent = RunOutputEvent | RunListenersEvent;
+
+export type RunEventCallback = (event: RunEvent) => void;
 
 export type RuntimeSignal = "graceful" | "immediate";
 
@@ -31,7 +39,7 @@ export interface BallerinaWorkerAPI {
 	run(
 		snapshot: SnapshotFS,
 		path: string,
-		onOutput: RunOutputCallback,
+		onEvent: RunEventCallback,
 	): Promise<void>;
 	sendStopSignal(signal: RuntimeSignal): Promise<boolean>;
 	dispatchHttpRequest(

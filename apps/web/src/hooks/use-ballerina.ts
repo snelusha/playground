@@ -12,7 +12,7 @@ import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 import type {
 	HttpDispatchRequest,
 	HttpDispatchResponse,
-	RunOutputCallback,
+	RunEventCallback,
 	RuntimeSignal,
 } from "@/workers/ballerina-worker-api";
 
@@ -44,16 +44,18 @@ export function useBallerina() {
 	}, []);
 
 	const run = React.useCallback(
-		async (path: string, onOutput: RunOutputCallback): Promise<void> => {
+		async (path: string, onEvent: RunEventCallback): Promise<void> => {
 			if (!clientRef.current) {
-				onOutput({
+				onEvent({
+					type: "output",
 					stream: "stderr",
 					text: "Ballerina runtime is not initialized",
 				});
 				return;
 			}
 			if (!fs) {
-				onOutput({
+				onEvent({
+					type: "output",
 					stream: "stderr",
 					text: "Virtual file system is not available",
 				});
@@ -61,7 +63,7 @@ export function useBallerina() {
 			}
 
 			const snapshot = await SnapshotFS.from(fs, path);
-			await clientRef.current.run(snapshot, path, onOutput);
+			await clientRef.current.run(snapshot, path, onEvent);
 		},
 		[fs],
 	);
