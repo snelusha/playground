@@ -4,7 +4,9 @@ import * as Comlink from "comlink";
 
 import type {
 	BallerinaWorkerAPI,
-	RunOutputCallback,
+	HttpDispatchRequest,
+	HttpDispatchResponse,
+	RunEventCallback,
 } from "@/workers/ballerina-worker-api";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
@@ -18,9 +20,12 @@ declare const self: typeof globalThis & {
 	run: (
 		fs: SnapshotFS,
 		path: string,
-		onOutput: RunOutputCallback,
+		onEvent: RunEventCallback,
 	) => Promise<void>;
 	sendStopSignal: () => Promise<boolean>;
+	dispatchHttpRequest: (
+		request: HttpDispatchRequest,
+	) => Promise<HttpDispatchResponse>;
 	getDiagnostics: (
 		fs: SnapshotFS,
 		path: string,
@@ -81,9 +86,8 @@ const api: BallerinaWorkerAPI = {
 			void go.run(instance);
 			const deadline = Date.now() + 10_000;
 			while (typeof self.run !== "function") {
-				if (Date.now() > deadline) {
+				if (Date.now() > deadline)
 					throw new Error("Ballerina runtime init timed out");
-				}
 				await new Promise((r) => setTimeout(r, 10));
 			}
 		})().catch((error) => {
@@ -96,20 +100,26 @@ const api: BallerinaWorkerAPI = {
 	run: async (
 		snapshot: SnapshotFS,
 		path: string,
-		onOutput: RunOutputCallback,
+		onEvent: RunEventCallback,
 	): Promise<void> => {
 		if (typeof self.run !== "function") {
-			onOutput({
+			onEvent({
+				type: "output",
 				stream: "stderr",
 				text: "Ballerina runtime is not initialized",
 			});
 			return;
 		}
-		return self.run(snapshot, path, onOutput);
+		return self.run(snapshot, path, onEvent);
 	},
 	sendStopSignal: async () => {
 		if (typeof self.sendStopSignal !== "function") return false;
 		return self.sendStopSignal();
+	},
+	dispatchHttpRequest: async (request) => {
+		if (typeof self.dispatchHttpRequest !== "function")
+			throw new Error("Ballerina runtime is not initialized");
+		return self.dispatchHttpRequest(request);
 	},
 	getDiagnostics: (
 		snapshot: SnapshotFS,

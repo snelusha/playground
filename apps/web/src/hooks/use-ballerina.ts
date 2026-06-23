@@ -10,76 +10,95 @@ import { useFileTreeStore } from "@/stores/file-tree-store";
 import { getBallerinaWorkerClient } from "@/workers/ballerina-worker-client";
 
 import type { BallerinaWorkerClient } from "@/workers/ballerina-worker-client";
-import type { RunOutputCallback } from "@/workers/ballerina-worker-api";
+import type {
+  HttpDispatchRequest,
+  HttpDispatchResponse,
+  RunEventCallback,
+} from "@/workers/ballerina-worker-api";
 
 export function useBallerina() {
-	const fs = useFS();
+  const fs = useFS();
 
-	const clientRef = React.useRef<BallerinaWorkerClient | null>(null);
+  const clientRef = React.useRef<BallerinaWorkerClient | null>(null);
 
-	const [isReady, setIsReady] = React.useState(false);
-	const [progress, setProgress] = React.useState(0);
+  const [isReady, setIsReady] = React.useState(false);
+  const [progress, setProgress] = React.useState(0);
 
-	React.useEffect(() => {
-		const client = getBallerinaWorkerClient();
-		clientRef.current = client;
+  React.useEffect(() => {
+    const client = getBallerinaWorkerClient();
+    clientRef.current = client;
 
-		client
-			.init((p) => setProgress(p))
-			.then(() => setIsReady(true))
-			.catch(() => setIsReady(false));
-	}, []);
+    client
+      .init((p) => setProgress(p))
+      .then(() => setIsReady(true))
+      .catch(() => setIsReady(false));
 
-	const run = React.useCallback(
-		async (path: string, onOutput: RunOutputCallback): Promise<void> => {
-			if (!clientRef.current) {
-				onOutput({
-					stream: "stderr",
-					text: "Ballerina runtime is not initialized",
-				});
-				return;
-			}
-			if (!fs) {
-				onOutput({
-					stream: "stderr",
-					text: "Virtual file system is not available",
-				});
-				return;
-			}
+    return () => {
+      if (clientRef.current === client) clientRef.current = null;
+    };
+  }, []);
 
-			const snapshot = await SnapshotFS.from(fs, path);
+  const run = React.useCallback(
+    async (path: string, onEvent: RunEventCallback): Promise<void> => {
+      if (!clientRef.current) {
+        onEvent({
+          type: "output",
+          stream: "stderr",
+          text: "Ballerina runtime is not initialized",
+        });
+        return;
+      }
+      if (!fs) {
+        onEvent({
+          type: "output",
+          stream: "stderr",
+          text: "Virtual file system is not available",
+        });
+        return;
+      }
 
-			let mutationSync = Promise.resolve();
-			const unsubscribe = snapshot.onMutation((mutation) => {
-				mutationSync = mutationSync
-					// Keep the mutation queue alive even if the previous sync failed.
-					.catch(() => undefined)
-					.then(async () => {
-						try {
-							await useFileTreeStore.getState().applyMutation(mutation);
-						} catch (error) {
-							onOutput({
-								stream: "stderr",
-								text: `Failed to sync file system mutation: ${String(error)}\n`,
-							});
-						}
-					});
-			});
+      const snapshot = await SnapshotFS.from(fs, path);
 
-			try {
-				await clientRef.current.run(snapshot, path, onOutput);
-			} finally {
-				unsubscribe();
-				await mutationSync;
-			}
-		},
-		[fs],
-	);
+      let mutationSync = Promise.resolve();
+      const unsubscribe = snapshot.onMutation((mutation) => {
+        mutationSync = mutationSync
+          // Keep the mutation queue alive even if the previous sync failed.
+          .catch(() => undefined)
+          .then(async () => {
+            try {
+              await useFileTreeStore.getState().applyMutation(mutation);
+            } catch (error) {
+              onEvent({
+                type: "output",
+                stream: "stderr",
+                text: `Failed to sync file system mutation: ${String(error)}\n`,
+              });
+            }
+          });
+      });
 
-	const sendStopSignal = React.useCallback(async (): Promise<boolean> => {
-		if (!clientRef.current) return false;
-		return clientRef.current.sendStopSignal();
-	}, []);
+      try {
+        await clientRef.current.run(snapshot, path, onEvent);
+      } finally {
+        unsubscribe();
+        await mutationSync;
+      }
+    },
+    [fs],
+  );
 
-	return { isReady, progress, run, sendStopSignal };
+  const sendStopSignal = React.useCallback(async (): Promise<boolean> => {
+    if (!clientRef.current) return false;
+    return clientRef.current.sendStopSignal();
+  }, []);
+
+  const dispatchHttpRequest = React.useCallback(
+    async (request: HttpDispatchRequest): Promise<HttpDispatchResponse> => {
+      if (!clientRef.current) throw new Error("Ballerina runtime is not initialized");
+      return clientRef.current.dispatchHttpRequest(request);
+    },
+    [],
+  );
+
+  return { isReady, progress, run, sendStopSignal, dispatchHttpRequest };
 }

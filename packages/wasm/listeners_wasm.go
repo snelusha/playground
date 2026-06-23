@@ -37,6 +37,9 @@ func (r *listenerRegistry) register(cfg pal.ServerConfig, handler http.Handler) 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	host := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	if _, exists := r.listeners[host]; exists {
+		return nil, fmt.Errorf("listener already registered for host %s", host)
+	}
 	r.listeners[host] = handler
 	return &wasmListenerHandle{cfg: cfg, registry: r}, nil
 }
