@@ -192,7 +192,11 @@ function RightPane({
 	const previousOutputOpenRef = React.useRef(outputOpen);
 
 	React.useEffect(() => {
-		if (!showTryIt && activeTab === "try-it") {
+		if (showTryIt) {
+			setActiveTab("try-it");
+			return;
+		}
+		if (activeTab === "try-it") {
 			setActiveTab("output");
 		}
 	}, [activeTab, showTryIt]);

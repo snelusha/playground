@@ -27,6 +27,7 @@ import type {
 } from "@/workers/ballerina-worker-api";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+const DEFAULT_HTTP_HOST = "0.0.0.0";
 
 const keyValuePairSchema = z.object({
 	key: z.string(),
@@ -252,10 +253,14 @@ function buildQueryString(url: URL, entries: KeyValueEntry[]) {
 	return params.toString();
 }
 
-function parseRequestPath(value: string, listenerHost: string) {
+function listenerPort(host: string) {
+	return host.split(":").at(-1) ?? host;
+}
+
+function parseRequestPath(value: string, listenerPort: string) {
 	const trimmed = value.trim();
 	const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-	return new URL(path, `http://${listenerHost}`);
+	return new URL(path, `http://${DEFAULT_HTTP_HOST}:${listenerPort}`);
 }
 
 function buildHttpDispatchRequest(values: FormValues): HttpDispatchRequest {
@@ -334,12 +339,16 @@ function ResponseSection({ response }: { response: ResponseState | null }) {
 }
 
 export function TryItPanel({ listenerHosts, dispatchHttpRequest }: Props) {
+	const listenerPorts = React.useMemo(
+		() => listenerHosts.map(listenerPort),
+		[listenerHosts],
+	);
 	const [response, setResponse] = React.useState<ResponseState | null>(null);
 	const form = useForm<FormValues>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
 			method: "GET",
-			listener: listenerHosts[0] ?? "",
+			listener: listenerPorts[0] ?? "",
 			path: "/",
 			query: [{ key: "", value: "" }],
 			headers: [{ key: "", value: "" }],
@@ -349,10 +358,10 @@ export function TryItPanel({ listenerHosts, dispatchHttpRequest }: Props) {
 
 	React.useEffect(() => {
 		const listener = form.getValues("listener");
-		if (!listenerHosts.includes(listener)) {
-			form.setValue("listener", listenerHosts[0] ?? "");
+		if (!listenerPorts.includes(listener)) {
+			form.setValue("listener", listenerPorts[0] ?? "");
 		}
-	}, [form, listenerHosts]);
+	}, [form, listenerPorts]);
 
 	async function onSubmit(data: FormValues) {
 		try {
@@ -432,9 +441,9 @@ export function TryItPanel({ listenerHosts, dispatchHttpRequest }: Props) {
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent align="end">
-										{listenerHosts.map((host) => (
-											<SelectItem key={host} value={host}>
-												{host.split(":").at(-1) ?? host}
+										{listenerPorts.map((port) => (
+											<SelectItem key={port} value={port}>
+												{port}
 											</SelectItem>
 										))}
 									</SelectContent>
