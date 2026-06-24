@@ -136,6 +136,12 @@ func sendStopSignal(_ js.Value, _ []js.Value) any {
 
 func dispatchHttpRequest(_ js.Value, args []js.Value) any {
 	return newPromise(func(resolve js.Value, reject js.Value) {
+		defer func() {
+			if r := recover(); r != nil {
+				reject.Invoke(js.ValueOf(fmt.Sprintf("%v", r)))
+			}
+		}()
+
 		if len(args) < 1 || args[0].Type() != js.TypeObject || args[0].IsNull() {
 			reject.Invoke(js.ValueOf("dispatchHttpRequest: expected an object argument"))
 			return
@@ -188,7 +194,11 @@ func httpRequestFromJS(reqObj js.Value) (*http.Request, error) {
 	body := getString(reqObj, "body", "")
 
 	reqURL := &url.URL{Scheme: "http", Host: host, Path: path, RawQuery: query}
-	req := httptest.NewRequest(method, reqURL.RequestURI(), strings.NewReader(body))
+	req, err := http.NewRequest(method, reqURL.String(), strings.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.RequestURI = req.URL.RequestURI()
 	req.Host = host
 	req.Header = parseHeaders(getObject(reqObj, "headers"))
 	req.ContentLength = int64(len(body))
