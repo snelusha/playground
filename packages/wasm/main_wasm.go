@@ -18,6 +18,7 @@ package main
 
 import (
 	_ "ballerina-lang-go/lib/rt"
+	"ballerina-lang-go/platform/pal"
 	"ballerina-lang-go/projects"
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
@@ -27,6 +28,8 @@ import (
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
+	js.Global().Set("sendStopSignal", js.FuncOf(sendStopSignal))
+
 	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
 
 	select {}
@@ -50,6 +53,16 @@ func run(_ js.Value, args []js.Value) any {
 			stderr := outputWriter{onOutput: onOutput, stream: "stderr"}
 			stdout := outputWriter{onOutput: onOutput, stream: "stdout"}
 			done := func() { resolve.Invoke(js.Undefined()) }
+
+			signalSource, signals := newSignalSource()
+			defer signalSource.cleanup()
+
+			if !activateSignalSource(signalSource) {
+				fmt.Fprintf(stderr, "another Ballerina run is already active\n")
+				done()
+				return
+			}
+			defer deactivateSignalSource(signalSource)
 
 			defer func() {
 				if r := recover(); r != nil {
@@ -92,16 +105,22 @@ func run(_ js.Value, args []js.Value) any {
 				return
 			}
 
-			pal := wasmPal(stderr, stdout)
+			pal := wasmPal(stderr, stdout, signals)
 			rt := runtime.NewRuntime(pal, project.Environment().TypeEnv())
 			for _, birPkg := range birPkgs {
-				if err := rt.Interpret(*birPkg); err != nil {
+				if err := rt.Init(*birPkg); err != nil {
 					fmt.Fprintf(stderr, "%v\n", err)
 					return
 				}
 			}
+			rt.Listen()
+			_ = <-rt.ExitStatus
 		}()
 	})
+}
+
+func sendStopSignal(_ js.Value, _ []js.Value) any {
+	return sendSignal(pal.GracefulStop)
 }
 
 func getDiagnostics(_ js.Value, args []js.Value) any {

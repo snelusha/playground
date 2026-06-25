@@ -7,16 +7,17 @@ import {
 	CleanIcon,
 	GithubFreeIcons,
 	PlayIcon,
+	StopIcon,
 } from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
 
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import {
 	SidebarInset,
 	SidebarProvider,
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Progress } from "@/components/ui/progress";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
@@ -263,9 +264,11 @@ function OutputPane() {
 function EditorPane({
 	onRun,
 	isRunning,
+	onStop,
 }: {
 	onRun: () => Promise<void>;
 	isRunning: boolean;
+	onStop: () => Promise<void>;
 }) {
 	const activeFile = useActiveFile();
 
@@ -294,22 +297,24 @@ function EditorPane({
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
 				<Button
-					className="h-full rounded-none"
+					className="h-full"
 					variant="ghost"
 					data-testid="run-button"
-					onClick={() => void onRun()}
+					onClick={isRunning ? () => void onStop() : () => void onRun()}
 					disabled={
-						isRunning ||
-						!activeFile ||
-						getLanguage(activeFile.path) !== "ballerina"
+						!isRunning &&
+						(!activeFile || getLanguage(activeFile.path) !== "ballerina")
 					}
 				>
-					{isRunning ? (
-						<span>[...]</span>
-					) : (
+					{!isRunning ? (
 						<>
 							<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-							<span>Run</span>
+							<span className="min-w-7.5">Run</span>
+						</>
+					) : (
+						<>
+							<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
+							<span className="min-w-7.5">Stop</span>
 						</>
 					)}
 				</Button>
@@ -359,7 +364,7 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run } = useBallerina();
+	const { isReady, progress, run, sendStopSignal } = useBallerina();
 
 	const activeFile = useActiveFile();
 
@@ -387,6 +392,10 @@ function EditorContent() {
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
+	const handleStop = React.useCallback(async () => {
+		await sendStopSignal();
+	}, [sendStopSignal]);
+
 	useHotkeys("mod+enter", () => void handleRun(), {
 		preventDefault: true,
 	});
@@ -403,7 +412,11 @@ function EditorContent() {
 			<SidebarInset className="flex flex-col h-dvh overflow-hidden">
 				<EditorHeader />
 				<main className="flex flex-col lg:flex-row flex-1 min-h-0">
-					<EditorPane onRun={handleRun} isRunning={isRunning} />
+					<EditorPane
+						onRun={handleRun}
+						isRunning={isRunning}
+						onStop={handleStop}
+					/>
 					<OutputPane />
 				</main>
 			</SidebarInset>

@@ -20,6 +20,7 @@ declare const self: typeof globalThis & {
 		path: string,
 		onOutput: RunOutputCallback,
 	) => Promise<void>;
+	sendStopSignal: () => Promise<boolean>;
 	getDiagnostics: (
 		fs: SnapshotFS,
 		path: string,
@@ -105,6 +106,10 @@ const api: BallerinaWorkerAPI = {
 			return;
 		}
 		return self.run(snapshot, path, onOutput);
+	},
+	sendStopSignal: async () => {
+		if (typeof self.sendStopSignal !== "function") return false;
+		return self.sendStopSignal();
 	},
 	getDiagnostics: (
 		snapshot: SnapshotFS,

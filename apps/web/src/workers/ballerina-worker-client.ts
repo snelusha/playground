@@ -48,6 +48,11 @@ export class BallerinaWorkerClient {
 		return this.api.run(Comlink.proxy(snapshot), path, Comlink.proxy(onOutput));
 	}
 
+	async sendStopSignal(): Promise<boolean> {
+		if (!this.api) return Promise.resolve(false);
+		return this.api.sendStopSignal();
+	}
+
 	async getDiagnostics(
 		snapshot: SnapshotFS,
 		path: string,

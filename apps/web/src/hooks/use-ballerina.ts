@@ -52,5 +52,10 @@ export function useBallerina() {
 		[fs],
 	);
 
-	return { isReady, progress, run };
+	const sendStopSignal = React.useCallback(async (): Promise<boolean> => {
+		if (!clientRef.current) return false;
+		return clientRef.current.sendStopSignal();
+	}, []);
+
+	return { isReady, progress, run, sendStopSignal };
 }

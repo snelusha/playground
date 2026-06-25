@@ -271,6 +271,7 @@ export function CodeEditor({
 	return (
 		<div
 			ref={parentRef}
+			data-testid="code-editor"
 			className={cn(
 				"relative overflow-hidden h-full min-h-37.5 cm-editor-host",
 				className,

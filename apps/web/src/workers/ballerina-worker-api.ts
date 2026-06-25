@@ -16,6 +16,7 @@ export interface BallerinaWorkerAPI {
 		path: string,
 		onOutput: RunOutputCallback,
 	): Promise<void>;
+	sendStopSignal(): Promise<boolean>;
 	getDiagnostics(
 		snapshot: SnapshotFS,
 		path: string,
