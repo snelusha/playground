@@ -6,6 +6,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"syscall/js"
 	"time"
@@ -30,22 +33,26 @@ func (ctx *requestContext) cleanup() {
 	}
 }
 
-func (c *fetchHTTPClient) Execute(ctx context.Context, method, url string, body io.Reader, _ int64, contentType string, reqHeaders map[string][]string) (int, map[string][]string, io.ReadCloser, error) {
-	fetch := js.Global().Get("fetch")
-	if !fetch.Truthy() {
-		return 0, nil, nil, fmt.Errorf("browser fetch API is not available")
-	}
-
+func (c *fetchHTTPClient) Execute(ctx context.Context, method, targetURL string, body io.Reader, _ int64, contentType string, reqHeaders map[string][]string) (int, map[string][]string, io.ReadCloser, error) {
 	bodyBytes, err := readRequestBody(method, body)
 	if err != nil {
 		return 0, nil, nil, err
+	}
+
+	if status, headers, respBody, handled, err := c.executeLocalRequest(ctx, method, targetURL, bodyBytes, contentType, reqHeaders); handled || err != nil {
+		return status, headers, respBody, err
+	}
+
+	fetch := js.Global().Get("fetch")
+	if !fetch.Truthy() {
+		return 0, nil, nil, fmt.Errorf("browser fetch API is not available")
 	}
 
 	reqCtx := &requestContext{}
 	defer reqCtx.cleanup()
 
 	options := c.buildFetchOptions(ctx, method, bodyBytes, contentType, reqHeaders, reqCtx)
-	resp, err := c.executeRequest(fetch, url, options)
+	resp, err := c.executeRequest(fetch, targetURL, options)
 	if err != nil {
 		return 0, nil, nil, err
 	}
@@ -60,6 +67,89 @@ func (c *fetchHTTPClient) Execute(ctx context.Context, method, url string, body 
 	}
 
 	return resp.Get("status").Int(), respHeaders, io.NopCloser(bytes.NewReader(respBody)), nil
+}
+
+func (c *fetchHTTPClient) executeLocalRequest(ctx context.Context, method, targetURL string, body []byte, contentType string, reqHeaders map[string][]string) (int, map[string][]string, io.ReadCloser, bool, error) {
+	parsed, err := url.Parse(targetURL)
+	if err != nil || !isLocalHTTPHost(parsed.Hostname()) {
+		return 0, nil, nil, false, err
+	}
+
+	handler, ok := localHandlerForHost(parsed)
+	if !ok {
+		return 0, nil, nil, true, fmt.Errorf("no in-memory service listening on %s", parsed.Host)
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, method, parsed.String(), bytes.NewReader(body))
+	if err != nil {
+		return 0, nil, nil, true, err
+	}
+	req.RequestURI = req.URL.RequestURI()
+	req.Host = parsed.Host
+	req.Header = http.Header{}
+	for key, values := range reqHeaders {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.ContentLength = int64(len(body))
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+	resp := recorder.Result()
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, nil, true, err
+	}
+	if c.cfg.ResponseLimits.MaxEntityBodySize != -1 && int64(len(respBody)) > c.cfg.ResponseLimits.MaxEntityBodySize {
+		return 0, nil, nil, true, fmt.Errorf("response entity body size exceeds: %d bytes", c.cfg.ResponseLimits.MaxEntityBodySize)
+	}
+
+	return resp.StatusCode, resp.Header, io.NopCloser(bytes.NewReader(respBody)), true, nil
+}
+
+func isLocalHTTPHost(host string) bool {
+	switch strings.ToLower(host) {
+	case "localhost", "127.0.0.1", "0.0.0.0", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+func localHandlerForHost(parsed *url.URL) (http.Handler, bool) {
+	if handler, ok := findLocalHandler(parsed); ok {
+		return handler, true
+	}
+	if activeRun.ensureStarted() {
+		return findLocalHandler(parsed)
+	}
+	return nil, false
+}
+
+func findLocalHandler(parsed *url.URL) (http.Handler, bool) {
+	candidates := []string{parsed.Host}
+	if port := parsed.Port(); port != "" {
+		candidates = append(candidates,
+			"0.0.0.0:"+port,
+			"localhost:"+port,
+			"127.0.0.1:"+port,
+		)
+	}
+	for _, candidate := range candidates {
+		if handler, ok := activeRun.getHandler(candidate); ok {
+			return handler, true
+		}
+	}
+	return nil, false
 }
 
 func readRequestBody(method string, body io.Reader) ([]byte, error) {
