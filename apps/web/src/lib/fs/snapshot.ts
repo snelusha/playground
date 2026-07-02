@@ -106,7 +106,7 @@ export class SnapshotFS implements FS {
 			isDir: false,
 			content,
 			modTime: Date.now(),
-			size: content.length,
+			size: new TextEncoder().encode(content).byteLength,
 		});
 		this.notifyListeners({ type: "writeFile", path, content });
 		return true;
@@ -117,6 +117,7 @@ export class SnapshotFS implements FS {
 
 		const leading = path.startsWith("/") ? "/" : "";
 		let current = leading || ".";
+		const created: string[] = [];
 
 		for (const segment of pathSegments(path)) {
 			current =
@@ -125,13 +126,19 @@ export class SnapshotFS implements FS {
 					: join(current, segment);
 
 			const existing = this.nodes.get(current);
-			if (existing && !existing.isDir) return false;
+			if (existing && !existing.isDir) {
+				for (const createdPath of created) {
+					this.nodes.delete(createdPath);
+				}
+				return false;
+			}
 			if (!existing) {
 				this.nodes.set(current, {
 					isDir: true,
 					modTime: Date.now(),
 					entries: [],
 				});
+				created.push(current);
 			}
 		}
 		this.notifyListeners({ type: "mkdirAll", path });

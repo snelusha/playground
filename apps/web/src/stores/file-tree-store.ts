@@ -337,7 +337,9 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 				switch (mutation.type) {
 					case "writeFile": {
 						const result = await fs.writeFile(mutation.path, mutation.content);
-						if (!result) break;
+						if (!result) {
+							throw new Error(`writeFile failed: ${mutation.path}`);
+						}
 						const dirs = ancestorDirPathsForFile(mutation.path);
 						set((s) => {
 							for (const d of dirs) s.expandedPaths.add(d);
@@ -347,12 +349,16 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						});
 						break;
 					}
-					case "mkdirAll":
-						await fs.mkdirAll(mutation.path);
+					case "mkdirAll": {
+						const result = await fs.mkdirAll(mutation.path);
+						if (!result) {
+							throw new Error(`mkdirAll failed: ${mutation.path}`);
+						}
 						set((s) => {
 							s.expandedPaths.add(mutation.path);
 						});
 						break;
+					}
 				}
 				await get()._syncTrees();
 			},
