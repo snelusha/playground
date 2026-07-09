@@ -275,6 +275,29 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 				return fsys.WriteFile(resolved, append(current, data...), 0o644)
 			},
 		},
+		OS: pal.OS{
+			GetEnv: func(name string) string {
+				panic("GetEnv is not supported in Playground")
+			},
+			GetUsername: func() string {
+				panic("GetUsername is not supported in Playground")
+			},
+			GetUserHome: func() string {
+				panic("GetUserHome is not supported in Playground")
+			},
+			SetEnv: func(key, val string) error {
+				panic("SetEnv is not supported in Playground")
+			},
+			UnsetEnv: func(key string) error {
+				panic("UnsetEnv is not supported in Playground")
+			},
+			ListEnv: func() map[string]string {
+				panic("ListEnv is not supported in Playground")
+			},
+			Exec: func(command string, args []string, envOverride map[string]string) (pal.ProcessHandle, error) {
+				panic("Exec is not supported in Playground")
+			},
+		},
 		Time: pal.Time{
 			Now:          time.Now,
 			MonotonicNow: func() time.Duration { return time.Since(processStart) },
