@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"path"
 	"strings"
 	"sync"
@@ -253,6 +254,44 @@ func resolvePath(cwd string, p string) string {
 	return path.Join(cwd, p)
 }
 
+type environment struct {
+	mu     sync.RWMutex
+	values map[string]string
+}
+
+func newEnvironment() *environment {
+	return &environment{values: make(map[string]string)}
+}
+
+func (e *environment) get(key string) string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.values[key]
+}
+
+func (e *environment) set(key, value string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.values[key] = value
+	return nil
+}
+
+func (e *environment) unset(key string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	delete(e.values, key)
+	return nil
+}
+
+func (e *environment) list() map[string]string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	values := make(map[string]string, len(e.values))
+	maps.Copy(values, e.values)
+	return values
+}
+
 func createParentDirs(fsys *bridgeFS, p string) error {
 	dir := path.Dir(p)
 	info, err := fs.Stat(fsys, dir)
@@ -269,6 +308,8 @@ func createParentDirs(fsys *bridgeFS, p string) error {
 }
 
 func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.SignalSource) pal.Platform {
+	env := newEnvironment()
+
 	return pal.Platform{
 		IO: pal.IO{
 			Stdout: stdout.Write,
@@ -298,24 +339,16 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 			},
 		},
 		OS: pal.OS{
-			GetEnv: func(name string) string {
-				panic("GetEnv is not supported in Playground")
-			},
+			GetEnv: env.get,
 			GetUsername: func() string {
 				panic("GetUsername is not supported in Playground")
 			},
 			GetUserHome: func() string {
 				panic("GetUserHome is not supported in Playground")
 			},
-			SetEnv: func(key, val string) error {
-				panic("SetEnv is not supported in Playground")
-			},
-			UnsetEnv: func(key string) error {
-				panic("UnsetEnv is not supported in Playground")
-			},
-			ListEnv: func() map[string]string {
-				panic("ListEnv is not supported in Playground")
-			},
+			SetEnv:   env.set,
+			UnsetEnv: env.unset,
+			ListEnv:  env.list,
 			Exec: func(command string, args []string, envOverride map[string]string) (pal.ProcessHandle, error) {
 				panic("Exec is not supported in Playground")
 			},
