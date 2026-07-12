@@ -74,6 +74,13 @@ const testCases: TestCase[] = [
 		entryPoint: "/tmp/main.bal",
 		expectedStdout: "true\ntrue\n",
 	},
+	{
+		name: "os env",
+		files: async () =>
+			new Map([["/tmp/main.bal", await load("./fixtures/os-env.bal")]]),
+		entryPoint: "/tmp/main.bal",
+		expectedStdout: "true\ntrue\ntrue\ntrue\ntrue\n",
+	},
 ];
 
 for (const tc of testCases) {
