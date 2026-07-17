@@ -72,7 +72,8 @@ const testCases: TestCase[] = [
 				["/tmp/main.bal", await load("./fixtures/file-read-write.bal")],
 			]),
 		entryPoint: "/tmp/main.bal",
-		expectedStdout: "true\ntrue\n",
+		expectedStdout:
+			"true\ntrue\ntrue\ntrue\n<book><title>Clean Code</title></book>\ntrue\n",
 	},
 	{
 		name: "os env",
