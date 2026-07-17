@@ -68,9 +68,9 @@ export function useBallerina() {
 
 			try {
 				await clientRef.current.run(snapshot, path, onOutput);
-				await mutationSync;
 			} finally {
 				unsubscribe();
+				await mutationSync;
 			}
 		},
 		[fs],

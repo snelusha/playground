@@ -77,7 +77,12 @@ export function createFs(inputFiles: Map<string, string>) {
 			return true;
 		},
 		async mkdirAll(path: string) {
-			if (files.has(path)) return false;
+			let dir = path;
+			while (true) {
+				if (files.has(dir)) return false;
+				if (dir === "/") break;
+				dir = dirname(dir);
+			}
 			ensureDirs(path);
 			return true;
 		},
@@ -94,8 +99,15 @@ export function createFs(inputFiles: Map<string, string>) {
 			return true;
 		},
 		async move(oldPath: string, newPath: string) {
+			if (oldPath === newPath) return true;
+
 			const content = files.get(oldPath);
-			if (content === undefined || !dirs.has(dirname(newPath))) return false;
+			if (
+				content === undefined ||
+				!dirs.has(dirname(newPath)) ||
+				dirs.has(newPath)
+			)
+				return false;
 			files.set(newPath, content);
 			files.delete(oldPath);
 			return true;

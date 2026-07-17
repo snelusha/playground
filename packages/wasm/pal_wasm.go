@@ -320,6 +320,9 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 				return fs.ReadFile(fsys, resolvePath(cwd, p))
 			},
 			WriteFile: func(p string, data []byte) error {
+				fsys.mu.Lock()
+				defer fsys.mu.Unlock()
+
 				resolvedPath := resolvePath(cwd, p)
 				if err := createParentDirs(fsys, resolvedPath); err != nil {
 					return err
@@ -327,6 +330,9 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 				return fsys.WriteFile(resolvedPath, data, 0o644)
 			},
 			AppendFile: func(p string, data []byte) error {
+				fsys.mu.Lock()
+				defer fsys.mu.Unlock()
+
 				resolved := resolvePath(cwd, p)
 				if err := createParentDirs(fsys, resolved); err != nil {
 					return err

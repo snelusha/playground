@@ -95,7 +95,8 @@ export class SnapshotFS implements FS {
 
 	async writeFile(path: string, content: string): Promise<boolean> {
 		const parentPath = dirname(path);
-		if (parentPath && parentPath !== "." && !this.nodes.has(parentPath)) {
+		const parent = this.nodes.get(parentPath);
+		if (parentPath && parentPath !== "." && !parent?.isDir) {
 			return false;
 		}
 

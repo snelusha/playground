@@ -356,6 +356,9 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						}
 						set((s) => {
 							s.expandedPaths.add(mutation.path);
+							for (const path of ancestorDirPathsForFile(mutation.path)) {
+								s.expandedPaths.add(path);
+							}
 						});
 						break;
 					}

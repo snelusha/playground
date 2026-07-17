@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/fs"
 	"path"
+	"sync"
 	"syscall/js"
 	"time"
 )
@@ -32,6 +33,7 @@ var (
 )
 
 type bridgeFS struct {
+	mu    sync.Mutex
 	proxy js.Value
 }
 
