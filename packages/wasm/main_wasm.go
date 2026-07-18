@@ -23,6 +23,8 @@ import (
 	"ballerina-lang-go/runtime"
 	"ballerina-lang-go/tools/diagnostics"
 	"fmt"
+	"io/fs"
+	"path"
 	"syscall/js"
 )
 
@@ -40,6 +42,14 @@ func runOutcome(stdout, stderr string) map[string]any {
 		"stdout": stdout,
 		"stderr": stderr,
 	}
+}
+
+func getWorkingDir(fsys fs.FS, p string) string {
+	info, err := fs.Stat(fsys, p)
+	if err == nil && info.IsDir() {
+		return p
+	}
+	return path.Dir(p)
 }
 
 func run(_ js.Value, args []js.Value) any {
@@ -77,23 +87,23 @@ func run(_ js.Value, args []js.Value) any {
 			}
 
 			proxy := args[0]
-			path := args[1].String()
+			runPath := args[1].String()
 			fsys := NewBridgeFS(proxy)
 
-			result, err := projects.Load(fsys, path)
+			result, err := projects.Load(fsys, runPath)
 			if err != nil {
 				fmt.Fprintf(stderr, "%v\n", err)
 				return
 			}
 
 			if diags := result.Diagnostics(); diags.HasErrors() {
-				printDiagnostics(fsys, path, stderr, diags, diagnostics.NewDiagnosticEnv())
+				printDiagnostics(fsys, runPath, stderr, diags, diagnostics.NewDiagnosticEnv())
 				return
 			}
 
 			compilation := result.Project().CurrentPackage().Compilation()
 			if diags := compilation.DiagnosticResult(); diags.HasErrors() {
-				printDiagnostics(fsys, path, stderr, diags, compilation.DiagnosticEnv())
+				printDiagnostics(fsys, runPath, stderr, diags, compilation.DiagnosticEnv())
 				return
 			}
 
@@ -105,7 +115,8 @@ func run(_ js.Value, args []js.Value) any {
 				return
 			}
 
-			pal := wasmPal(stderr, stdout, signals)
+			workingDir := getWorkingDir(fsys, runPath)
+			pal := wasmPal(fsys, workingDir, stderr, stdout, signals)
 			rt := runtime.NewRuntime(pal, project.Environment().TypeEnv())
 			for _, birPkg := range birPkgs {
 				if err := rt.Init(*birPkg); err != nil {

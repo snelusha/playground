@@ -1,9 +1,9 @@
 import { beforeAll, expect, test } from "bun:test";
 
-import type { RunOutput } from "../src/workers/ballerina-worker-api";
 import { createFs } from "./test-fs";
-
 import "../src/wasm_exec";
+
+import type { RunOutput } from "../src/workers/ballerina-worker-api";
 
 interface TestCase {
 	name: string;
@@ -64,6 +64,23 @@ const testCases: TestCase[] = [
 			]),
 		entryPoint: "/tmp/hello-world",
 		expectedStdout: "Hello, World!\n",
+	},
+	{
+		name: "file read/write",
+		files: async () =>
+			new Map([
+				["/tmp/main.bal", await load("./fixtures/file-read-write.bal")],
+			]),
+		entryPoint: "/tmp/main.bal",
+		expectedStdout:
+			"true\ntrue\ntrue\ntrue\n<book><title>Clean Code</title></book>\ntrue\n",
+	},
+	{
+		name: "os env",
+		files: async () =>
+			new Map([["/tmp/main.bal", await load("./fixtures/os-env.bal")]]),
+		entryPoint: "/tmp/main.bal",
+		expectedStdout: "true\ntrue\ntrue\ntrue\ntrue\n",
 	},
 ];
 
