@@ -131,9 +131,7 @@ func run(_ js.Value, args []js.Value) any {
 					return
 				}
 			}
-			if !activeRun.isStarted() {
-				rt.Listen()
-			}
+			activeRun.ensureStarted()
 			emitEvent(onEvent, map[string]any{
 				"type":  "listeners",
 				"hosts": activeRun.hosts(),

@@ -4,6 +4,7 @@ import (
 	"ballerina-lang-go/platform/pal"
 	"ballerina-lang-go/runtime"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 )
@@ -123,5 +124,5 @@ func (c *runContext) hosts() []any {
 }
 
 func listenerHost(cfg pal.ServerConfig) string {
-	return fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	return net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
 }
