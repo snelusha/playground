@@ -10,9 +10,9 @@ import {
 	StopIcon,
 } from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
-
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	SidebarInset,
 	SidebarProvider,
@@ -21,6 +21,7 @@ import {
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
+import { SendRequestPanel } from "@/components/send-request-panel";
 import { VersionCard } from "@/components/version-card";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { ANSI } from "@/components/ansi";
@@ -35,7 +36,12 @@ import { useActiveFile, useFileTreeActions } from "@/stores/file-tree-store";
 import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
+import type { SendRequestPanelHandle } from "@/components/send-request-panel";
 import type { EditorLanguage } from "@/components/code-editor";
+import type {
+	HttpDispatchRequest,
+	HttpDispatchResponse,
+} from "@/workers/ballerina-worker-api";
 
 function getLanguage(path: string): EditorLanguage {
 	const ex = ext(path);
@@ -182,7 +188,15 @@ function formatJsonOutput(output: string): string {
 	}
 }
 
-function OutputPane() {
+function RightPane({
+	listenerAddresses,
+	dispatchHttpRequest,
+}: {
+	listenerAddresses: string[];
+	dispatchHttpRequest: (
+		request: HttpDispatchRequest,
+	) => Promise<HttpDispatchResponse>;
+}) {
 	const output = useEditorStore((s) => s.output);
 	const formattedOutput = React.useMemo(
 		() => formatJsonOutput(output),
@@ -191,10 +205,39 @@ function OutputPane() {
 	const outputOpen = useEditorStore((s) => s.outputOpen);
 	const toggleOutputOpen = useEditorStore((s) => s.toggleOutputOpen);
 	const clearOutput = useEditorStore((s) => s.clearOutput);
+
 	const scrollRef = React.useRef<HTMLDivElement>(null);
+	const sendRequestPanelRef = React.useRef<SendRequestPanelHandle>(null);
 	const shouldAutoScrollRef = React.useRef(true);
 	const previousOutputLengthRef = React.useRef(output.length);
 	const previousOutputOpenRef = React.useRef(outputOpen);
+
+	const showSendRequest = listenerAddresses.length > 0;
+	const previousShowSendRequestRef = React.useRef(showSendRequest);
+
+	const [activeTab, setActiveTab] = React.useState("output");
+
+	React.useEffect(() => {
+		const didOpenSendRequest =
+			showSendRequest && !previousShowSendRequestRef.current;
+		previousShowSendRequestRef.current = showSendRequest;
+
+		if (didOpenSendRequest) {
+			setActiveTab("send-request");
+			return;
+		}
+
+		if (!showSendRequest) setActiveTab("output");
+	}, [showSendRequest]);
+
+	const handleClear = React.useCallback(() => {
+		if (activeTab === "send-request") {
+			sendRequestPanelRef.current?.clear();
+			return;
+		}
+
+		clearOutput();
+	}, [activeTab, clearOutput]);
 
 	const updateAutoScrollState = React.useCallback(() => {
 		const element = scrollRef.current;
@@ -235,49 +278,84 @@ function OutputPane() {
 				outputOpen ? "flex-1 lg:flex" : "shrink-0 lg:flex",
 			)}
 		>
-			<div className="flex h-10 shrink-0 items-center justify-between border-b border-t lg:border-t-0">
-				<div className="flex items-center h-full">
-					<span className="px-4 h-full text-xs text-muted-foreground flex items-center">
-						Output
-					</span>
-				</div>
-				<div className="flex items-center h-full">
-					<Button
-						className="h-full border-l lg:hidden"
-						variant="ghost"
-						onClick={toggleOutputOpen}
-					>
-						<HugeiconsIcon
-							icon={outputOpen ? ChevronDown : ChevronUp}
-							strokeWidth={1.5}
-						/>
-						<span className="text-xs">
-							{outputOpen ? "Minimize" : "Show Output"}
-						</span>
-					</Button>
-					<Button
-						className="h-full border-l"
-						variant="ghost"
-						onClick={clearOutput}
-					>
-						<HugeiconsIcon icon={CleanIcon} strokeWidth={1.5} />
-						<span className="hidden sm:inline">Clear</span>
-					</Button>
-				</div>
-			</div>
-			<div
-				ref={scrollRef}
-				data-testid="output-pane"
-				onScroll={updateAutoScrollState}
-				className={cn(
-					"min-h-0 overflow-y-auto p-4",
-					outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
-				)}
+			<Tabs
+				value={activeTab}
+				onValueChange={(value) => setActiveTab(String(value))}
+				className="min-h-0 flex-1 gap-0"
 			>
-				<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
-					<ANSI value={formattedOutput} />
-				</pre>
-			</div>
+				<div className="flex h-10 shrink-0 items-center justify-between border-b border-t lg:border-t-0">
+					<TabsList className="h-full! p-0">
+						<TabsTrigger
+							value="output"
+							className="h-full px-4 bg-background border-0 border-r border-border"
+						>
+							Output
+						</TabsTrigger>
+						{showSendRequest && (
+							<TabsTrigger
+								value="send-request"
+								className="h-full px-4 bg-background border-0 border-r border-border"
+							>
+								Send Request
+							</TabsTrigger>
+						)}
+					</TabsList>
+					<div className="flex items-center h-full">
+						<Button
+							className="h-full border-l lg:hidden"
+							variant="ghost"
+							onClick={toggleOutputOpen}
+						>
+							<HugeiconsIcon
+								icon={outputOpen ? ChevronDown : ChevronUp}
+								strokeWidth={1.5}
+							/>
+							<span className="text-xs">
+								{outputOpen ? "Minimize" : "Show Pane"}
+							</span>
+						</Button>
+						<Button
+							className="h-full border-l"
+							variant="ghost"
+							onClick={handleClear}
+						>
+							<HugeiconsIcon icon={CleanIcon} strokeWidth={1.5} />
+							<span className="hidden sm:inline">Clear</span>
+						</Button>
+					</div>
+				</div>
+				<TabsContent
+					value="output"
+					keepMounted
+					ref={scrollRef}
+					data-testid="output-pane"
+					onScroll={updateAutoScrollState}
+					className={cn(
+						"min-h-0 overflow-y-auto p-4",
+						outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
+					)}
+				>
+					<pre className="text-[13px] font-sans whitespace-pre-wrap wrap-break-word">
+						<ANSI value={formattedOutput} />
+					</pre>
+				</TabsContent>
+				{showSendRequest && (
+					<TabsContent
+						value="send-request"
+						keepMounted
+						className={cn(
+							"min-h-0 overflow-y-auto p-4",
+							outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
+						)}
+					>
+						<SendRequestPanel
+							ref={sendRequestPanelRef}
+							listenerAddresses={listenerAddresses}
+							dispatchHttpRequest={dispatchHttpRequest}
+						/>
+					</TabsContent>
+				)}
+			</Tabs>
 		</div>
 	);
 }
@@ -385,12 +463,16 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, run, sendStopSignal } = useBallerina();
+	const { isReady, progress, run, sendStopSignal, dispatchHttpRequest } =
+		useBallerina();
 
 	const activeFile = useActiveFile();
 
 	const { saveFile } = useFileTreeActions();
 	const [isRunning, setIsRunning] = React.useState(false);
+	const [listenerAddresses, setListenerAddresses] = React.useState<string[]>(
+		[],
+	);
 
 	const openOutputWith = useEditorStore((s) => s.openOutputWith);
 	const appendOutput = useEditorStore((s) => s.appendOutput);
@@ -401,15 +483,20 @@ function EditorContent() {
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
 		setIsRunning(true);
+		setListenerAddresses([]);
 		try {
 			// FIXME: We should automatically save files on change.
 			await saveFile();
 
 			const target = await getBallerinaProjectTarget(fs, activeFile.path);
 			openOutputWith("");
-			await run(target, ({ text }) => appendOutput(text));
+			await run(target, (event) => {
+				if (event.type === "output") appendOutput(event.text);
+				if (event.type === "listeners") setListenerAddresses(event.hosts);
+			});
 		} finally {
 			setIsRunning(false);
+			setListenerAddresses([]);
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
@@ -438,7 +525,10 @@ function EditorContent() {
 						isRunning={isRunning}
 						onStop={handleStop}
 					/>
-					<OutputPane />
+					<RightPane
+						listenerAddresses={listenerAddresses}
+						dispatchHttpRequest={dispatchHttpRequest}
+					/>
 				</main>
 			</SidebarInset>
 		</>
