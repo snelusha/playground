@@ -75,6 +75,7 @@ func (c *fetchHTTPClient) executeLocalRequest(ctx context.Context, method, targe
 		return 0, nil, nil, false, err
 	}
 
+	// Intentionally ignore the scheme for loopback requests; TLS is not supported.
 	handler, ok := findLocalHandler(parsed)
 	if !ok {
 		return 0, nil, nil, false, nil
@@ -128,7 +129,8 @@ func isLocalHTTPHost(host string) bool {
 func findLocalHandler(parsed *url.URL) (http.Handler, bool) {
 	candidates := []string{parsed.Host}
 	if port := parsed.Port(); port != "" {
-		candidates = append(candidates,
+		candidates = append(
+			candidates,
 			"0.0.0.0:"+port,
 			"localhost:"+port,
 			"127.0.0.1:"+port,
