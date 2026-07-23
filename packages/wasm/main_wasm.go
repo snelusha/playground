@@ -72,14 +72,13 @@ func run(_ js.Value, args []js.Value) any {
 			done := func() { resolve.Invoke(js.Undefined()) }
 
 			signalSource, signals := newSignalSource()
-			defer signalSource.cleanup()
-
-			if !activateSignalSource(signalSource) {
+			if !activeRun.begin(signalSource) {
+				signalSource.cleanup()
 				fmt.Fprintf(stderr, "another Ballerina run is already active\n")
 				done()
 				return
 			}
-			defer deactivateSignalSource(signalSource)
+			defer activeRun.end(signalSource)
 
 			defer func() {
 				if r := recover(); r != nil {
@@ -125,16 +124,17 @@ func run(_ js.Value, args []js.Value) any {
 			workingDir := getWorkingDir(fsys, runPath)
 			pal := wasmPal(fsys, workingDir, stderr, stdout, signals)
 			rt := runtime.NewRuntime(pal, project.Environment().TypeEnv())
+			activeRun.setRuntime(signalSource, rt)
 			for _, birPkg := range birPkgs {
 				if err := rt.Init(*birPkg); err != nil {
 					fmt.Fprintf(stderr, "%v\n", err)
 					return
 				}
 			}
-			rt.Listen()
+			activeRun.ensureStarted()
 			emitEvent(onEvent, map[string]any{
 				"type":  "listeners",
-				"hosts": activeListeners.hosts(),
+				"hosts": activeRun.hosts(),
 			})
 			_ = <-rt.ExitStatus
 		}()
@@ -142,7 +142,7 @@ func run(_ js.Value, args []js.Value) any {
 }
 
 func sendStopSignal(_ js.Value, _ []js.Value) any {
-	return sendSignal(pal.GracefulStop)
+	return activeRun.sendSignal(pal.GracefulStop)
 }
 
 func dispatchHttpRequest(_ js.Value, args []js.Value) any {
@@ -159,16 +159,15 @@ func dispatchHttpRequest(_ js.Value, args []js.Value) any {
 		}
 
 		reqObj := args[0]
-		host := getString(reqObj, "host", "")
-		handler, ok := activeListeners.getHandler(host)
-		if !ok {
-			reject.Invoke(js.ValueOf(fmt.Sprintf("no service listening on %s", host)))
-			return
-		}
-
 		req, err := httpRequestFromJS(reqObj)
 		if err != nil {
 			reject.Invoke(js.ValueOf(err.Error()))
+			return
+		}
+
+		handler, ok := findLocalHandler(req.URL)
+		if !ok {
+			reject.Invoke(js.ValueOf(fmt.Sprintf("no service listening on %s", req.Host)))
 			return
 		}
 

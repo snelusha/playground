@@ -19,7 +19,7 @@ export type RunEventCallback = (event: RunEvent) => void;
 
 export interface HttpDispatchRequest {
 	method?: string;
-	host?: string;
+	host: string;
 	path?: string;
 	query?: string;
 	headers?: Record<string, string | string[]>;

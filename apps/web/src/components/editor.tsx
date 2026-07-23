@@ -482,6 +482,7 @@ function EditorContent() {
 		if (isRunning) return;
 		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
 
+		let isRunActive = true;
 		setIsRunning(true);
 		setListenerAddresses([]);
 		try {
@@ -492,9 +493,11 @@ function EditorContent() {
 			openOutputWith("");
 			await run(target, (event) => {
 				if (event.type === "output") appendOutput(event.text);
-				if (event.type === "listeners") setListenerAddresses(event.hosts);
+				if (event.type === "listeners" && isRunActive)
+					setListenerAddresses(event.hosts);
 			});
 		} finally {
+			isRunActive = false;
 			setIsRunning(false);
 			setListenerAddresses([]);
 		}
