@@ -21,7 +21,7 @@ import {
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { CodeEditor } from "@/components/code-editor";
-import { SendRequestPanel } from "@/components/send-request-panel";
+import { TryItPanel } from "@/components/try-it-panel";
 import { VersionCard } from "@/components/version-card";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { ANSI } from "@/components/ansi";
@@ -36,7 +36,7 @@ import { useActiveFile, useFileTreeActions } from "@/stores/file-tree-store";
 import { useBallerina } from "@/hooks/use-ballerina";
 import { useFS } from "@/providers/fs-provider";
 
-import type { SendRequestPanelHandle } from "@/components/send-request-panel";
+import type { TryItPanelHandle } from "@/components/try-it-panel";
 import type { EditorLanguage } from "@/components/code-editor";
 import type {
 	HttpDispatchRequest,
@@ -207,32 +207,31 @@ function RightPane({
 	const clearOutput = useEditorStore((s) => s.clearOutput);
 
 	const scrollRef = React.useRef<HTMLDivElement>(null);
-	const sendRequestPanelRef = React.useRef<SendRequestPanelHandle>(null);
+	const tryItPanelRef = React.useRef<TryItPanelHandle>(null);
 	const shouldAutoScrollRef = React.useRef(true);
 	const previousOutputLengthRef = React.useRef(output.length);
 	const previousOutputOpenRef = React.useRef(outputOpen);
 
-	const showSendRequest = listenerAddresses.length > 0;
-	const previousShowSendRequestRef = React.useRef(showSendRequest);
+	const showTryIt = listenerAddresses.length > 0;
+	const previousShowTryItRef = React.useRef(showTryIt);
 
 	const [activeTab, setActiveTab] = React.useState("output");
 
 	React.useEffect(() => {
-		const didOpenSendRequest =
-			showSendRequest && !previousShowSendRequestRef.current;
-		previousShowSendRequestRef.current = showSendRequest;
+		const didOpenTryIt = showTryIt && !previousShowTryItRef.current;
+		previousShowTryItRef.current = showTryIt;
 
-		if (didOpenSendRequest) {
-			setActiveTab("send-request");
+		if (didOpenTryIt) {
+			setActiveTab("try-it");
 			return;
 		}
 
-		if (!showSendRequest) setActiveTab("output");
-	}, [showSendRequest]);
+		if (!showTryIt) setActiveTab("output");
+	}, [showTryIt]);
 
 	const handleClear = React.useCallback(() => {
-		if (activeTab === "send-request") {
-			sendRequestPanelRef.current?.clear();
+		if (activeTab === "try-it") {
+			tryItPanelRef.current?.clear();
 			return;
 		}
 
@@ -291,12 +290,12 @@ function RightPane({
 						>
 							Output
 						</TabsTrigger>
-						{showSendRequest && (
+						{showTryIt && (
 							<TabsTrigger
-								value="send-request"
+								value="try-it"
 								className="h-full px-4 bg-background border-0 border-r border-border"
 							>
-								Send Request
+								Try It
 							</TabsTrigger>
 						)}
 					</TabsList>
@@ -339,17 +338,17 @@ function RightPane({
 						<ANSI value={formattedOutput} />
 					</pre>
 				</TabsContent>
-				{showSendRequest && (
+				{showTryIt && (
 					<TabsContent
-						value="send-request"
+						value="try-it"
 						keepMounted
 						className={cn(
 							"min-h-0 overflow-y-auto p-4",
 							outputOpen ? "flex-1" : "hidden lg:block lg:flex-1",
 						)}
 					>
-						<SendRequestPanel
-							ref={sendRequestPanelRef}
+						<TryItPanel
+							ref={tryItPanelRef}
 							listenerAddresses={listenerAddresses}
 							dispatchHttpRequest={dispatchHttpRequest}
 						/>

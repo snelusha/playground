@@ -60,7 +60,7 @@ type ResponseState = {
 
 type FieldArrayName = "query" | "headers";
 
-export type SendRequestPanelHandle = {
+export type TryItPanelHandle = {
 	clear: () => void;
 };
 
@@ -332,8 +332,8 @@ function ResponseSection({ response }: { response: ResponseState }) {
 	);
 }
 
-export const SendRequestPanel = React.forwardRef<SendRequestPanelHandle, Props>(
-	function SendRequestPanel({ listenerAddresses, dispatchHttpRequest }, ref) {
+export const TryItPanel = React.forwardRef<TryItPanelHandle, Props>(
+	function TryItPanel({ listenerAddresses, dispatchHttpRequest }, ref) {
 		const listenerPorts = React.useMemo(
 			() => listenerAddresses.map(toListenerPort),
 			[listenerAddresses],
@@ -533,12 +533,12 @@ export const SendRequestPanel = React.forwardRef<SendRequestPanelHandle, Props>(
 					</TabsContent>
 					<TabsContent value="body" className="mt-0" keepMounted>
 						<Field>
-							<FieldLabel htmlFor="send-request-body" className="sr-only">
+							<FieldLabel htmlFor="try-it-body" className="sr-only">
 								Body
 							</FieldLabel>
 							<Textarea
 								{...form.register("body")}
-								id="send-request-body"
+								id="try-it-body"
 								placeholder="Request body"
 								autoComplete="off"
 								className="min-h-32 resize-y"
