@@ -75,9 +75,9 @@ func (c *fetchHTTPClient) executeLocalRequest(ctx context.Context, method, targe
 		return 0, nil, nil, false, err
 	}
 
-	handler, ok := localHandlerForHost(parsed)
+	handler, ok := findLocalHandler(parsed)
 	if !ok {
-		return 0, nil, nil, true, fmt.Errorf("no in-memory service listening on %s", parsed.Host)
+		return 0, nil, nil, false, nil
 	}
 
 	if ctx == nil {
@@ -123,16 +123,6 @@ func isLocalHTTPHost(host string) bool {
 	default:
 		return false
 	}
-}
-
-func localHandlerForHost(parsed *url.URL) (http.Handler, bool) {
-	if handler, ok := findLocalHandler(parsed); ok {
-		return handler, true
-	}
-	if activeRun.ensureStarted() {
-		return findLocalHandler(parsed)
-	}
-	return nil, false
 }
 
 func findLocalHandler(parsed *url.URL) (http.Handler, bool) {

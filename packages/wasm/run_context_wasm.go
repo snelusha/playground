@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"sync"
 )
 
@@ -116,9 +117,15 @@ func (c *runContext) hosts() []any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	hosts := make([]any, 0, len(c.listeners))
+	listenerHosts := make([]string, 0, len(c.listeners))
 	for host := range c.listeners {
-		hosts = append(hosts, host)
+		listenerHosts = append(listenerHosts, host)
+	}
+	sort.Strings(listenerHosts)
+
+	hosts := make([]any, len(listenerHosts))
+	for i, host := range listenerHosts {
+		hosts[i] = host
 	}
 	return hosts
 }
