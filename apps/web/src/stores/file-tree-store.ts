@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { immer } from "zustand/middleware/immer";
 
 import { LOCAL_ROOT } from "@/lib/fs/fs-roots";
+import { publishFileMutation } from "@/lib/fs/mutations";
 import { ancestorDirPathsForFile, isUnder } from "@/lib/fs/core/path-utils";
 
 import type { LayeredFS } from "@/lib/fs/layered-fs";
@@ -158,6 +159,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			async createFile(path) {
 				const result = await _fs().writeFile(path, "");
 				if (!result) return false;
+				publishFileMutation({ type: "writeFile", path, content: "" });
 				await get()._syncTrees();
 				return true;
 			},
@@ -165,6 +167,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			async deleteFile(path) {
 				const result = await _fs().remove(path);
 				if (!result) return false;
+				publishFileMutation({ type: "remove", path });
 				set((s) => {
 					if (s.activeFile?.path === path) s.activeFile = null;
 				});
@@ -175,6 +178,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			async renameFile(oldPath, newPath) {
 				const result = await _fs().move(oldPath, newPath);
 				if (!result) return false;
+				publishFileMutation({ type: "move", oldPath, newPath });
 				set((s) => {
 					if (!s.activeFile) return;
 					const currentPath = s.activeFile.path;
@@ -200,6 +204,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			async createDir(path) {
 				const result = await _fs().mkdirAll(path);
 				if (!result) return false;
+				publishFileMutation({ type: "mkdirAll", path });
 				await get()._syncTrees();
 				return true;
 			},
@@ -207,6 +212,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			async deleteDir(path) {
 				const result = await _fs().remove(path);
 				if (!result) return false;
+				publishFileMutation({ type: "remove", path });
 				set((s) => {
 					const activePath = s.activeFile?.path;
 					if (activePath === path || activePath?.startsWith(`${path}/`)) {
@@ -231,12 +237,15 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			},
 
 			updateFileContent(content) {
+				const path = get().activeFile?.path;
+				if (!path) return;
 				set((s) => {
 					if (s.activeFile) {
 						s.activeFile.content = content;
 						s.activeFile.dirty = true;
 					}
 				});
+				publishFileMutation({ type: "writeFile", path, content });
 			},
 
 			async exists(path) {
@@ -259,6 +268,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			async createNewFile(path) {
 				const result = await _fs().writeFile(path, "");
 				if (!result) return false;
+				publishFileMutation({ type: "writeFile", path, content: "" });
 				await get()._syncTrees();
 				await get().openFile(path);
 				return true;
@@ -267,6 +277,7 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 			async createNewDir(path) {
 				const result = await _fs().mkdirAll(path);
 				if (!result) return false;
+				publishFileMutation({ type: "mkdirAll", path });
 				await get()._syncTrees();
 				return true;
 			},

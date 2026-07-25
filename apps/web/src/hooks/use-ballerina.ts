@@ -2,6 +2,7 @@ import "@/wasm_exec";
 
 import * as React from "react";
 
+import { subscribeFileMutations } from "@/lib/fs/mutations";
 import { SnapshotFS } from "@/lib/fs/snapshot";
 
 import { useFS } from "@/providers/fs-provider";
@@ -60,6 +61,16 @@ export function useBallerina() {
 			const snapshot = await SnapshotFS.from(fs, path);
 
 			let mutationSync = Promise.resolve();
+			const unsubscribeExternalMutations = subscribeFileMutations(
+				(mutation) => {
+					mutationSync = mutationSync
+						.catch(() => undefined)
+						.then(async () => {
+							const events = await snapshot.applyExternalMutation(mutation);
+							await clientRef.current?.notifyFilesystemEvents(events);
+						});
+				},
+			);
 			const unsubscribe = snapshot.onMutation((mutation) => {
 				mutationSync = mutationSync
 					// Keep the mutation queue alive even if the previous sync failed.
@@ -81,6 +92,7 @@ export function useBallerina() {
 				await clientRef.current.run(snapshot, path, onEvent);
 			} finally {
 				unsubscribe();
+				unsubscribeExternalMutations();
 				await mutationSync;
 			}
 		},

@@ -295,8 +295,16 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 				}
 				return "", &fs.PathError{Op: "readlink", Path: resolved, Err: fs.ErrInvalid}
 			},
-			Watch: func(string, bool, pal.WatchHandler) (pal.WatchHandle, error) {
-				return nil, errors.New("filesystem watching is not supported in Playground")
+			Watch: func(p string, recursive bool, handler pal.WatchHandler) (pal.WatchHandle, error) {
+				resolved := resolvePath(cwd, p)
+				info, err := fs.Stat(fsys, resolved)
+				if err != nil {
+					return nil, err
+				}
+				if !info.IsDir() {
+					return nil, &fs.PathError{Op: "watch", Path: resolved, Err: fs.ErrInvalid}
+				}
+				return fsys.Watch(resolved, recursive, handler)
 			},
 		},
 		OS: pal.OS{

@@ -1,5 +1,6 @@
 import * as Comlink from "comlink";
 
+import type { FileWatchEvent } from "@/lib/fs/mutations";
 import type {
 	BallerinaWorkerAPI,
 	HttpDispatchRequest,
@@ -57,6 +58,11 @@ export class BallerinaWorkerClient {
 	async sendStopSignal(): Promise<boolean> {
 		if (!this.api) return Promise.resolve(false);
 		return this.api.sendStopSignal();
+	}
+
+	async notifyFilesystemEvents(events: FileWatchEvent[]): Promise<boolean> {
+		if (!this.api || events.length === 0) return false;
+		return this.api.notifyFilesystemEvents(events);
 	}
 
 	async dispatchHttpRequest(

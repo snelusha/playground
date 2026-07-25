@@ -18,10 +18,12 @@ package main
 
 import (
 	"ballerina-lang-go/common/bfs"
+	"ballerina-lang-go/platform/pal"
 	"bytes"
 	"io"
 	"io/fs"
 	"path"
+	"strings"
 	"sync"
 	"syscall/js"
 	"time"
@@ -35,32 +37,55 @@ var (
 type bridgeFS struct {
 	mu    sync.Mutex
 	proxy js.Value
+
+	watchMu     sync.RWMutex
+	watchers    map[uint64]bridgeWatcher
+	nextWatcher uint64
+}
+
+type bridgeWatcher struct {
+	path      string
+	recursive bool
+	handler   pal.WatchHandler
+}
+
+type bridgeWatchHandle struct {
+	fs *bridgeFS
+	id uint64
+}
+
+func (h *bridgeWatchHandle) Close() error {
+	h.fs.watchMu.Lock()
+	delete(h.fs.watchers, h.id)
+	h.fs.watchMu.Unlock()
+	return nil
 }
 
 func NewBridgeFS(proxy js.Value) *bridgeFS {
 	return &bridgeFS{
-		proxy: proxy,
+		proxy:    proxy,
+		watchers: make(map[uint64]bridgeWatcher),
 	}
 }
 
 func (l *bridgeFS) Create(name string) (fs.File, error) {
-	res, err := l.bridgeCall("writeFile", name, name, "")
-	if err != nil {
+	if err := l.WriteFile(name, nil, 0o644); err != nil {
 		return nil, err
-	}
-	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
-		return nil, &fs.PathError{Op: "create", Path: name, Err: fs.ErrNotExist}
 	}
 	return l.Open(name)
 }
 
 func (l *bridgeFS) MkdirAll(path string, perm fs.FileMode) error {
+	_, existed := fs.Stat(l, path)
 	res, err := l.bridgeCall("mkdirAll", path, path)
 	if err != nil {
 		return err
 	}
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
 		return &fs.PathError{Op: "mkdirAll", Path: path, Err: fs.ErrInvalid}
+	}
+	if existed != nil {
+		l.emitWatchEvent(path, pal.WatchCreate)
 	}
 	return nil
 }
@@ -73,6 +98,8 @@ func (l *bridgeFS) Move(oldpath string, newpath string) error {
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
 		return &fs.PathError{Op: "move", Path: oldpath, Err: fs.ErrInvalid}
 	}
+	l.emitWatchEvent(oldpath, pal.WatchDelete)
+	l.emitWatchEvent(newpath, pal.WatchCreate)
 	return nil
 }
 
@@ -88,6 +115,7 @@ func (l *bridgeFS) Remove(name string) error {
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
 		return &fs.PathError{Op: "remove", Path: name, Err: fs.ErrNotExist}
 	}
+	l.emitWatchEvent(name, pal.WatchDelete)
 	return nil
 }
 
@@ -150,6 +178,7 @@ func (l *bridgeFS) openDir(name string, stat js.Value) (fs.File, error) {
 }
 
 func (l *bridgeFS) WriteFile(name string, data []byte, perm fs.FileMode) error {
+	_, existed := fs.Stat(l, name)
 	res, err := l.bridgeCall("writeFile", name, name, string(data))
 	if err != nil {
 		return err
@@ -157,7 +186,47 @@ func (l *bridgeFS) WriteFile(name string, data []byte, perm fs.FileMode) error {
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
 		return &fs.PathError{Op: "writeFile", Path: name, Err: fs.ErrInvalid}
 	}
+	if existed == nil {
+		l.emitWatchEvent(name, pal.WatchModify)
+	} else {
+		l.emitWatchEvent(name, pal.WatchCreate)
+	}
 	return nil
+}
+
+func (l *bridgeFS) Watch(p string, recursive bool, handler pal.WatchHandler) (pal.WatchHandle, error) {
+	l.watchMu.Lock()
+	defer l.watchMu.Unlock()
+	l.nextWatcher++
+	l.watchers[l.nextWatcher] = bridgeWatcher{
+		path:      path.Clean(p),
+		recursive: recursive,
+		handler:   handler,
+	}
+	return &bridgeWatchHandle{fs: l, id: l.nextWatcher}, nil
+}
+
+func (l *bridgeFS) emitWatchEvent(eventPath string, op pal.WatchOp) {
+	eventPath = path.Clean(eventPath)
+	l.watchMu.RLock()
+	handlers := make([]pal.WatchHandler, 0, len(l.watchers))
+	for _, watcher := range l.watchers {
+		if watcherMatches(watcher, eventPath) {
+			handlers = append(handlers, watcher.handler)
+		}
+	}
+	l.watchMu.RUnlock()
+
+	for _, handler := range handlers {
+		go handler(pal.WatchEvent{Path: eventPath, Op: op})
+	}
+}
+
+func watcherMatches(watcher bridgeWatcher, eventPath string) bool {
+	if watcher.recursive {
+		return eventPath == watcher.path || strings.HasPrefix(eventPath, watcher.path+"/")
+	}
+	return path.Dir(eventPath) == watcher.path
 }
 
 func (l *bridgeFS) bridgeCall(op string, path string, args ...any) (js.Value, error) {

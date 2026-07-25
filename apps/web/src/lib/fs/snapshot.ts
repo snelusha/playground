@@ -1,4 +1,5 @@
 import { TEMP_ROOT } from "@/lib/fs/fs-roots";
+import type { FileMutation, FileWatchEvent } from "@/lib/fs/mutations";
 import {
 	basename,
 	dirname,
@@ -28,11 +29,7 @@ type SnapshotDirNode = {
 
 type SnapshotNode = SnapshotFileNode | SnapshotDirNode;
 
-export type SnapshotFSMutation =
-	| { type: "writeFile"; path: string; content: string }
-	| { type: "mkdirAll"; path: string }
-	| { type: "remove"; path: string }
-	| { type: "move"; oldPath: string; newPath: string };
+export type SnapshotFSMutation = FileMutation;
 
 export type SnapshotFSListener = (mutation: SnapshotFSMutation) => void;
 
@@ -105,14 +102,63 @@ export class SnapshotFS implements FS {
 	}
 
 	async writeFile(path: string, content: string): Promise<boolean> {
+		if (!this.writeFileNode(path, content)) return false;
+		this.notifyListeners({ type: "writeFile", path, content });
+		return true;
+	}
+
+	async mkdirAll(path: string): Promise<boolean> {
+		const created = this.mkdirAllNodes(path);
+		if (!created) return false;
+		this.notifyListeners({ type: "mkdirAll", path });
+		return true;
+	}
+
+	async remove(path: string): Promise<boolean> {
+		if (!this.removeNodes(path)) return false;
+		this.notifyListeners({ type: "remove", path });
+		return true;
+	}
+
+	async move(oldPath: string, newPath: string): Promise<boolean> {
+		if (!this.moveNodes(oldPath, newPath)) return false;
+		this.notifyListeners({ type: "move", oldPath, newPath });
+		return true;
+	}
+
+	async applyExternalMutation(
+		mutation: FileMutation,
+	): Promise<FileWatchEvent[]> {
+		switch (mutation.type) {
+			case "writeFile": {
+				const existing = this.nodes.has(mutation.path);
+				if (!this.writeFileNode(mutation.path, mutation.content)) return [];
+				return [{ path: mutation.path, op: existing ? "modify" : "create" }];
+			}
+			case "mkdirAll": {
+				const created = this.mkdirAllNodes(mutation.path);
+				if (!created) return [];
+				return created.map((path) => ({ path, op: "create" }));
+			}
+			case "remove":
+				return this.removeNodes(mutation.path)
+					? [{ path: mutation.path, op: "delete" }]
+					: [];
+			case "move":
+				return this.moveNodes(mutation.oldPath, mutation.newPath)
+					? [
+							{ path: mutation.oldPath, op: "delete" },
+							{ path: mutation.newPath, op: "create" },
+						]
+					: [];
+		}
+	}
+
+	private writeFileNode(path: string, content: string): boolean {
 		const parentPath = dirname(path);
 		const parent = this.nodes.get(parentPath);
-		if (parentPath && parentPath !== "." && !parent?.isDir) {
-			return false;
-		}
-
-		const existing = this.nodes.get(path);
-		if (existing?.isDir) return false;
+		if (parentPath && parentPath !== "." && !parent?.isDir) return false;
+		if (this.nodes.get(path)?.isDir) return false;
 
 		this.nodes.set(path, {
 			isDir: false,
@@ -120,29 +166,24 @@ export class SnapshotFS implements FS {
 			modTime: Date.now(),
 			size: new TextEncoder().encode(content).byteLength,
 		});
-		this.notifyListeners({ type: "writeFile", path, content });
 		return true;
 	}
 
-	async mkdirAll(path: string): Promise<boolean> {
-		if (!path || path === "." || path === "/") return true;
+	private mkdirAllNodes(path: string): string[] | null {
+		if (!path || path === "." || path === "/") return [];
 
 		const leading = path.startsWith("/") ? "/" : "";
 		let current = leading || ".";
 		const created: string[] = [];
-
 		for (const segment of pathSegments(path)) {
 			current =
 				current === "/" || current === "."
 					? `${leading}${segment}`
 					: join(current, segment);
-
 			const existing = this.nodes.get(current);
 			if (existing && !existing.isDir) {
-				for (const createdPath of created) {
-					this.nodes.delete(createdPath);
-				}
-				return false;
+				for (const createdPath of created) this.nodes.delete(createdPath);
+				return null;
 			}
 			if (!existing) {
 				this.nodes.set(current, {
@@ -153,30 +194,25 @@ export class SnapshotFS implements FS {
 				created.push(current);
 			}
 		}
-		this.notifyListeners({ type: "mkdirAll", path });
-		return true;
+		return created;
 	}
 
-	async remove(path: string): Promise<boolean> {
+	private removeNodes(path: string): boolean {
 		if (!path || path === "/" || !this.nodes.has(path)) return false;
-
 		for (const candidate of [...this.nodes.keys()]) {
 			if (candidate === path || candidate.startsWith(`${path}/`)) {
 				this.nodes.delete(candidate);
 			}
 		}
-		this.notifyListeners({ type: "remove", path });
 		return true;
 	}
 
-	async move(oldPath: string, newPath: string): Promise<boolean> {
+	private moveNodes(oldPath: string, newPath: string): boolean {
 		if (oldPath === newPath) return this.nodes.has(oldPath);
 		if (!this.nodes.has(oldPath) || newPath.startsWith(`${oldPath}/`)) {
 			return false;
 		}
-
-		const parent = this.nodes.get(dirname(newPath));
-		if (!parent?.isDir) return false;
+		if (!this.nodes.get(dirname(newPath))?.isDir) return false;
 		const destination = this.nodes.get(newPath);
 		if (destination?.isDir) return false;
 		if (destination) this.nodes.delete(newPath);
@@ -189,7 +225,6 @@ export class SnapshotFS implements FS {
 		for (const [candidate, node] of moved) {
 			this.nodes.set(`${newPath}${candidate.slice(oldPath.length)}`, node);
 		}
-		this.notifyListeners({ type: "move", oldPath, newPath });
 		return true;
 	}
 }

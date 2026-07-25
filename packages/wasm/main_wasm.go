@@ -37,6 +37,7 @@ func main() {
 	js.Global().Set("run", js.FuncOf(run))
 
 	js.Global().Set("sendStopSignal", js.FuncOf(sendStopSignal))
+	js.Global().Set("notifyFilesystemEvents", js.FuncOf(notifyFilesystemEvents))
 	js.Global().Set("dispatchHttpRequest", js.FuncOf(dispatchHttpRequest))
 
 	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
@@ -95,6 +96,7 @@ func run(_ js.Value, args []js.Value) any {
 			proxy := args[0]
 			runPath := args[1].String()
 			fsys := NewBridgeFS(proxy)
+			activeRun.setBridgeFS(signalSource, fsys)
 
 			result, err := projects.Load(fsys, runPath)
 			if err != nil {
@@ -143,6 +145,34 @@ func run(_ js.Value, args []js.Value) any {
 
 func sendStopSignal(_ js.Value, _ []js.Value) any {
 	return activeRun.sendSignal(pal.GracefulStop)
+}
+
+func notifyFilesystemEvents(_ js.Value, args []js.Value) any {
+	if len(args) < 1 || args[0].Type() != js.TypeObject || args[0].IsNull() {
+		return false
+	}
+
+	events := make([]filesystemEvent, 0, args[0].Length())
+	for i := 0; i < args[0].Length(); i++ {
+		event := args[0].Index(i)
+		path := getString(event, "path", "")
+		if path == "" {
+			continue
+		}
+		var op pal.WatchOp
+		switch getString(event, "op", "") {
+		case "create":
+			op = pal.WatchCreate
+		case "modify":
+			op = pal.WatchModify
+		case "delete":
+			op = pal.WatchDelete
+		default:
+			continue
+		}
+		events = append(events, filesystemEvent{path: path, op: op})
+	}
+	return activeRun.emitFilesystemEvents(events)
 }
 
 func dispatchHttpRequest(_ js.Value, args []js.Value) any {

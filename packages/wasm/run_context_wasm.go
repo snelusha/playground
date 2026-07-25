@@ -12,10 +12,16 @@ import (
 
 var activeRun = &runContext{}
 
+type filesystemEvent struct {
+	path string
+	op   pal.WatchOp
+}
+
 type runContext struct {
 	mu sync.RWMutex
 
 	rt        *runtime.Runtime
+	fsys      *bridgeFS
 	signals   *signalSource
 	listeners map[string]http.Handler
 	started   bool
@@ -37,6 +43,7 @@ func (c *runContext) end(signals *signalSource) {
 	c.mu.Lock()
 	if c.signals == signals {
 		c.rt = nil
+		c.fsys = nil
 		c.signals = nil
 		c.listeners = nil
 		c.started = false
@@ -51,6 +58,27 @@ func (c *runContext) setRuntime(signals *signalSource, rt *runtime.Runtime) {
 	if c.signals == signals {
 		c.rt = rt
 	}
+}
+
+func (c *runContext) setBridgeFS(signals *signalSource, fsys *bridgeFS) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.signals == signals {
+		c.fsys = fsys
+	}
+}
+
+func (c *runContext) emitFilesystemEvents(events []filesystemEvent) bool {
+	c.mu.RLock()
+	fsys := c.fsys
+	c.mu.RUnlock()
+	if fsys == nil {
+		return false
+	}
+	for _, event := range events {
+		fsys.emitWatchEvent(event.path, event.op)
+	}
+	return true
 }
 
 func (c *runContext) ensureStarted() bool {

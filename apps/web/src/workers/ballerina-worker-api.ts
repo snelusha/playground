@@ -1,3 +1,4 @@
+import type { FileWatchEvent } from "@/lib/fs/mutations";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
 export type RunOutputStream = "stdout" | "stderr";
@@ -40,6 +41,7 @@ export interface BallerinaWorkerAPI {
 		onEvent: RunEventCallback,
 	): Promise<void>;
 	sendStopSignal(): Promise<boolean>;
+	notifyFilesystemEvents(events: FileWatchEvent[]): Promise<boolean>;
 	dispatchHttpRequest(
 		request: HttpDispatchRequest,
 	): Promise<HttpDispatchResponse>;

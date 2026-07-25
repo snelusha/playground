@@ -8,6 +8,7 @@ import type {
 	HttpDispatchResponse,
 	RunEventCallback,
 } from "@/workers/ballerina-worker-api";
+import type { FileWatchEvent } from "@/lib/fs/mutations";
 import type { SnapshotFS } from "@/lib/fs/snapshot";
 
 export interface GoRuntime {
@@ -23,6 +24,7 @@ declare const self: typeof globalThis & {
 		onEvent: RunEventCallback,
 	) => Promise<void>;
 	sendStopSignal: () => Promise<boolean>;
+	notifyFilesystemEvents: (events: FileWatchEvent[]) => boolean;
 	dispatchHttpRequest: (
 		request: HttpDispatchRequest,
 	) => Promise<HttpDispatchResponse>;
@@ -115,6 +117,10 @@ const api: BallerinaWorkerAPI = {
 	sendStopSignal: async () => {
 		if (typeof self.sendStopSignal !== "function") return false;
 		return self.sendStopSignal();
+	},
+	notifyFilesystemEvents: async (events) => {
+		if (typeof self.notifyFilesystemEvents !== "function") return false;
+		return self.notifyFilesystemEvents(events);
 	},
 	dispatchHttpRequest: async (request) => {
 		if (typeof self.dispatchHttpRequest !== "function")

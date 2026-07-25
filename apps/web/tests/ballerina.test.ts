@@ -12,6 +12,7 @@ interface TestCase {
 	entryPoint: string;
 	expectedStdout?: string;
 	expectedStderr?: string;
+	stopAfterOutput?: boolean;
 }
 
 async function load(path: string) {
@@ -21,11 +22,18 @@ async function load(path: string) {
 async function runBallerina(
 	files: Map<string, string>,
 	entryPoint: string,
+	stopAfterOutput = false,
 ): Promise<{ stdout: string; stderr: string }> {
 	const fs = await SnapshotFS.from(createFs(files), entryPoint);
 	const output = { stdout: "", stderr: "" };
+	let stopSent = false;
 	const onEvent = (event: RunEvent) => {
-		if (event.type === "output") output[event.stream] += event.text;
+		if (event.type !== "output") return;
+		output[event.stream] += event.text;
+		if (stopAfterOutput && !stopSent && output.stdout.length > 0) {
+			stopSent = true;
+			void globalThis.sendStopSignal();
+		}
 	};
 
 	await globalThis.run(fs, entryPoint, onEvent);
@@ -97,16 +105,56 @@ const testCases: TestCase[] = [
 		entryPoint: "/local/main.bal",
 		expectedStdout: "true\n1\ntrue\ntrue\nfalse\ntrue\nfalse\n",
 	},
+	{
+		name: "file watch",
+		files: async () =>
+			new Map([["/local/main.bal", await load("./fixtures/file-watch.bal")]]),
+		entryPoint: "/local/main.bal",
+		expectedStdout: "true\n",
+		stopAfterOutput: true,
+	},
 ];
 
 for (const tc of testCases) {
 	test(tc.name, async () => {
 		const files = await tc.files();
-		const result = await runBallerina(files, tc.entryPoint);
+		const result = await runBallerina(files, tc.entryPoint, tc.stopAfterOutput);
 		expect(result.stdout).toBe(tc.expectedStdout ?? "");
 		expect(result.stderr).toBe(tc.expectedStderr ?? "");
 	});
 }
+
+test("file watch receives external editor mutations", async () => {
+	const snapshot = await SnapshotFS.from(
+		createFs(
+			new Map([
+				["/local/main.bal", await load("./fixtures/file-watch-external.bal")],
+			]),
+		),
+		"/local/main.bal",
+	);
+	await snapshot.mkdirAll("/tmp/watch-external");
+
+	const output = { stdout: "", stderr: "" };
+	let editorMutationApplied = false;
+	await globalThis.run(snapshot, "/local/main.bal", async (event: RunEvent) => {
+		if (event.type !== "output") return;
+		output[event.stream] += event.text;
+		if (!editorMutationApplied && output.stdout.includes("ready\n")) {
+			editorMutationApplied = true;
+			const events = await snapshot.applyExternalMutation({
+				type: "writeFile",
+				path: "/tmp/watch-external/editor.txt",
+				content: "from editor",
+			});
+			globalThis.notifyFilesystemEvents(events);
+		}
+		if (output.stdout.includes("true\n")) void globalThis.sendStopSignal();
+	});
+
+	expect(output.stdout).toBe("ready\ntrue\n");
+	expect(output.stderr).toBe("");
+});
 
 test("snapshot reports move and remove mutations", async () => {
 	const snapshot = await SnapshotFS.from(

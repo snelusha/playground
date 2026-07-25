@@ -4,6 +4,7 @@ import type {
 	HttpDispatchResponse,
 	RunEventCallback,
 } from "@/workers/ballerina-worker-api";
+import type { FileWatchEvent } from "@/lib/fs/mutations";
 
 declare global {
 	export interface Window {
@@ -13,6 +14,7 @@ declare global {
 			proxy: FS,
 			path: string,
 		) => Promise<Array<Record<string, any>> | null>;
+		notifyFilesystemEvents(events: FileWatchEvent[]): boolean;
 		dispatchHttpRequest: (
 			request: HttpDispatchRequest,
 		) => Promise<HttpDispatchResponse>;
