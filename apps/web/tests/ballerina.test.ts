@@ -82,6 +82,13 @@ const testCases: TestCase[] = [
 		entryPoint: "/tmp/main.bal",
 		expectedStdout: "true\ntrue\ntrue\ntrue\ntrue\n",
 	},
+	{
+		name: "runtime sleep",
+		files: async () =>
+			new Map([["/tmp/main.bal", await load("./fixtures/runtime-sleep.bal")]]),
+		entryPoint: "/tmp/main.bal",
+		expectedStdout: "before\nafter\ndone\n",
+	},
 ];
 
 for (const tc of testCases) {
