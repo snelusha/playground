@@ -1,6 +1,7 @@
 import { beforeAll, expect, test } from "bun:test";
 
 import { createFs } from "./test-fs";
+import { SnapshotFS } from "../src/lib/fs/snapshot";
 import "../src/wasm_exec";
 
 import type { RunEvent } from "../src/workers/ballerina-worker-api";
@@ -21,7 +22,7 @@ async function runBallerina(
 	files: Map<string, string>,
 	entryPoint: string,
 ): Promise<{ stdout: string; stderr: string }> {
-	const fs = createFs(files);
+	const fs = await SnapshotFS.from(createFs(files), entryPoint);
 	const output = { stdout: "", stderr: "" };
 	const onEvent = (event: RunEvent) => {
 		if (event.type === "output") output[event.stream] += event.text;
@@ -89,6 +90,13 @@ const testCases: TestCase[] = [
 		entryPoint: "/tmp/main.bal",
 		expectedStdout: "before\nafter\ndone\n",
 	},
+	{
+		name: "file API",
+		files: async () =>
+			new Map([["/local/main.bal", await load("./fixtures/file-api.bal")]]),
+		entryPoint: "/local/main.bal",
+		expectedStdout: "true\n1\ntrue\ntrue\nfalse\ntrue\nfalse\n",
+	},
 ];
 
 for (const tc of testCases) {
@@ -99,3 +107,18 @@ for (const tc of testCases) {
 		expect(result.stderr).toBe(tc.expectedStderr ?? "");
 	});
 }
+
+test("snapshot reports move and remove mutations", async () => {
+	const snapshot = await SnapshotFS.from(
+		createFs(new Map([["/tmp/source.txt", "content"]])),
+		"/tmp/source.txt",
+	);
+	const mutations: string[] = [];
+	snapshot.onMutation((mutation) => mutations.push(mutation.type));
+
+	expect(await snapshot.move("/tmp/source.txt", "/tmp/destination.txt")).toBe(
+		true,
+	);
+	expect(await snapshot.remove("/tmp/destination.txt")).toBe(true);
+	expect(mutations).toEqual(["move", "remove"]);
+});
