@@ -49,6 +49,10 @@ export class LayeredFS implements FS {
 		return this._withTargetOrFalse(path, (fs) => fs.writeFile(path, content));
 	}
 
+	async appendFile(path: string, content: string) {
+		return this._withTargetOrFalse(path, (fs) => fs.appendFile(path, content));
+	}
+
 	async remove(path: string) {
 		return this._withTargetOrFalse(path, (fs) => fs.remove(path));
 	}

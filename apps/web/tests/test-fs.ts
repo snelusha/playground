@@ -76,6 +76,12 @@ export function createFs(inputFiles: Map<string, string>) {
 			files.set(path, content);
 			return true;
 		},
+		async appendFile(path: string, content: string) {
+			const existing = files.get(path);
+			if (existing === undefined || dirs.has(path)) return false;
+			files.set(path, existing + content);
+			return true;
+		},
 		async mkdirAll(path: string) {
 			let dir = path;
 			while (true) {

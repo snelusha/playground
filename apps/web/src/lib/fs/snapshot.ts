@@ -13,10 +13,10 @@ import type {
 } from "@/lib/fs/core/fs.interface";
 
 type SnapshotFileNode = {
-	readonly isDir: false;
-	readonly content: string;
-	readonly modTime: number;
-	readonly size: number;
+	isDir: false;
+	chunks: string[];
+	modTime: number;
+	size: number;
 };
 
 type SnapshotDirNode = {
@@ -29,6 +29,7 @@ type SnapshotNode = SnapshotFileNode | SnapshotDirNode;
 
 export type SnapshotFSMutation =
 	| { type: "writeFile"; path: string; content: string }
+	| { type: "appendFile"; path: string; content: string }
 	| { type: "mkdirAll"; path: string };
 
 export type SnapshotFSListener = (mutation: SnapshotFSMutation) => void;
@@ -69,7 +70,7 @@ export class SnapshotFS implements FS {
 		const node = this.nodes.get(path);
 		if (!node || node.isDir) return null;
 		return {
-			content: node.content,
+			content: node.chunks.join(""),
 			size: node.size,
 			modTime: node.modTime,
 			isDir: false,
@@ -105,11 +106,22 @@ export class SnapshotFS implements FS {
 
 		this.nodes.set(path, {
 			isDir: false,
-			content,
+			chunks: [content],
 			modTime: Date.now(),
 			size: new TextEncoder().encode(content).byteLength,
 		});
 		this.notifyListeners({ type: "writeFile", path, content });
+		return true;
+	}
+
+	async appendFile(path: string, content: string): Promise<boolean> {
+		const existing = this.nodes.get(path);
+		if (!existing || existing.isDir) return false;
+
+		existing.chunks.push(content);
+		existing.modTime = Date.now();
+		existing.size += new TextEncoder().encode(content).byteLength;
+		this.notifyListeners({ type: "appendFile", path, content });
 		return true;
 	}
 
@@ -179,7 +191,7 @@ async function collectFileNode(
 	if (!file) return;
 	nodes.set(path, {
 		isDir: false,
-		content: file.content,
+		chunks: [file.content],
 		modTime: file.modTime,
 		size: file.size,
 	});

@@ -22,6 +22,7 @@ export interface FS {
 	stat(path: string): Promise<StatResult | null>;
 	readDir(path: string): Promise<DirEntry[] | null>;
 	writeFile(path: string, content: string): Promise<boolean>;
+	appendFile(path: string, content: string): Promise<boolean>;
 	remove(path: string): Promise<boolean>;
 	move(oldPath: string, newPath: string): Promise<boolean>;
 	mkdirAll(path: string): Promise<boolean>;

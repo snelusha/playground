@@ -68,6 +68,19 @@ export class AbstractFS implements FS {
 		}
 	}
 
+	async appendFile(path: string, content: string): Promise<boolean> {
+		try {
+			const node = this._getNode(path, false);
+			if (!node || node.isDir) return false;
+			node.content = (node.content ?? "") + content;
+			node.modTime = Date.now();
+			this._onWrite();
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
 	async remove(path: string): Promise<boolean> {
 		const parts = pathSegments(path);
 		if (parts.length === 0) return false;

@@ -150,12 +150,20 @@ func (l *bridgeFS) openDir(name string, stat js.Value) (fs.File, error) {
 }
 
 func (l *bridgeFS) WriteFile(name string, data []byte, perm fs.FileMode) error {
-	res, err := l.bridgeCall("writeFile", name, name, string(data))
+	return l.writeFile("writeFile", name, data, perm)
+}
+
+func (l *bridgeFS) AppendFile(name string, data []byte, perm fs.FileMode) error {
+	return l.writeFile("appendFile", name, data, perm)
+}
+
+func (l *bridgeFS) writeFile(op string, name string, data []byte, _ fs.FileMode) error {
+	res, err := l.bridgeCall(op, name, name, string(data))
 	if err != nil {
 		return err
 	}
 	if res.IsNull() || res.IsUndefined() || (res.Type() == js.TypeBoolean && !res.Bool()) {
-		return &fs.PathError{Op: "writeFile", Path: name, Err: fs.ErrInvalid}
+		return &fs.PathError{Op: op, Path: name, Err: fs.ErrInvalid}
 	}
 	return nil
 }

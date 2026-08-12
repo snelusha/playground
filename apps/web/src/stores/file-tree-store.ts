@@ -349,6 +349,18 @@ export const useFileTreeStore = create<FileTreeState & FileTreeActions>()(
 						});
 						break;
 					}
+					case "appendFile": {
+						const result = await fs.appendFile(mutation.path, mutation.content);
+						if (!result) {
+							throw new Error(`appendFile failed: ${mutation.path}`);
+						}
+						set((s) => {
+							if (s.activeFile?.path === mutation.path && !s.activeFile.dirty) {
+								s.activeFile.content += mutation.content;
+							}
+						});
+						break;
+					}
 					case "mkdirAll": {
 						const result = await fs.mkdirAll(mutation.path);
 						if (!result) {

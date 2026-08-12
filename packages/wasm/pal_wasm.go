@@ -20,40 +20,28 @@ func resolvePath(cwd string, p string) string {
 	return path.Join(cwd, p)
 }
 
-type bufferedWriteCloser struct {
-	fsys       *bridgeFS
-	path       string
-	appendMode bool
-	buffer     []byte
-	closed     bool
+type bridgeWriteCloser struct {
+	fsys   *bridgeFS
+	path   string
+	closed bool
 }
 
-func (w *bufferedWriteCloser) Write(data []byte) (int, error) {
+func (w *bridgeWriteCloser) Write(data []byte) (int, error) {
 	if w.closed {
 		return 0, errors.New("write to closed file")
 	}
-	w.buffer = append(w.buffer, data...)
-	return len(data), nil
-}
-
-func (w *bufferedWriteCloser) Close() error {
-	if w.closed {
-		return nil
-	}
-	w.closed = true
 
 	w.fsys.mu.Lock()
 	defer w.fsys.mu.Unlock()
-
-	data := w.buffer
-	if w.appendMode {
-		existing, err := fs.ReadFile(w.fsys, w.path)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-		data = append(existing, data...)
+	if err := w.fsys.AppendFile(w.path, data, 0o644); err != nil {
+		return 0, err
 	}
-	return w.fsys.WriteFile(w.path, data, 0o644)
+	return len(data), nil
+}
+
+func (w *bridgeWriteCloser) Close() error {
+	w.closed = true
+	return nil
 }
 
 type environment struct {
@@ -133,11 +121,16 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 					if err := fsys.WriteFile(resolvedPath, nil, 0o644); err != nil {
 						return nil, err
 					}
+				} else if _, err := fs.Stat(fsys, resolvedPath); errors.Is(err, fs.ErrNotExist) {
+					if err := fsys.WriteFile(resolvedPath, nil, 0o644); err != nil {
+						return nil, err
+					}
+				} else if err != nil {
+					return nil, err
 				}
-				return &bufferedWriteCloser{
-					fsys:       fsys,
-					path:       resolvedPath,
-					appendMode: appendMode,
+				return &bridgeWriteCloser{
+					fsys: fsys,
+					path: resolvedPath,
 				}, nil
 			},
 			ReadFile: func(p string) ([]byte, error) {
@@ -161,11 +154,7 @@ func wasmPal(fsys *bridgeFS, cwd string, stderr, stdout io.Writer, signals pal.S
 				if err := createParentDirs(fsys, resolved); err != nil {
 					return err
 				}
-				current, err := fs.ReadFile(fsys, resolved)
-				if err != nil && !errors.Is(err, fs.ErrNotExist) {
-					return err
-				}
-				return fsys.WriteFile(resolved, append(current, data...), 0o644)
+				return fsys.AppendFile(resolved, data, 0o644)
 			},
 		},
 		OS: pal.OS{
