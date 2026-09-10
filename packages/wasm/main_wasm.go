@@ -192,7 +192,7 @@ func test(_ js.Value, args []js.Value) any {
 				return
 			}
 			if diags := result.Diagnostics(); diags.HasErrors() {
-				printDiagnostics(stderr, diags, diagnostics.NewDiagnosticEnv())
+				printDiagnostics(fsys, testPath, stderr, diags, diagnostics.NewDiagnosticEnv())
 				return
 			}
 
@@ -200,12 +200,12 @@ func test(_ js.Value, args []js.Value) any {
 			pkg := project.CurrentPackage()
 			compilation := pkg.Compilation()
 			if diags := compilation.DiagnosticResult(); diags.HasErrors() {
-				printDiagnostics(stderr, diags, compilation.DiagnosticEnv())
+				printDiagnostics(fsys, testPath, stderr, diags, compilation.DiagnosticEnv())
 				return
 			}
 			backend := projects.NewBallerinaBackend(compilation)
 			if diags := backend.DiagnosticResult(); diags.HasErrors() {
-				printDiagnostics(stderr, diags, compilation.DiagnosticEnv())
+				printDiagnostics(fsys, testPath, stderr, diags, compilation.DiagnosticEnv())
 				return
 			}
 			birPkgs := backend.BIRPackages()
