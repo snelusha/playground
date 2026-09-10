@@ -18,6 +18,7 @@ interface BallerinaContextValue {
 	progress: number;
 	error: Error | null;
 	run(path: string, onEvent: RunEventCallback): Promise<void>;
+	test(path: string, onEvent: RunEventCallback): Promise<void>;
 	sendStopSignal(): Promise<void>;
 	dispatchHttpRequest(
 		request: HttpDispatchRequest,
@@ -81,6 +82,14 @@ export function BallerinaProvider({ children }: React.PropsWithChildren) {
 		[fs],
 	);
 
+	const test = React.useCallback(
+		async (path: string, onEvent: RunEventCallback): Promise<void> => {
+			const snapshot = await SnapshotFS.from(fs, path);
+			await requireClient(clientRef.current).test(snapshot, path, onEvent);
+		},
+		[fs],
+	);
+
 	const sendStopSignal = React.useCallback(async (): Promise<void> => {
 		await requireClient(clientRef.current).sendStopSignal();
 	}, []);
@@ -98,10 +107,11 @@ export function BallerinaProvider({ children }: React.PropsWithChildren) {
 			progress,
 			error,
 			run,
+			test,
 			sendStopSignal,
 			dispatchHttpRequest,
 		}),
-		[isReady, progress, error, run, sendStopSignal, dispatchHttpRequest],
+		[isReady, progress, error, run, test, sendStopSignal, dispatchHttpRequest],
 	);
 
 	return (

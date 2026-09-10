@@ -22,6 +22,11 @@ declare const self: typeof globalThis & {
 		path: string,
 		onEvent: RunEventCallback,
 	) => Promise<void>;
+	test: (
+		fs: SnapshotFS,
+		path: string,
+		onEvent: RunEventCallback,
+	) => Promise<void>;
 	sendStopSignal: () => Promise<boolean>;
 	dispatchHttpRequest: (
 		request: HttpDispatchRequest,
@@ -105,6 +110,15 @@ const api: BallerinaWorkerAPI = {
 		if (typeof self.run !== "function")
 			throw new Error("Ballerina runtime is not initialized");
 		return self.run(snapshot, path, onEvent);
+	},
+	test: async (
+		snapshot: SnapshotFS,
+		path: string,
+		onEvent: RunEventCallback,
+	): Promise<void> => {
+		if (typeof self.test !== "function")
+			throw new Error("Ballerina runtime is not initialized");
+		return self.test(snapshot, path, onEvent);
 	},
 	sendStopSignal: async () => {
 		if (typeof self.sendStopSignal !== "function")

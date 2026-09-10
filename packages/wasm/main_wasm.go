@@ -18,23 +18,30 @@ package main
 
 import (
 	"fmt"
-	_ "github.com/ballerina-nutcracker/ballerina/lib/rt"
-	"github.com/ballerina-nutcracker/ballerina/platform/pal"
-	"github.com/ballerina-nutcracker/ballerina/projects"
-	"github.com/ballerina-nutcracker/ballerina/runtime"
-	"github.com/ballerina-nutcracker/ballerina/tools/diagnostics"
 	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path"
+	"playground/testerina"
 	"strings"
 	"syscall/js"
+
+	_ "github.com/ballerina-nutcracker/ballerina/lib/rt"
+	"github.com/ballerina-nutcracker/ballerina/platform/pal"
+	"github.com/ballerina-nutcracker/ballerina/projects"
+	"github.com/ballerina-nutcracker/ballerina/runtime"
+	"github.com/ballerina-nutcracker/ballerina/tools/diagnostics"
+
+	"github.com/ballerina-nutcracker/ballerina/bir"
+	"github.com/ballerina-nutcracker/ballerina/compilerplugin"
+	_ "github.com/ballerina-nutcracker/ballerina/lib/rt"
 )
 
 func main() {
 	js.Global().Set("run", js.FuncOf(run))
+	js.Global().Set("test", js.FuncOf(test))
 
 	js.Global().Set("sendStopSignal", js.FuncOf(sendStopSignal))
 	js.Global().Set("dispatchHttpRequest", js.FuncOf(dispatchHttpRequest))
@@ -139,6 +146,120 @@ func run(_ js.Value, args []js.Value) any {
 			_ = <-rt.ExitStatus
 		}()
 	})
+}
+
+// test compiles the package at the supplied path and executes its Testerina
+// tests. It mirrors the `bal test` pipeline while using the browser PAL.
+func test(_ js.Value, args []js.Value) any {
+	return newPromise(func(resolve js.Value, _ js.Value) {
+		go func() {
+			onEvent := js.Null()
+			if len(args) >= 3 {
+				onEvent = args[2]
+			}
+			stderr := outputWriter{onEvent: onEvent, stream: "stderr"}
+			stdout := outputWriter{onEvent: onEvent, stream: "stdout"}
+			done := func() { resolve.Invoke(js.Undefined()) }
+
+			signalSource, signals := newSignalSource()
+			if !activeRun.begin(signalSource) {
+				signalSource.cleanup()
+				fmt.Fprintln(stderr, "another Ballerina execution is already active")
+				done()
+				return
+			}
+			defer activeRun.end(signalSource)
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Fprintf(stderr, "%v\n", r)
+				}
+				done()
+			}()
+
+			if len(args) < 2 {
+				fmt.Fprintln(stderr, "expected at least 2 arguments: (fsProxy, path[, onEvent])")
+				return
+			}
+
+			testPath := args[1].String()
+			fsys := NewBridgeFS(args[0])
+			collector := testerina.NewCollector()
+			result, err := projects.Load(fsys, testPath, projects.ProjectLoadConfig{
+				CompilerPlugins: []compilerplugin.InjectedPlugin{collector.Plugin()},
+			})
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+				return
+			}
+			if diags := result.Diagnostics(); diags.HasErrors() {
+				printDiagnostics(stderr, diags, diagnostics.NewDiagnosticEnv())
+				return
+			}
+
+			project := result.Project()
+			pkg := project.CurrentPackage()
+			compilation := pkg.Compilation()
+			if diags := compilation.DiagnosticResult(); diags.HasErrors() {
+				printDiagnostics(stderr, diags, compilation.DiagnosticEnv())
+				return
+			}
+			backend := projects.NewBallerinaBackend(compilation)
+			if diags := backend.DiagnosticResult(); diags.HasErrors() {
+				printDiagnostics(stderr, diags, compilation.DiagnosticEnv())
+				return
+			}
+			birPkgs := backend.BIRPackages()
+			if len(birPkgs) == 0 {
+				fmt.Fprintln(stderr, "BIR generation failed: no BIR package produced")
+				return
+			}
+
+			schedule := testerina.NewSchedule(collector.Plan(rootModuleOrder(pkg)), nil)
+			runTestSchedule(project, birPkgs, fsys, testPath, stderr, stdout, signalSource, signals, schedule)
+		}()
+	})
+}
+
+func rootModuleOrder(pkg *projects.Package) []testerina.ModuleKey {
+	rootDescriptor := pkg.Descriptor()
+	var order []testerina.ModuleKey
+	for _, module := range pkg.Compilation().Resolution().ModuleDependencyGraph().ToTopologicallySortedList() {
+		if module.PackageDescriptor().Equals(rootDescriptor) {
+			order = append(order, testerina.ModuleKey{Org: module.Org().Value(), Module: module.Name().String()})
+		}
+	}
+	return order
+}
+
+func runTestSchedule(
+	project projects.Project,
+	birPkgs []*bir.BIRPackage,
+	fsys *bridgeFS,
+	testPath string,
+	stderr, stdout io.Writer,
+	signalSource *signalSource,
+	signals pal.SignalSource,
+	schedule testerina.Schedule,
+) {
+	platform := wasmPal(fsys, getWorkingDir(fsys, testPath), stderr, stdout, signals)
+	runner := testerina.NewRunner(platform, platform.Signals.Signals, project.Environment().TypeEnv())
+	rt := runtime.NewRuntime(runner.Platform(), project.Environment().TypeEnv())
+	activeRun.setRuntime(signalSource, rt)
+	for _, birPkg := range birPkgs {
+		if err := rt.Init(*birPkg); err != nil {
+			fmt.Fprintln(stderr, err)
+			rt.Listen()
+			runner.Shutdown(rt)
+			return
+		}
+	}
+	rt.Listen()
+	runner.Start(rt)
+	reporter := testerina.NewPlainReporter(stdout)
+	summary := runner.Run(schedule, reporter)
+	runner.Shutdown(rt)
+	summary.RunFailures = runner.RunFailures()
+	reporter.End(summary)
 }
 
 func sendStopSignal(_ js.Value, _ []js.Value) any {

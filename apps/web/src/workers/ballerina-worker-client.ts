@@ -52,6 +52,15 @@ export class BallerinaWorkerClient {
 		return this.api.run(Comlink.proxy(snapshot), path, Comlink.proxy(onEvent));
 	}
 
+	async test(
+		snapshot: SnapshotFS,
+		path: string,
+		onEvent: RunEventCallback,
+	): Promise<void> {
+		if (!this.api) throw new Error("Ballerina runtime is not ready");
+		return this.api.test(Comlink.proxy(snapshot), path, Comlink.proxy(onEvent));
+	}
+
 	async sendStopSignal(): Promise<void> {
 		if (!this.api) throw new Error("Ballerina runtime is not ready");
 		await this.api.sendStopSignal();

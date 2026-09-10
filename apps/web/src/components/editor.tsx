@@ -10,11 +10,19 @@ import {
 	LayoutRightIcon,
 	PlayIcon,
 	StopIcon,
+	TestTube01Icon,
 } from "@hugeicons/core-free-icons";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -357,12 +365,14 @@ function RightPane({ listenerAddresses }: { listenerAddresses: string[] }) {
 
 function EditorPane({
 	onRun,
+	onTest,
 	isRunning,
 	onStop,
 	onToggleOutput,
 	outputCollapsed = false,
 }: {
 	onRun: () => Promise<void>;
+	onTest: () => Promise<void>;
 	isRunning: boolean;
 	onStop: () => Promise<void>;
 	onToggleOutput?: () => void;
@@ -395,28 +405,58 @@ function EditorPane({
 					{activeFile ? basename(activeFile.path) : "No file selected"}
 				</span>
 				<div className="flex h-full">
-					<Button
-						className="h-full"
-						variant="ghost"
-						data-testid="run-button"
-						onClick={isRunning ? () => void onStop() : () => void onRun()}
-						disabled={
-							!isRunning &&
-							(!activeFile || getLanguage(activeFile.path) !== "ballerina")
-						}
-					>
-						{!isRunning ? (
-							<>
-								<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
-								<span className="min-w-7.5">Run</span>
-							</>
-						) : (
-							<>
-								<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
-								<span className="min-w-7.5">Stop</span>
-							</>
-						)}
-					</Button>
+					<ButtonGroup className="h-full">
+						<Button
+							className="h-full"
+							variant="ghost"
+							data-testid="run-button"
+							onClick={isRunning ? () => void onStop() : () => void onRun()}
+							disabled={
+								!isRunning &&
+								(!activeFile || getLanguage(activeFile.path) !== "ballerina")
+							}
+						>
+							{!isRunning ? (
+								<>
+									<HugeiconsIcon icon={PlayIcon} strokeWidth={1.5} />
+									<span className="min-w-7.5">Run</span>
+								</>
+							) : (
+								<>
+									<HugeiconsIcon icon={StopIcon} strokeWidth={1.5} />
+									<span className="min-w-7.5">Stop</span>
+								</>
+							)}
+						</Button>
+						<DropdownMenu>
+							<DropdownMenuTrigger
+								render={
+									<Button
+										className="h-full"
+										variant="ghost"
+										size="icon"
+										aria-label="Run options"
+										disabled={
+											isRunning ||
+											!activeFile ||
+											getLanguage(activeFile.path) !== "ballerina"
+										}
+									/>
+								}
+							>
+								<HugeiconsIcon icon={ChevronDown} strokeWidth={1.5} />
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-28">
+								<DropdownMenuItem
+									data-testid="test-button"
+									onClick={() => void onTest()}
+								>
+									<HugeiconsIcon icon={TestTube01Icon} strokeWidth={1.5} />
+									Test
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</ButtonGroup>
 					{onToggleOutput && (
 						<Button
 							className="h-full w-10 border-l"
@@ -454,11 +494,13 @@ function EditorPane({
 
 function EditorWorkspace({
 	onRun,
+	onTest,
 	isRunning,
 	onStop,
 	listenerAddresses,
 }: {
 	onRun: () => Promise<void>;
+	onTest: () => Promise<void>;
 	isRunning: boolean;
 	onStop: () => Promise<void>;
 	listenerAddresses: string[];
@@ -478,6 +520,7 @@ function EditorWorkspace({
 	const editorPane = (
 		<EditorPane
 			onRun={onRun}
+			onTest={onTest}
 			isRunning={isRunning}
 			onStop={onStop}
 			onToggleOutput={isDesktop ? toggleOutputPanel : undefined}
@@ -553,7 +596,8 @@ function EditorHeader() {
 function EditorContent() {
 	const fs = useFS();
 
-	const { isReady, progress, error, run, sendStopSignal } = useBallerina();
+	const { isReady, progress, error, run, test, sendStopSignal } =
+		useBallerina();
 
 	const activeFile = useActiveFile();
 
@@ -599,6 +643,31 @@ function EditorContent() {
 		}
 	}, [activeFile, fs, saveFile, run, openOutputWith, appendOutput, isRunning]);
 
+	const handleTest = React.useCallback(async () => {
+		if (isRunning) return;
+		if (!activeFile || getLanguage(activeFile.path) !== "ballerina") return;
+
+		setIsRunning(true);
+		setListenerAddresses([]);
+		try {
+			await saveFile();
+			const target = await getBallerinaProjectTarget(fs, activeFile.path);
+			openOutputWith("");
+			await test(target, (event) => {
+				if (event.type === "output") appendOutput(event.text);
+			});
+		} catch (cause) {
+			const message =
+				cause instanceof Error
+					? cause.message
+					: "Failed to run Ballerina tests";
+			appendOutput(`\n${message}\n`);
+			toast.error(message);
+		} finally {
+			setIsRunning(false);
+		}
+	}, [activeFile, fs, saveFile, test, openOutputWith, appendOutput, isRunning]);
+
 	const handleStop = React.useCallback(async () => {
 		try {
 			await sendStopSignal();
@@ -629,6 +698,7 @@ function EditorContent() {
 				<main className="flex flex-1 min-h-0">
 					<EditorWorkspace
 						onRun={handleRun}
+						onTest={handleTest}
 						isRunning={isRunning}
 						onStop={handleStop}
 						listenerAddresses={listenerAddresses}

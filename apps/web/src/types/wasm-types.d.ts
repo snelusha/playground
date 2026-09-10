@@ -9,6 +9,7 @@ declare global {
 	export interface Window {
 		Go: any;
 		run(proxy: FS, path: string, onEvent: RunEventCallback): Promise<void>;
+		test(proxy: FS, path: string, onEvent: RunEventCallback): Promise<void>;
 		getDiagnostics: (
 			proxy: FS,
 			path: string,

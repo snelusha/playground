@@ -39,6 +39,11 @@ export interface BallerinaWorkerAPI {
 		path: string,
 		onEvent: RunEventCallback,
 	): Promise<void>;
+	test(
+		snapshot: SnapshotFS,
+		path: string,
+		onEvent: RunEventCallback,
+	): Promise<void>;
 	sendStopSignal(): Promise<void>;
 	dispatchHttpRequest(
 		request: HttpDispatchRequest,
