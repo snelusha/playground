@@ -9,12 +9,8 @@ declare global {
 	export interface Window {
 		Go: any;
 		run(proxy: FS, path: string, onEvent: RunEventCallback): Promise<void>;
-		getDiagnostics: (
-			proxy: FS,
-			path: string,
-		) => Promise<Array<Record<string, any>> | null>;
-		dispatchHttpRequest: (
+		dispatchHttpRequest(
 			request: HttpDispatchRequest,
-		) => Promise<HttpDispatchResponse>;
+		): Promise<HttpDispatchResponse>;
 	}
 }

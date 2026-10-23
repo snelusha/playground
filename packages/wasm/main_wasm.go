@@ -39,7 +39,8 @@ func main() {
 	js.Global().Set("sendStopSignal", js.FuncOf(sendStopSignal))
 	js.Global().Set("dispatchHttpRequest", js.FuncOf(dispatchHttpRequest))
 
-	js.Global().Set("getDiagnostics", js.FuncOf(getDiagnostics))
+	js.Global().Set("startLanguageServer", js.FuncOf(startLanguageServer))
+	js.Global().Set("sendLanguageServerMessage", js.FuncOf(sendLanguageServerMessage))
 
 	select {}
 }
@@ -281,44 +282,6 @@ func headersToJS(headers http.Header) map[string]any {
 	return mapped
 }
 
-func getDiagnostics(_ js.Value, args []js.Value) any {
-	return newPromise(func(resolve js.Value, reject js.Value) {
-		defer func() {
-			if r := recover(); r != nil {
-				resolve.Invoke(js.ValueOf([]any{}))
-			}
-		}()
-
-		if len(args) < 2 {
-			resolve.Invoke(js.ValueOf([]any{}))
-			return
-		}
-
-		proxy := args[0]
-		path := args[1].String()
-		fsys := NewBridgeFS(proxy)
-
-		result, err := projects.Load(fsys, path)
-		if err != nil {
-			resolve.Invoke(js.ValueOf([]any{}))
-			return
-		}
-
-		if result.Diagnostics().HasErrors() {
-			resolve.Invoke(mapDiagnostics(result.Diagnostics().Diagnostics(), diagnostics.NewDiagnosticEnv()))
-			return
-		}
-
-		compilation := result.Project().CurrentPackage().Compilation()
-		if compilation.DiagnosticResult().HasErrors() {
-			resolve.Invoke(mapDiagnostics(compilation.DiagnosticResult().Diagnostics(), compilation.DiagnosticEnv()))
-			return
-		}
-
-		resolve.Invoke(js.ValueOf([]any{}))
-	})
-}
-
 type outputWriter struct {
 	onEvent js.Value
 	stream  string
@@ -338,26 +301,4 @@ func emitEvent(onEvent js.Value, event map[string]any) {
 		return
 	}
 	onEvent.Invoke(event)
-}
-
-func mapDiagnostics(diags []diagnostics.Diagnostic, de *diagnostics.DiagnosticEnv) []any {
-	mapped := make([]any, 0, len(diags))
-	for _, d := range diags {
-		location := d.Location()
-		if diagnostics.IsLocationEmpty(location) || !diagnostics.LocationHasSource(location) {
-			continue
-		}
-
-		start := map[string]any{"line": de.StartLine(location), "character": de.StartColumn(location)}
-		end := map[string]any{"line": de.EndLine(location), "character": de.EndColumn(location)}
-		mapped = append(mapped, map[string]any{
-			"range": map[string]any{
-				"start": start,
-				"end":   end,
-			},
-			"severity": 1,
-			"message":  d.Message(),
-		})
-	}
-	return mapped
 }

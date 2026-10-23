@@ -26,10 +26,11 @@ declare const self: typeof globalThis & {
 	dispatchHttpRequest: (
 		request: HttpDispatchRequest,
 	) => Promise<HttpDispatchResponse>;
-	getDiagnostics: (
+	startLanguageServer: (
 		fs: SnapshotFS,
-		path: string,
-	) => Promise<Array<Record<string, unknown>>>;
+		onMessage: (message: string) => void,
+	) => unknown;
+	sendLanguageServerMessage: (message: string) => unknown;
 };
 
 async function fetchWithProgress(
@@ -120,13 +121,17 @@ const api: BallerinaWorkerAPI = {
 			throw new Error("Ballerina runtime is not initialized");
 		return self.dispatchHttpRequest(request);
 	},
-	getDiagnostics: (
-		snapshot: SnapshotFS,
-		path: string,
-	): Promise<Array<Record<string, unknown>>> => {
-		if (typeof self.getDiagnostics !== "function")
+	startLanguageServer: async (snapshot, onMessage): Promise<void> => {
+		if (typeof self.startLanguageServer !== "function")
 			throw new Error("Ballerina runtime is not initialized");
-		return Promise.resolve(self.getDiagnostics(snapshot, path) ?? []);
+		const result = self.startLanguageServer(snapshot, onMessage);
+		if (typeof result === "string") throw new Error(result);
+	},
+	languageServerMessage: async (message): Promise<void> => {
+		if (typeof self.sendLanguageServerMessage !== "function")
+			throw new Error("Ballerina runtime is not initialized");
+		const result = self.sendLanguageServerMessage(message);
+		if (typeof result === "string") throw new Error(result);
 	},
 };
 

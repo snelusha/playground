@@ -42,7 +42,7 @@ import { ShikiEditor } from "@/components/shiki-editor";
 import { useEditorStore } from "@/stores/editor-store";
 import { useFileTreeActions } from "@/stores/file-tree-store";
 
-import { BallerinaLS } from "@/lib/ballerina-ls";
+import { BallerinaLS, fileURI } from "@/lib/ballerina-ls";
 import { cn } from "@/lib/utils";
 
 import type { KeyBinding } from "@codemirror/view";
@@ -225,7 +225,10 @@ export function CodeEditor({
 			},
 			extensions: [
 				...baseExtensions(hotkeysRef),
-				ballerinaLSPClient.plugin(filePath ?? ""),
+				ballerinaLSPClient.plugin(
+					fileURI(filePath ?? "/untitled.bal"),
+					"ballerina",
+				),
 				languageCompartment.current.of(
 					language === "ballerina" ? ballerinaMode : [],
 				),

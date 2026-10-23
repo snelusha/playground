@@ -43,8 +43,9 @@ export interface BallerinaWorkerAPI {
 	dispatchHttpRequest(
 		request: HttpDispatchRequest,
 	): Promise<HttpDispatchResponse>;
-	getDiagnostics(
+	startLanguageServer(
 		snapshot: SnapshotFS,
-		path: string,
-	): Promise<Array<Record<string, unknown>>>;
+		onMessage: (message: string) => void,
+	): Promise<void>;
+	languageServerMessage(message: string): Promise<void>;
 }

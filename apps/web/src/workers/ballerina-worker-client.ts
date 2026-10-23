@@ -64,12 +64,20 @@ export class BallerinaWorkerClient {
 		return this.api.dispatchHttpRequest(request);
 	}
 
-	async getDiagnostics(
+	async startLanguageServer(
 		snapshot: SnapshotFS,
-		path: string,
-	): Promise<Array<Record<string, unknown>>> {
+		onMessage: (message: string) => void,
+	): Promise<void> {
 		if (!this.api) throw new Error("Ballerina runtime is not ready");
-		return this.api.getDiagnostics(Comlink.proxy(snapshot), path);
+		return this.api.startLanguageServer(
+			Comlink.proxy(snapshot),
+			Comlink.proxy(onMessage),
+		);
+	}
+
+	async languageServerMessage(message: string): Promise<void> {
+		if (!this.api) throw new Error("Ballerina runtime is not ready");
+		return this.api.languageServerMessage(message);
 	}
 
 	dispose() {
