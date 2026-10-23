@@ -41,7 +41,6 @@ func main() {
 
 	js.Global().Set("startLanguageServer", js.FuncOf(startLanguageServer))
 	js.Global().Set("sendLanguageServerMessage", js.FuncOf(sendLanguageServerMessage))
-	js.Global().Set("flushLanguageServer", js.FuncOf(flushLanguageServer))
 
 	select {}
 }

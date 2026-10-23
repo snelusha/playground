@@ -31,7 +31,6 @@ declare const self: typeof globalThis & {
 		onMessage: (message: string) => void,
 	) => unknown;
 	sendLanguageServerMessage: (message: string) => unknown;
-	flushLanguageServer: () => unknown;
 };
 
 async function fetchWithProgress(
@@ -132,12 +131,6 @@ const api: BallerinaWorkerAPI = {
 		if (typeof self.sendLanguageServerMessage !== "function")
 			throw new Error("Ballerina runtime is not initialized");
 		const result = self.sendLanguageServerMessage(message);
-		if (typeof result === "string") throw new Error(result);
-	},
-	flushLanguageServer: async (): Promise<void> => {
-		if (typeof self.flushLanguageServer !== "function")
-			throw new Error("Ballerina runtime is not initialized");
-		const result = self.flushLanguageServer();
 		if (typeof result === "string") throw new Error(result);
 	},
 };
