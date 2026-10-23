@@ -48,4 +48,5 @@ export interface BallerinaWorkerAPI {
 		onMessage: (message: string) => void,
 	): Promise<void>;
 	languageServerMessage(message: string): Promise<void>;
+	flushLanguageServer(): Promise<void>;
 }

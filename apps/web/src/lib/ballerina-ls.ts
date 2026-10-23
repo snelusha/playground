@@ -19,6 +19,7 @@ export class BallerinaLS implements Transport {
 	private handlers: ((value: string) => void)[] = [];
 	private pending: string[] = [];
 	private starting: Promise<void> | null = null;
+	private flushTimer: ReturnType<typeof setTimeout> | null = null;
 	private started = false;
 
 	send(message: string): void {
@@ -87,7 +88,16 @@ export class BallerinaLS implements Transport {
 
 	private async forward(message: string): Promise<void> {
 		try {
-			await getBallerinaWorkerClient().languageServerMessage(message);
+			const client = getBallerinaWorkerClient();
+			await client.languageServerMessage(message);
+			if ((JSON.parse(message) as JSONRPCMessage).method === "textDocument/didChange") {
+				if (this.flushTimer) clearTimeout(this.flushTimer);
+				this.flushTimer = setTimeout(() => {
+					void client.flushLanguageServer().catch((error: unknown) => {
+						console.error("Ballerina language-server flush failed", error);
+					});
+				}, 200);
+			}
 		} catch (error) {
 			console.error("Ballerina language-server transport failed", error);
 		}

@@ -141,6 +141,18 @@ func startLanguageServer(_ js.Value, args []js.Value) any {
 	return js.Null()
 }
 
+func flushLanguageServer(_ js.Value, _ []js.Value) any {
+	activeLanguageServer.Lock()
+	instance := activeLanguageServer.instance
+	activeLanguageServer.Unlock()
+	if instance == nil {
+		return js.ValueOf("language server is not started")
+	}
+	instance.compiler.Flush()
+	instance.bus.Flush()
+	return js.Null()
+}
+
 func sendLanguageServerMessage(_ js.Value, args []js.Value) any {
 	if len(args) != 1 || args[0].Type() != js.TypeString {
 		return js.ValueOf("sendLanguageServerMessage: expected a JSON-RPC message")

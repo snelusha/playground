@@ -17,12 +17,12 @@
 package main
 
 import (
+	"fmt"
 	_ "github.com/ballerina-nutcracker/ballerina/lib/rt"
 	"github.com/ballerina-nutcracker/ballerina/platform/pal"
 	"github.com/ballerina-nutcracker/ballerina/projects"
 	"github.com/ballerina-nutcracker/ballerina/runtime"
 	"github.com/ballerina-nutcracker/ballerina/tools/diagnostics"
-	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -41,6 +41,7 @@ func main() {
 
 	js.Global().Set("startLanguageServer", js.FuncOf(startLanguageServer))
 	js.Global().Set("sendLanguageServerMessage", js.FuncOf(sendLanguageServerMessage))
+	js.Global().Set("flushLanguageServer", js.FuncOf(flushLanguageServer))
 
 	select {}
 }

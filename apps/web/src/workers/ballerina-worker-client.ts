@@ -80,6 +80,11 @@ export class BallerinaWorkerClient {
 		return this.api.languageServerMessage(message);
 	}
 
+	async flushLanguageServer(): Promise<void> {
+		if (!this.api) throw new Error("Ballerina runtime is not ready");
+		return this.api.flushLanguageServer();
+	}
+
 	dispose() {
 		this.worker?.terminate();
 		this.worker = null;
