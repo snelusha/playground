@@ -15,10 +15,10 @@ import (
 	"sync"
 	"syscall/js"
 
-	"ballerina/ls/core/compile"
-	"ballerina/ls/core/event"
-	"ballerina/ls/core/workspace"
-	"ballerina/ls/server"
+	"github.com/ballerina-nutcracker/ballerina/ls/core/compile"
+	"github.com/ballerina-nutcracker/ballerina/ls/core/event"
+	"github.com/ballerina-nutcracker/ballerina/ls/core/workspace"
+	"github.com/ballerina-nutcracker/ballerina/ls/server"
 )
 
 // languageServerTransport adapts browser messages to the framed byte stream

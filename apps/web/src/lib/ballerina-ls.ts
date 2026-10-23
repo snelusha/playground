@@ -29,6 +29,10 @@ export class BallerinaLS implements Transport {
 
 		this.pending.push(message);
 		const request = JSON.parse(message) as JSONRPCMessage;
+		if (request.method === "initialize") {
+			this.startWhenFileIsReady();
+			return;
+		}
 		if (request.method !== "textDocument/didOpen") return;
 		const uri = request.params?.textDocument?.uri;
 		if (uri) this.start(uri);
@@ -40,6 +44,15 @@ export class BallerinaLS implements Transport {
 
 	unsubscribe(handler: (value: string) => void): void {
 		this.handlers = this.handlers.filter((h) => h !== handler);
+	}
+
+	private startWhenFileIsReady(): void {
+		const activeFile = useFileTreeStore.getState().activeFile;
+		if (useFileTreeStore.getState().ready && activeFile) {
+			this.start(fileURI(activeFile.path));
+			return;
+		}
+		setTimeout(() => this.startWhenFileIsReady(), 10);
 	}
 
 	private start(uri: string): void {
@@ -60,6 +73,7 @@ export class BallerinaLS implements Transport {
 		const targetPath = await getBallerinaProjectTarget(fs, filePath);
 		const snapshot = await SnapshotFS.from(fs, targetPath);
 		const client = getBallerinaWorkerClient();
+		await client.init(() => undefined);
 
 		await client.startLanguageServer(snapshot, (message) => {
 			for (const handler of this.handlers) handler(message);

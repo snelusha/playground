@@ -220,8 +220,10 @@ export function CodeEditor({
 			defaultColor: "light",
 			themeStyle: "cm",
 			onUpdate: (update) => {
-				if (update.docChanged)
+				if (update.docChanged) {
 					onChangeRef.current?.(update.state.doc.toString());
+					queueMicrotask(() => ballerinaLSPClient.sync());
+				}
 			},
 			extensions: [
 				...baseExtensions(hotkeysRef),
